@@ -1,0 +1,16 @@
+ok I have an idea for a small app or powershell wrapper that I want you help me build. Ok the problem is this: I have 3 accounts of claude code on this machine as you know and
+  I need to have all 3 of them open at the same time on my pc on different powershell sessions. 1 of the 3 is instead always opened on the claude desktop app which is the best
+  way to work with claude code on desktop, I find working on cc on powershell cumbersombe: there's no search keyword, no ctrl+v paste of images and files and directories (yes
+  there are the commands for that but come on), no easy access to the other sessions opened on the same account, no easy way to see and add skills plugins and connectors,
+  cumbersome to see config and usage of tokens and context, no easy view on file changes, no direct embedded browser, no easy subagent view, hard to scroll and go back and edit
+  the prompt, no way to cntrl shift to go on multiple lines without triggering the prompt to be accepted and much more things the claude desktop app does well. Now I am not
+  directly suiggesting creating a lighter copy of the claude code app, but maybe I am. At least what I have in mind would be a powershell wrapper, inside you are still using cc
+  in powershell but then the app we build around gives you some more features like other sessions visibility and switch, search bar, context usage, token usage, file changes,
+  subagent view, contrl v of files, images, videos, links, directories, easy effort, model and mode switch.
+
+I want you to plan this app using /agents-team.
+This app needs to be availble on native windows pc, so a .NET or a c++ app with simple UI, we are basically adding a GUI to powershell.
+I want you to take inspiration from the Claude desktop app, see online how it is how it works and think on how to make a lighter versión, not for the public, it's just for me. It would be cool to even have the GitHub account switch. And when you open it it should ask which Claude account you want, like streaming platforms do, or else like IDE do a list of all recent sessions each marked on which Claude profile did it.
+
+LEt's brainstorm this idea before jumping onto it.
+Also let's talk technical on which type of language and dev env to run this app on, and what I need to install for you to work on it, I am thinking that visual studio installer mught already have what we need.
