@@ -20,6 +20,7 @@ public partial class TerminalHost : UserControl
     readonly Dictionary<Guid, Tab> _tabs = [];
     readonly TaskCompletionSource _pageReady = new();
     Task? _ready;
+    Tab? _shown; // the terminal the page is showing
 
     /// <summary>The exit overlay's Close button was clicked; the handler removes the session and calls <see cref="Close"/>.</summary>
     public event EventHandler<LiveSession>? CloseRequested;
@@ -69,6 +70,7 @@ public partial class TerminalHost : UserControl
     public void Show(LiveSession session)
     {
         if (!_tabs.TryGetValue(session.TabId, out var tab)) return;
+        _shown = tab;
         Post(new { t = "show", id = tab.Id });
         Web.Focus();
     }
@@ -83,6 +85,7 @@ public partial class TerminalHost : UserControl
         tab.Size?.TrySetResult((0, 0)); // unblock a start still waiting for the page
         tab.Feed?.Dispose();
         session.Channel = null;
+        session.Pid = null;
         session.Status = SessionStatus.Exited;
         Post(new { t = "close", id = tab.Id });
     }
@@ -105,6 +108,7 @@ public partial class TerminalHost : UserControl
     {
         await Ready;
         tab.Size = new();
+        _shown = tab;
         Post(new { t = "open", id = tab.Id }); // the page shows the terminal, fits it and answers with its size
         var (cols, rows) = await tab.Size.Task;
         tab.Size = null;
@@ -126,6 +130,7 @@ public partial class TerminalHost : UserControl
         }
         if (!_tabs.ContainsValue(tab)) { pty.Dispose(); return; }
         tab.Pty = pty;
+        tab.Session.Pid = pty.Pid;
         tab.Session.Channel = tab;
     }
 
@@ -159,6 +164,7 @@ public partial class TerminalHost : UserControl
         Flush(tab);
         tab.Pty = null;
         tab.Session.Channel = null;
+        tab.Session.Pid = null;
         tab.Session.Status = SessionStatus.Exited;
         Post(new { t = "exit", id = tab.Id, code });
     }
@@ -176,10 +182,40 @@ public partial class TerminalHost : UserControl
         core.SetVirtualHostNameToFolderMapping(new Uri(Origin).Host,
             Path.Combine(AppContext.BaseDirectory, "Terminal", "wwwroot"), CoreWebView2HostResourceAccessKind.Deny);
         core.WebMessageReceived += OnMessage;
+        core.ProcessFailed += OnProcessFailed;
         core.NewWindowRequested += (_, e) => { e.Handled = true; OpenLink(e.Uri); };
         core.NavigationStarting += (_, e) => e.Cancel = !e.Uri.StartsWith(Origin, StringComparison.OrdinalIgnoreCase);
         core.Navigate(Origin + "index.html");
         await _pageReady.Task;
+    }
+
+    // Renderer crash: the xterm buffers and the acks that unblock PtySession are gone and claude.exe would stall. Choice: end every
+    // running session (Resume restores it from its transcript) and reload, rather than re-attach to blank screens.
+    void OnProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
+    {
+        if (e.ProcessFailedKind != CoreWebView2ProcessFailedKind.RenderProcessExited) return;
+        foreach (var tab in _tabs.Values.Where(t => t.Pty is not null).ToList())
+        {
+            var pty = tab.Pty;
+            tab.Pty = null;
+            pty?.Dispose();
+            lock (tab.Pending) tab.Pending.Clear();
+            tab.Session.Channel = null;
+            tab.Session.Pid = null;
+            tab.Session.Status = SessionStatus.Exited;
+        }
+        Web.CoreWebView2.Reload();
+    }
+
+    // The reloaded page has no terminals: recreate them, with the exit overlay (Resume, Close) on the ended ones.
+    void RestoreTerminals()
+    {
+        foreach (var tab in _tabs.Values)
+        {
+            Post(new { t = "open", id = tab.Id });
+            if (tab.Size is null) Post(new { t = "exit", id = tab.Id, code = -1 }); // else a start is waiting for this open's size
+        }
+        if (_shown is { } shown && _tabs.ContainsValue(shown)) Post(new { t = "show", id = shown.Id });
     }
 
     void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
@@ -191,7 +227,9 @@ public partial class TerminalHost : UserControl
 
         switch (S("t"))
         {
-            case "ready": _pageReady.TrySetResult(); return;
+            case "ready":
+                if (!_pageReady.TrySetResult()) RestoreTerminals(); // the page reloaded after a renderer crash
+                return;
             case "copy": SetClipboard(S("d")); return;
             case "link": OpenLink(S("url")); return;
         }

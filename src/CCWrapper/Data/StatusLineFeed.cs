@@ -3,8 +3,9 @@ using CCWrapper.Core;
 
 namespace CCWrapper.Data;
 
-/// <summary>Feeds the relay's <c>live\&lt;TabId&gt;.json</c> into its session: StatusLine, plus SessionId, TranscriptPath
-/// and Cwd when present. Values are set on the thread that created the feed (the UI thread). Dispose deletes the file.</summary>
+/// <summary>Feeds the relay's <c>live\&lt;TabId&gt;.json</c> into its session: StatusLine, plus SessionId and TranscriptPath
+/// when present. Cwd is not touched: it follows Claude's own <c>cd</c> (see <c>StatusLine.Cwd</c>), the launcher's stays.
+/// Values are set on the thread that created the feed (the UI thread). Dispose deletes the file.</summary>
 public sealed class StatusLineFeed : IDisposable
 {
     public static string LiveDir =>
@@ -51,7 +52,6 @@ public sealed class StatusLineFeed : IDisposable
         _session.StatusLine = data;
         if (data.SessionId is { } id) _session.SessionId = id;
         if (data.TranscriptPath is { } path) _session.TranscriptPath = path;
-        if (data.Cwd is { } cwd) _session.Cwd = cwd;
     }
 
     public void Dispose()

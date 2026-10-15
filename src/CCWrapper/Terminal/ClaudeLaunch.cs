@@ -38,6 +38,7 @@ public static class ClaudeLaunch
     [
         "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_EFFORT", "CLAUDE_CODE_SSE_PORT",
         "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_PID",
+        "AI_AGENT", "CLAUDE_CODE_EXECPATH",
     ];
 
     /// <summary>The parent env copied minus the parent Claude Code session's variables, then the account's keys, then CCW_TAB and COLORTERM.</summary>

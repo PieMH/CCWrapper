@@ -109,6 +109,21 @@ public sealed class FileChangesTests : IDisposable
     }
 
     [Fact]
+    public void Binary_compare_reads_a_file_that_another_process_has_open_for_writing()
+    {
+        var live = Path.Combine(_cwd, "live.bin");
+        File.WriteAllBytes(live, [1, 0, 3]);
+        Backup("hb@v1", [1, 0, 2]); // same size as the file, so the bytes are compared
+        Write(Delta("live.bin", "hb@v1", 1));
+        using var writer = new FileStream(live, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+
+        var c = Find(new FileChanges(_paths, _transcript, _cwd).Refresh(), "live.bin");
+
+        Assert.True(c.IsBinary);
+        Assert.Equal(3L, c.CurrentSize);
+    }
+
+    [Fact]
     public void Deleted_file_is_a_missing_file_on_disk()
     {
         var c = Find(Scenario().Refresh(), "gone.txt");
