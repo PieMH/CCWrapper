@@ -134,6 +134,8 @@ public partial class ComposeBox : UserControl
 public static class TuiInput
 {
     public const string ClearInputFirst = "Clear the terminal input first: the command would be added to the text there";
+    public const string BashModeFirst = "Clear the terminal input first: it is in bash mode (!) and the text would run as a shell command";
+    const string StatusUnreadable = "Could not read Claude Code's status — try again";
     const int ScreenRows = 12;
 
     static readonly HashSet<LiveSession> Switching = []; // UI thread only
@@ -164,26 +166,36 @@ public static class TuiInput
     }
 
     /// <summary><see cref="BlockedReason"/> with the session's registry entry (by pid, else session id) read now rather than
-    /// as of the last poll: a prompt that opened since then would take the next key. The mode switch itself passes
+    /// as of the last poll: a prompt that opened since then would take the next key. The tab's own pid must have an entry
+    /// (its file may be torn mid-write: read again a few times), else it is blocked. The mode switch itself passes
     /// <paramref name="switching"/>.</summary>
     public static async Task<string?> FreshBlockedReasonAsync(LiveSession s, bool switching = false)
     {
         if ((switching ? Blocked(s) : BlockedReason(s)) is { } why) return why;
         try
         {
-            var running = await Task.Run(() => SessionCatalog.Running(s.Account));
+            var running = await Task.Run(() =>
+            {
+                for (var tries = 1; ; tries++)
+                {
+                    var r = SessionCatalog.Running(s.Account); // reads each file once: a torn one is silently missing
+                    if (s.Pid is not { } pid || r.Any(x => x.Pid == pid) || tries == 4) return r;
+                    Thread.Sleep(50);
+                }
+            });
+            if (s.Pid is { } pid && !running.Any(r => r.Pid == pid)) return StatusUnreadable; // fail closed
             return ShellModel.MapStatus([s], running).Select(m => m.Registry).FirstOrDefault() is { Status: SessionStatus.Waiting } r
                 ? WaitingText(r.WaitingFor) : null;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return "Could not read Claude Code's status: try again"; // fail closed
+            return StatusUnreadable; // fail closed
         }
     }
 
     /// <summary>One bracketed paste, then Enter after <see cref="EnterDelay"/> (an Enter sent with the paste would be taken as
-    /// part of it). The registry is read again right before each. A slash command is refused while the TUI's own input holds
-    /// text. Null when it went in, else why not.</summary>
+    /// part of it). The registry is read again right before each. Any text is refused while the TUI's input is in bash mode
+    /// (it would run as a shell command), and a slash command while it holds text. Null when it went in, else why not.</summary>
     public static async Task<string?> SubmitAsync(LiveSession? s, string text)
     {
         var refusal = await TrySubmitAsync(s, text);
@@ -194,8 +206,12 @@ public static class TuiInput
     static async Task<string?> TrySubmitAsync(LiveSession? s, string text)
     {
         if (s is null || BlockedReason(s) is not null) return BlockedReason(s);
-        if (text.StartsWith('/') && s.Channel is IScreenChannel screen && HasPromptText(await screen.ReadTailAsync(ScreenRows)))
-            return ClearInputFirst;
+        if (s.Channel is IScreenChannel screen)
+        {
+            var tail = await screen.ReadTailAsync(ScreenRows);
+            if (InBashMode(tail)) return BashModeFirst;
+            if (text.StartsWith('/') && HasPromptText(tail)) return ClearInputFirst;
+        }
         if (await FreshBlockedReasonAsync(s) is { } before) return before;
         if (!s.SendText(text)) return BlockedReason(s) ?? "Not sent";
         await Task.Delay(EnterDelay(text.Length));
@@ -206,16 +222,30 @@ public static class TuiInput
     /// <summary>A long paste takes the TUI longer to take in: 80 ms + 1 ms per 100 characters, at most 1 s.</summary>
     public static TimeSpan EnterDelay(int length) => TimeSpan.FromMilliseconds(Math.Min(1000, 80 + length / 100));
 
-    /// <summary>True when the TUI's prompt row holds typed text: the last "❯ " or "> " row right under a ─ rule (Claude Code
-    /// frames its input with rules or a box), so echoed prompts in the transcript and status line rows do not count.
+    /// <summary>True when the TUI's input holds typed text: its prompt row, a "❯ ", "> " or bash-mode "! " row, has typed text or
+    /// continuation rows. See <see cref="PromptOf"/>.
     /// shortcut: the placeholder is told apart only by its 'Try "' start (colors are not read); revisit if Claude Code changes it.</summary>
-    public static bool HasPromptText(string? screen)
+    public static bool HasPromptText(string? screen) => PromptOf(screen) is { Text: true };
+
+    /// <summary>True when the TUI's prompt row starts with the bash-mode "!", typed text or not.</summary>
+    public static bool InBashMode(string? screen) => PromptOf(screen) is { Marker: '!' };
+
+    static readonly Regex Rule = new(@"^\s*[╭┌╰└]?─{3,}"), PromptRow = new(@"^\s*│?\s*([❯>!])(?:\s+(.*?))?\s*│?\s*$");
+
+    /// <summary>The last prompt row that has a ─ rule (or box border) right above it and another below it (after the
+    /// continuation rows of a multi-line input), as Claude Code frames its input; so echoed prompts in the transcript and
+    /// a status line under the box do not count. Null when none.</summary>
+    static (char Marker, bool Text)? PromptOf(string? screen)
     {
         var rows = (screen ?? "").Split('\n').Where(l => l.Trim().Length > 0).ToList();
-        for (var i = rows.Count - 1; i > 0; i--)
-            if (Regex.IsMatch(rows[i - 1], @"^\s*[╭┌]?─{3,}") && Regex.Match(rows[i], @"^\s*│?\s*[❯>](?:\s+(.*?))?\s*│?\s*$") is { Success: true } m)
-                return m.Groups[1].Value is { Length: > 0 } typed && !typed.StartsWith("Try \"");
-        return false;
+        for (var i = rows.Count - 2; i > 0; i--)
+        {
+            if (!Rule.IsMatch(rows[i - 1]) || PromptRow.Match(rows[i]) is not { Success: true } m) continue;
+            var continued = rows.Skip(i + 1).TakeWhile(r => !Rule.IsMatch(r)).Count();
+            if (i + 1 + continued == rows.Count) continue; // no rule below
+            return (m.Groups[1].Value[0], continued > 0 || (m.Groups[2].Value is { Length: > 0 } typed && !typed.StartsWith("Try \"")));
+        }
+        return null;
     }
 }
 
