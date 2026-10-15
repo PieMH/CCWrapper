@@ -1,0 +1,6 @@
+<Window x:Class="CCWrapper.Views.TranscriptWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TranscriptWindow" Width="800" Height="600">
+    <TextBlock Text="TranscriptWindow (TODO T7)" Margin="8" Opacity="0.6" />
+</Window>

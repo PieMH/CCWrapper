@@ -1,0 +1,6 @@
+<Window x:Class="CCWrapper.Views.FileDiffWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FileDiffWindow" Width="800" Height="600">
+    <TextBlock Text="FileDiffWindow (TODO T7)" Margin="8" Opacity="0.6" />
+</Window>
