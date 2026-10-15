@@ -103,6 +103,41 @@ public sealed class ShellTests
     }
 
     [Fact]
+    public void An_exited_session_shows_no_dot_unless_a_process_still_runs()
+    {
+        var ended = Live("s1", SessionStatus.Exited);
+        var catalog = new[] { Entry("s1", "Ended", @"C:\p\open", TimeSpan.FromHours(1)) };
+        Assert.Equal("", Assert.Single(SessionRow.Build(catalog, [ended], null, Now)).Dot);
+        Assert.Equal("", Assert.Single(SessionRow.Build([], [ended], null, Now)).Dot);
+
+        var running = new[] { Entry("s1", "Ended", @"C:\p\open", TimeSpan.FromHours(1), Reg("s1", SessionStatus.Idle)) };
+        Assert.Equal("○", Assert.Single(SessionRow.Build(running, [ended], null, Now)).Dot);
+    }
+
+    [Fact]
+    public void Rows_compare_equal_across_refreshes_unless_something_shown_changes()
+    {
+        static SessionRow Row(SessionStatus status, long updated, TimeSpan ago) => Assert.Single(SessionRow.Build(
+            [Entry("away", "Elsewhere", @"C:\p\away", ago, Reg("away", status, updated: updated))], [], null, Now));
+
+        var before = Row(SessionStatus.Busy, 1, TimeSpan.FromSeconds(5));
+        Assert.Equal(before, Row(SessionStatus.Busy, 4, TimeSpan.FromSeconds(2))); // only Running.UpdatedAt and LastActivity moved
+        Assert.True(before == Row(SessionStatus.Busy, 4, TimeSpan.FromSeconds(2)));
+        Assert.Equal(before.GetHashCode(), Row(SessionStatus.Busy, 4, TimeSpan.Zero).GetHashCode());
+        Assert.NotEqual(before, Row(SessionStatus.Idle, 4, TimeSpan.FromSeconds(2))); // the dot changed
+        Assert.NotEqual(before, Row(SessionStatus.Busy, 4, TimeSpan.FromMinutes(5))); // the age text changed
+    }
+
+    [Theory]
+    [InlineData(@"C:\proj\", @"C:\proj")]
+    [InlineData(@"C:\proj", @"C:\proj")]
+    [InlineData(@"  ""C:/proj/sub/""  ", @"C:\proj\sub")]
+    [InlineData(@"C:\", @"C:\")]
+    [InlineData("", "")]
+    [InlineData("a\0b", "a\0b")] // unusable text is passed on; Directory.Exists then says no
+    public void Typed_folders_lose_their_trailing_separator(string typed, string folder) => Assert.Equal(folder, ShellModel.NormalizeFolder(typed));
+
+    [Fact]
     public void Rows_filter_on_title_and_project_or_restrict_to_search_hits()
     {
         var catalog = new[] { Entry("s1", "Fix login", @"C:\p\Alpha", TimeSpan.FromHours(1)), Entry("s2", "Docs", @"C:\p\Beta", TimeSpan.FromHours(2)) };

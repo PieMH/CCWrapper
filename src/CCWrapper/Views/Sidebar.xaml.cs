@@ -152,11 +152,11 @@ public partial class Sidebar : UserControl
         SettingsMenu.IsOpen = true;
     }
 
-    // The slash commands need a running terminal to type into.
+    // The slash commands need a terminal that takes input: not while a prompt or dialog is open (the Enter would answer it).
     void OnSettingsOpened(object sender, RoutedEventArgs e)
     {
         foreach (var item in SettingsMenu.Items.OfType<MenuItem>().Where(m => m.Tag is string t && t.StartsWith('/')))
-            item.IsEnabled = State.ActiveSession?.Channel is not null;
+            item.IsEnabled = TuiInput.BlockedReason(State.ActiveSession) is null;
     }
 
     void OnOpenFile(object sender, RoutedEventArgs e)
@@ -173,10 +173,10 @@ public partial class Sidebar : UserControl
         catch (Win32Exception) when (File.Exists(path)) { Process.Start("notepad.exe", $"\"{path}\""); } // no program registered for the type
     }
 
-    void OnSlash(object sender, RoutedEventArgs e)
+    async void OnSlash(object sender, RoutedEventArgs e)
     {
-        if (State.ActiveSession is { } session && sender is MenuItem { Tag: string command } && session.SendText(command))
-            session.SendKeys("\r");
+        // SubmitAsync checks BlockedReason again: a prompt may have opened since the menu did.
+        if (State.ActiveSession is { } session && sender is MenuItem { Tag: string command }) await TuiInput.SubmitAsync(session, command);
     }
 
     void OnCustomize(object sender, RoutedEventArgs e)

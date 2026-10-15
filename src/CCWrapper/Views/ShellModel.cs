@@ -41,6 +41,15 @@ public static class ShellModel
     public static string ProjectOf(string? cwd) =>
         string.IsNullOrWhiteSpace(cwd) ? "" : Path.GetFileName(Path.TrimEndingDirectorySeparator(cwd)) is { Length: > 0 } name ? name : cwd;
 
+    /// <summary>A typed or picked project folder as a full path without a trailing separator, so that <c>C:\proj\</c> and
+    /// <c>C:\proj</c> both map to Claude Code's <c>C--proj</c> transcript folder. Unusable text is returned trimmed.</summary>
+    public static string NormalizeFolder(string typed)
+    {
+        var path = typed.Trim().Trim('"');
+        try { return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)); }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return path; }
+    }
+
     /// <summary>The registry state of every open session that has a live claude process, matched by session id.
     /// Exited sessions are left alone.</summary>
     public static IEnumerable<(LiveSession Session, SessionStatus Status, string? WaitingFor)> MapStatus(
@@ -74,12 +83,20 @@ public sealed record RecentRow(SessionEntry Entry, string Letter, string Color, 
 }
 
 /// <summary>One row of the sidebar: a transcript of the account merged with the session open in this window.
-/// Record equality lets the sidebar leave unchanged rows alone when it refreshes.</summary>
+/// Equality lets the sidebar leave unchanged rows alone when it refreshes.</summary>
 /// <param name="Live">The tab in this window, or null.</param>
 /// <param name="Entry">The transcript, or null for a session that has not written one yet.</param>
 public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Live, string Title, string Project, string Age,
     string Dot, string DotColor, bool IsActive, string? Snippet, string Tip)
 {
+    // Entry is left out: its Running.UpdatedAt changes on every refresh of a busy session and nothing shows it, so
+    // comparing it would rebuild the ListBoxItem (selection, tooltip, in-flight click). What the row shows is compared.
+    public bool Equals(SessionRow? other) => other is not null && Key == other.Key && Live == other.Live && Title == other.Title
+        && Project == other.Project && Age == other.Age && Dot == other.Dot && DotColor == other.DotColor && IsActive == other.IsActive
+        && Snippet == other.Snippet && Tip == other.Tip;
+
+    public override int GetHashCode() => Key.GetHashCode();
+
     public bool IsOpen => Live is not null;
 
     /// <summary>A claude process that is not a tab of this window (another window, PowerShell, Desktop).</summary>
@@ -113,7 +130,7 @@ public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Li
     static SessionRow Make(SessionEntry? entry, LiveSession? live, string id, LiveSession? active, DateTimeOffset now, string? snippet)
     {
         var cwd = entry?.Cwd ?? live?.Cwd;
-        var hasProcess = live is not null || entry?.Running is not null;
+        var hasProcess = (live is not null && live.Status != SessionStatus.Exited) || entry?.Running is not null;
         var status = live?.Status ?? entry?.Running?.Status ?? SessionStatus.Unknown;
         var waitingFor = live?.WaitingFor ?? entry?.Running?.WaitingFor;
         var (dot, color) = !hasProcess ? ("", "#9A9A9A") : status switch
