@@ -109,7 +109,7 @@ public partial class MainWindow : Window, IAppCommands
     /// <summary>Open here: show it. Running elsewhere: read-only transcript. Otherwise resume it in its folder.</summary>
     public async Task OpenEntry(SessionEntry entry, string? query = null)
     {
-        if (_state.OpenSessions.FirstOrDefault(s => s.SessionId == entry.Id) is { } open) Activate(open);
+        if (ShellModel.Match(_state.OpenSessions, entry.Running?.Pid, entry.Id) is { } open) Activate(open);
         else if (entry.Running is not null) ShowTranscript(entry.Path, entry.Title, query);
         else if (entry.Cwd is not { } cwd || !Directory.Exists(cwd))
             MessageBox.Show(this, $"The session's folder does not exist any more:\n{entry.Cwd ?? "(unknown)"}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -209,7 +209,7 @@ public partial class MainWindow : Window, IAppCommands
 
     // ---- status ----
 
-    /// <summary>Copies the claude registry's status of each open session onto it; a session turning Waiting flashes the taskbar.</summary>
+    /// <summary>Copies the claude registry's status of each open session onto it (matched by pid, so a /clear keeps the tab's status); a session turning Waiting flashes the taskbar.</summary>
     async Task PollStatusAsync()
     {
         if (_polling || _state.OpenSessions.Count == 0) return;
@@ -217,12 +217,13 @@ public partial class MainWindow : Window, IAppCommands
         try
         {
             var running = await Task.Run(() => SessionCatalog.Running(_state.Account)); // reads files
-            foreach (var (session, status, waitingFor) in ShellModel.MapStatus(_state.OpenSessions.ToList(), running))
+            foreach (var (session, registry) in ShellModel.MapStatus(_state.OpenSessions.ToList(), running))
             {
+                ShellModel.Adopt(session, registry); // /clear or /resume in the TUI: the pid stays, the session id changes
                 var was = session.Status;
-                session.Status = status;
-                session.WaitingFor = waitingFor;
-                if (status == SessionStatus.Waiting && was != SessionStatus.Waiting) FlashAttention(session);
+                session.Status = registry.Status;
+                session.WaitingFor = registry.WaitingFor;
+                if (registry.Status == SessionStatus.Waiting && was != SessionStatus.Waiting) FlashAttention(session);
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // registry changing: the next poll catches up

@@ -50,15 +50,29 @@ public static class ShellModel
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return path; }
     }
 
-    /// <summary>The registry state of every open session that has a live claude process, matched by session id.
-    /// Exited sessions are left alone.</summary>
-    public static IEnumerable<(LiveSession Session, SessionStatus Status, string? WaitingFor)> MapStatus(
+    /// <summary>The open session a claude process belongs to: by pid first (the tab spawned it; /clear and an in-TUI /resume
+    /// change the session id but not the pid), then by session id. Exited sessions have no pid and match by id only.</summary>
+    public static LiveSession? Match(IEnumerable<LiveSession> open, int? pid, string id) =>
+        open.FirstOrDefault(s => pid is { } p && s.Pid == p) ?? open.FirstOrDefault(s => s.SessionId == id);
+
+    /// <summary>The registry entry of every open session that has a live claude process; exited sessions are left alone.
+    /// Per session its own pid's entry wins, else the newest entry of its session id.</summary>
+    public static IEnumerable<(LiveSession Session, RunningSession Registry)> MapStatus(
         IEnumerable<LiveSession> open, IReadOnlyList<RunningSession> running)
     {
-        var byId = running.GroupBy(r => r.SessionId).ToDictionary(g => g.Key, g => g.MaxBy(r => r.UpdatedAt)!);
-        foreach (var s in open)
-            if (s.Status != SessionStatus.Exited && s.SessionId is { } id && byId.TryGetValue(id, out var r))
-                yield return (s, r.Status, r.WaitingFor);
+        var alive = open.Where(s => s.Status != SessionStatus.Exited).ToList();
+        foreach (var g in running.Select(r => (Reg: r, Tab: Match(alive, r.Pid, r.SessionId))).Where(x => x.Tab is not null).GroupBy(x => x.Tab!))
+            yield return (g.Key, g.OrderByDescending(x => x.Reg.Pid == g.Key.Pid).ThenByDescending(x => x.Reg.UpdatedAt).First().Reg);
+    }
+
+    /// <summary>A session whose registry entry carries another id (after /clear or /resume inside the TUI) follows it:
+    /// new id, its transcript and the registry name as title.</summary>
+    public static void Adopt(LiveSession session, RunningSession registry)
+    {
+        if (session.SessionId == registry.SessionId) return;
+        session.SessionId = registry.SessionId;
+        if (session.Cwd is { } cwd) session.TranscriptPath = session.Account.Paths.Transcript(cwd, registry.SessionId);
+        if (registry.Name is { Length: > 0 } name) session.Title = name;
     }
 }
 
@@ -112,14 +126,19 @@ public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Li
         foreach (var s in open) if (s.SessionId is { } id) live.TryAdd(id, s);
 
         var rows = new List<(DateTimeOffset At, SessionRow Row)>();
+        var matched = new HashSet<LiveSession>(); // tabs that own a transcript row, by pid or id
         foreach (var e in catalog)
             if (hits is null || hits.ContainsKey(e.Id))
-                rows.Add((e.LastActivity, Make(e, live.GetValueOrDefault(e.Id), e.Id, active, now, hits?.GetValueOrDefault(e.Id)?.Snippet)));
+            {
+                var tab = ShellModel.Match(open, e.Running?.Pid, e.Id);
+                if (tab is not null) matched.Add(tab);
+                rows.Add((e.LastActivity, Make(e, tab, e.Id, active, now, hits?.GetValueOrDefault(e.Id)?.Snippet)));
+            }
         if (hits is null)
         {
             var known = catalog.Select(e => e.Id).ToHashSet();
             foreach (var (id, l) in live)
-                if (!known.Contains(id)) rows.Add((now, Make(null, l, id, active, now, null))); // no transcript yet: newest
+                if (!known.Contains(id) && !matched.Contains(l)) rows.Add((now, Make(null, l, id, active, now, null))); // no transcript yet: newest
         }
 
         var all = rows.OrderByDescending(r => r.At).Select(r => r.Row);
