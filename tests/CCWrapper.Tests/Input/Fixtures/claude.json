@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tool": { "type": "stdio", "command": "C:\\Tools\\tool.exe", "args": ["mcp", "--flag"], "env": { "SECRET": "x" } },
+    "remote": { "type": "http", "url": "https://example.test/mcp?token=secret" }
+  },
+  "projects": {
+    "C:/Work/Proj": { "mcpServers": { "local": { "command": "node", "args": ["server.js"] } } },
+    "C:/Work/Other": { "mcpServers": { "other": { "command": "x" } } }
+  }
+}

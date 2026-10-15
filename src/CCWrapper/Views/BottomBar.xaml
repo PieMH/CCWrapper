@@ -1,5 +1,24 @@
 <UserControl x:Class="CCWrapper.Views.BottomBar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <TextBlock Text="BottomBar (TODO T6)" Margin="8" Opacity="0.6" />
+    <WrapPanel Margin="8,4" VerticalAlignment="Center">
+        <WrapPanel.Resources>
+            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="Padding" Value="8,2" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+                <Setter Property="Margin" Value="0,2,6,2" />
+            </Style>
+            <Style TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="10,2,0,2" />
+            </Style>
+        </WrapPanel.Resources>
+        <Button x:Name="ModelButton" Click="OnModel" />
+        <Button x:Name="EffortButton" Click="OnEffort" />
+        <Button x:Name="ModeButton" Click="OnMode" />
+        <TextBlock x:Name="CtxText" ToolTip="Context window: last turn's tokens / window size" />
+        <TextBlock x:Name="SpendText" ToolTip="Session tokens in / out, and cost" />
+        <TextBlock x:Name="UsageText" />
+    </WrapPanel>
 </UserControl>

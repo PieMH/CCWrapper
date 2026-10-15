@@ -1,5 +1,85 @@
 <UserControl x:Class="CCWrapper.Views.CustomizePage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <TextBlock Text="CustomizePage (TODO T6)" Margin="8" Opacity="0.6" />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CCWrapper.Views">
+    <UserControl.Resources>
+        <Style x:Key="Header" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,18,0,6" />
+        </Style>
+        <Style x:Key="Dim" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16">
+            <TextBlock x:Name="Heading" FontSize="18" FontWeight="SemiBold" />
+            <WrapPanel Margin="0,10,0,0">
+                <WrapPanel.Resources>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Setter Property="Padding" Value="10,4" />
+                        <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="Margin" Value="0,0,8,4" />
+                    </Style>
+                </WrapPanel.Resources>
+                <Button Content="Manage plugins" ToolTip="Runs /plugin in the active session" Click="OnManagePlugins" />
+                <Button Content="Manage MCP" ToolTip="Runs /mcp in the active session" Click="OnManageMcp" />
+                <Button Content="Connectors on claude.ai" Click="OnOpenConnectors" />
+            </WrapPanel>
+            <TextBlock x:Name="Status" Opacity="0.7" TextWrapping="Wrap" />
+
+            <TextBlock x:Name="PluginsHeader" Style="{StaticResource Header}" />
+            <ItemsControl x:Name="Plugins">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:PluginRow}">
+                        <DockPanel Margin="0,2">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding State}" Opacity="0.8" />
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Dim}" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock x:Name="SkillsHeader" Style="{StaticResource Header}" />
+            <ItemsControl x:Name="Skills">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:SkillRow}">
+                        <StackPanel Margin="0,3" ToolTip="{Binding Description}">
+                            <DockPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Source}" Style="{StaticResource Dim}" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding Description}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock x:Name="McpHeader" Style="{StaticResource Header}" />
+            <ItemsControl x:Name="Mcp">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type local:McpRow}">
+                        <StackPanel Margin="0,3">
+                            <DockPanel>
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Source}" Style="{StaticResource Dim}" />
+                            </DockPanel>
+                            <TextBlock Text="{Binding Detail}" Opacity="0.7" TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <DockPanel Margin="0,18,0,6">
+                <Button x:Name="LoadButton" DockPanel.Dock="Right" Content="Load" Padding="10,4" MinHeight="0" ToolTip="Runs claude mcp list for this account" Click="OnLoadConnectors" />
+                <TextBlock Text="Connectors" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </DockPanel>
+            <TextBox x:Name="ConnectorOutput" IsReadOnly="True" FontFamily="Consolas" MaxHeight="320" MinHeight="48"
+                     TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                     Text="Click Load to list MCP servers and claude.ai connectors (runs claude mcp list)." />
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

@@ -1,5 +1,20 @@
 <UserControl x:Class="CCWrapper.Views.ComposeBox"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <TextBlock Text="ComposeBox (TODO T6)" Margin="8" Opacity="0.6" />
+    <Grid Margin="8,6">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock x:Name="Notice" Grid.ColumnSpan="2" Margin="2,0,0,4" Foreground="#E0B050" TextWrapping="Wrap" Visibility="Collapsed" />
+        <TextBox x:Name="Input" Grid.Row="1" MinHeight="40" MaxHeight="180" AcceptsReturn="True" TextWrapping="Wrap"
+                 VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True" AllowDrop="True"
+                 PreviewKeyDown="OnKeyDown" PreviewDragOver="OnDragOver" PreviewDrop="OnDrop" />
+        <Button x:Name="SendButton" Grid.Row="1" Grid.Column="1" Content="Send" Margin="8,0,0,0" VerticalAlignment="Bottom"
+                ToolTip="Enter sends, Shift+Enter adds a line" Click="OnSend" />
+    </Grid>
 </UserControl>
