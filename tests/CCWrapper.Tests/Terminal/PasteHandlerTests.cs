@@ -33,6 +33,13 @@ public sealed class PasteHandlerTests : IDisposable
     }
 
     [Fact]
+    public void Text_drops_ESC_so_a_pasted_end_marker_cannot_end_the_bracketed_paste()
+    {
+        Assert.Equal("a[201~rm -rf /\rb", PasteHandler.Text(new DataObject(DataFormats.UnicodeText, "a\x1b[201~rm -rf /\rb")));
+        Assert.Null(PasteHandler.Text(new DataObject(DataFormats.UnicodeText, "\x1b\x1b")));
+    }
+
+    [Fact]
     public void Bitmap_only_has_no_text_and_compose_saves_a_png()
     {
         var data = new DataObject(DataFormats.Bitmap, Bitmap());

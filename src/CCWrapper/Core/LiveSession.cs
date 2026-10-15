@@ -36,6 +36,9 @@ public sealed class LiveSession(Account account) : Observable
     /// <summary>Latest "permission-mode" record of the transcript, e.g. default, acceptEdits, plan, auto.</summary>
     public string? PermissionMode { get; set => Set(ref field, value); }
 
+    /// <summary>Process id of this tab's claude.exe (matches <c>sessions\&lt;pid&gt;.json</c>); null before it starts and after it exits.</summary>
+    public int? Pid { get; set => Set(ref field, value); }
+
     /// <summary>Attached by the terminal (T2) once the tab's PTY runs; null before and after.</summary>
     public ITerminalChannel? Channel { get; set => Set(ref field, value); }
 

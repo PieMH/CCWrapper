@@ -205,7 +205,7 @@ host.addEventListener('message', e => {
   }
 });
 
-// Read back by the host (smoke test) and by manual checks over DevTools.
+// Read back by the host: TerminalHost.ReadTextAsync (smoke test, bottom bar).
 window.ccw = {
   text(id) {
     const buf = tabs.get(id)?.term.buffer.active;

@@ -35,10 +35,15 @@ public sealed class ClaudeLaunchTests : IDisposable
     public void Env_copies_parent_applies_account_and_adds_tab_vars()
     {
         var tab = Guid.NewGuid();
-        var parent = new Hashtable { ["Path"] = @"C:\bin", ["claude_config_dir"] = "stray", ["COLORTERM"] = "x" };
+        var parent = new Hashtable
+        {
+            ["Path"] = @"C:\bin", ["claude_config_dir"] = "stray", ["COLORTERM"] = "x",
+            ["CLAUDECODE"] = "1", ["ai_agent"] = "claude-code", ["CLAUDE_CODE_EXECPATH"] = @"C:\parent\claude.exe",
+        };
 
         var a = ClaudeLaunch.Env(new Account("a", null, Path.Combine(_dir, ".claude.json"), "A"), tab, parent);
         Assert.False(a.ContainsKey("CLAUDE_CONFIG_DIR"));
+        Assert.All(new[] { "CLAUDECODE", "AI_AGENT", "CLAUDE_CODE_EXECPATH" }, name => Assert.False(a.ContainsKey(name)));
         Assert.Equal(@"C:\bin", a["PATH"]);
         Assert.Equal(tab.ToString(), a["CCW_TAB"]);
         Assert.Equal("truecolor", a["COLORTERM"]);
@@ -76,7 +81,7 @@ public sealed class ClaudeLaunchTests : IDisposable
     [Fact]
     public void Relay_exe_writes_stdin_to_live_json_and_feed_applies_it()
     {
-        var session = new LiveSession(AccountC());
+        var session = new LiveSession(AccountC()) { Cwd = @"C:\launch" };
         using var feed = new StatusLineFeed(session);
         var target = Path.Combine(StatusLineFeed.LiveDir, session.TabId + ".json");
         const string json = """{"session_id":"s9","transcript_path":"C:\\t.jsonl","workspace":{"current_dir":"C:\\w"},"model":{"display_name":"Opus"}}""";
@@ -86,8 +91,10 @@ public sealed class ClaudeLaunchTests : IDisposable
         Assert.Equal(json, File.ReadAllText(target));
 
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (session.StatusLine is null && DateTime.UtcNow < deadline) Thread.Sleep(50);
-        Assert.Equal(("Opus", "s9", @"C:\t.jsonl", @"C:\w"), (session.StatusLine?.ModelName, session.SessionId, session.TranscriptPath, session.Cwd));
+        while (session.TranscriptPath is null && DateTime.UtcNow < deadline) Thread.Sleep(50); // the last value Apply sets
+        // Cwd stays the launcher's: the status line's current_dir follows Claude's own cd.
+        Assert.Equal(("Opus", "s9", @"C:\t.jsonl", @"C:\w", @"C:\launch"),
+            (session.StatusLine?.ModelName, session.SessionId, session.TranscriptPath, session.StatusLine?.Cwd, session.Cwd));
 
         feed.Dispose();
         Assert.False(File.Exists(target));

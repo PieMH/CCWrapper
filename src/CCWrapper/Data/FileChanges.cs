@@ -110,7 +110,7 @@ public sealed class FileChanges(ClaudePaths paths, string transcriptPath, string
         var binary = (!isNew && HasNul(backup!)) || (exists && HasNul(full));
         if (binary)
         {
-            var same = baseSize == currentSize && (isNew || File.ReadAllBytes(backup!).AsSpan().SequenceEqual(File.ReadAllBytes(full)));
+            var same = baseSize == currentSize && (isNew || ReadShared(backup!).AsSpan().SequenceEqual(ReadShared(full)));
             return same ? null : new FileChange(rel, full, kind, true, null, null, baseSize, currentSize, backup);
         }
 
@@ -141,6 +141,15 @@ public sealed class FileChanges(ClaudePaths paths, string transcriptPath, string
         using var s = JsonlReader.OpenShared(path);
         var buf = new byte[8192];
         return Array.IndexOf(buf, (byte)0, 0, s.Read(buf, 0, buf.Length)) >= 0;
+    }
+
+    // Not File.ReadAllBytes: it takes FileShare.Read and would block Claude (or the user) writing the file.
+    static byte[] ReadShared(string path)
+    {
+        using var s = JsonlReader.OpenShared(path);
+        using var m = new MemoryStream();
+        s.CopyTo(m);
+        return m.ToArray();
     }
 
     internal static string? TryReadText(string path)

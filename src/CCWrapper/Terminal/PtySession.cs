@@ -19,6 +19,8 @@ public sealed class PtySession : IDisposable
 
     PtySession(IPtyConnection pty) => _pty = pty;
 
+    public int Pid => _pty.Pid;
+
     /// <param name="env">The complete environment block for the child.</param>
     /// <param name="output">Decoded output, called on the reader thread.</param>
     /// <param name="exited">Called once on the reader thread after the last output, with the exit code (-1 if unknown).</param>
