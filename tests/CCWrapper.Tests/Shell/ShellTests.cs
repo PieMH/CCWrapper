@@ -15,11 +15,11 @@ public sealed class ShellTests
     static SessionEntry Entry(string id, string title, string cwd, TimeSpan ago, RunningSession? running = null) =>
         new(C, id, $@"C:\h\{id}.jsonl", cwd, Now - ago, title) { Running = running };
 
-    static RunningSession Reg(string id, SessionStatus status, string? waitingFor = null, long updated = 0) =>
-        new(1, id, @"C:\p", null, status, waitingFor, "interactive", DateTimeOffset.FromUnixTimeSeconds(updated));
+    static RunningSession Reg(string id, SessionStatus status, string? waitingFor = null, long updated = 0, int pid = 1, string? name = null) =>
+        new(pid, id, @"C:\p", name, status, waitingFor, "interactive", DateTimeOffset.FromUnixTimeSeconds(updated));
 
-    static LiveSession Live(string id, SessionStatus status = SessionStatus.Idle) =>
-        new(C) { SessionId = id, Cwd = @"C:\p\open", Status = status };
+    static LiveSession Live(string id, SessionStatus status = SessionStatus.Idle, int? pid = null) =>
+        new(C) { SessionId = id, Cwd = @"C:\p\open", Status = status, Pid = pid };
 
     [Fact]
     public void Account_colors_are_fixed_by_letter_and_survive_odd_letters()
@@ -70,16 +70,63 @@ public sealed class ShellTests
     }
 
     [Fact]
-    public void MapStatus_matches_open_sessions_by_id_and_skips_exited()
+    public void MapStatus_falls_back_to_the_session_id_and_skips_exited()
     {
         var busy = Live("s1");
         var exited = Live("s2", SessionStatus.Exited);
         var unregistered = Live("s3");
         var result = ShellModel.MapStatus([busy, exited, unregistered],
-            [Reg("s1", SessionStatus.Waiting, "permission", updated: 1), Reg("s1", SessionStatus.Busy, updated: 5), Reg("s2", SessionStatus.Busy)]).ToList();
+            [Reg("s1", SessionStatus.Waiting, "permission", updated: 1), Reg("s1", SessionStatus.Busy, updated: 5, pid: 2), Reg("s2", SessionStatus.Busy)]).ToList();
 
-        var (session, status, waiting) = Assert.Single(result); // the newest registry entry of s1 wins
-        Assert.Equal((busy, SessionStatus.Busy, (string?)null), (session, status, waiting));
+        var (session, registry) = Assert.Single(result); // no pid known: the newest registry entry of s1 wins
+        Assert.Equal((busy, SessionStatus.Busy, (string?)null), (session, registry.Status, registry.WaitingFor));
+    }
+
+    [Fact]
+    public void MapStatus_matches_by_pid_when_the_session_id_changed_and_adopts_the_new_id()
+    {
+        var tab = Live("old", SessionStatus.Busy, pid: 10);
+        tab.TranscriptPath = C.Paths.Transcript(@"C:\p\open", "old");
+        var other = Live("other", pid: 11);
+        var cleared = Reg("new", SessionStatus.Waiting, "permission", pid: 10, name: "After clear");
+
+        var (session, registry) = Assert.Single(ShellModel.MapStatus([tab, other], [cleared, Reg("new", SessionStatus.Idle, updated: 9, pid: 99)]));
+        Assert.Same(tab, session);
+        Assert.Equal(10, registry.Pid); // its own pid wins over a newer entry of the same id from another process
+
+        ShellModel.Adopt(session, registry);
+        Assert.Equal(("new", C.Paths.Transcript(@"C:\p\open", "new"), "After clear"), (tab.SessionId, tab.TranscriptPath, tab.Title));
+        Assert.Equal("other", other.SessionId);
+    }
+
+    [Fact]
+    public void Adopt_leaves_a_session_with_the_same_id_alone()
+    {
+        var tab = Live("s1", pid: 10);
+        tab.Title = "Mine";
+        ShellModel.Adopt(tab, Reg("s1", SessionStatus.Idle, pid: 10, name: "Registry name"));
+        Assert.Equal(("s1", "Mine", null), (tab.SessionId, tab.Title, tab.TranscriptPath));
+    }
+
+    [Fact]
+    public void MapStatus_skips_unmatched_registry_entries_and_exited_tabs_without_a_pid()
+    {
+        var exited = Live("old", SessionStatus.Exited); // Pid is null after exit: only the id could match
+        Assert.Empty(ShellModel.MapStatus([exited], [Reg("new", SessionStatus.Busy, pid: 10), Reg("old", SessionStatus.Busy, pid: 11)]));
+        Assert.Empty(ShellModel.MapStatus([Live("s1", pid: 10)], [Reg("other", SessionStatus.Busy, pid: 11)]));
+    }
+
+    [Fact]
+    public void A_cleared_session_keeps_its_row_instead_of_showing_running_elsewhere()
+    {
+        var tab = Live("old", SessionStatus.Idle, pid: 10); // the poll has not adopted the new id yet
+        var catalog = new[] { Entry("new", "After clear", @"C:\p\open", TimeSpan.FromSeconds(5), Reg("new", SessionStatus.Busy, pid: 10)) };
+
+        var row = Assert.Single(SessionRow.Build(catalog, [tab], tab, Now)); // no second row for the unknown old id
+        Assert.Equal(("new", true, false, true), (row.Key, row.IsOpen, row.IsElsewhere, row.IsActive));
+
+        var rows = SessionRow.Build(catalog, [Live("old", pid: 11)], null, Now); // another pid: the process is really elsewhere
+        Assert.Equal(("new", true), (rows[1].Key, rows[1].IsElsewhere));
     }
 
     [Fact]
