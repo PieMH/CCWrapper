@@ -1,0 +1,84 @@
+using System.Collections;
+using System.IO;
+using System.Text.Json;
+using CCWrapper.Core;
+
+namespace CCWrapper.Terminal;
+
+/// <summary>How to start one claude.exe tab. Optional flags are passed only when set, so the account's own defaults apply.</summary>
+/// <param name="ResumeId">Null starts a new session with a fresh <c>--session-id</c>; otherwise <c>--resume &lt;id&gt;</c>.</param>
+public sealed record LaunchOptions(string Cwd, string? ResumeId = null, string? Model = null, string? Effort = null,
+    string? PermissionMode = null, string? Name = null);
+
+/// <summary>Command line, environment and statusLine relay for claude.exe (docs/PLAN.md, "Launch command per session").</summary>
+public static class ClaudeLaunch
+{
+    public static string AppDataDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CCWrapper");
+
+    /// <summary>claude.exe from PATH, else the bare name (the spawn then fails with a visible error).</summary>
+    public static string FindClaude() =>
+        (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(d => Path.Combine(d.Trim().Trim('"'), "claude.exe")).FirstOrDefault(File.Exists) ?? "claude.exe";
+
+    public static List<string> Args(LaunchOptions o, string sessionId, string? relaySettings)
+    {
+        List<string> args = o.ResumeId is null ? ["--session-id", sessionId] : ["--resume", o.ResumeId];
+        void Add(string flag, string? value) { if (!string.IsNullOrWhiteSpace(value)) args.AddRange([flag, value]); }
+        Add("--model", o.Model);
+        Add("--effort", o.Effort);
+        Add("--permission-mode", o.PermissionMode);
+        Add("-n", o.Name);
+        Add("--settings", relaySettings);
+        return args;
+    }
+
+    /// <summary>The parent env copied, then the account's keys, then CCW_TAB and COLORTERM.</summary>
+    public static Dictionary<string, string> Env(Account account, Guid tabId, IDictionary parent)
+    {
+        var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (DictionaryEntry e in parent) env[(string)e.Key] = e.Value as string ?? "";
+        account.ApplyEnv(env);
+        env["CCW_TAB"] = tabId.ToString();
+        env["COLORTERM"] = "truecolor";
+        return env;
+    }
+
+    /// <summary>The <c>--settings</c> file that installs the relay, or null when a statusLine is already configured.
+    /// --settings outranks user and project settings, so any of them having one means the relay must stay out.</summary>
+    public static string? RelaySettings(Account account, string cwd, string? relayExe = null, string? dir = null)
+    {
+        string[] own = [account.Paths.Settings, Path.Combine(cwd, ".claude", "settings.json"), Path.Combine(cwd, ".claude", "settings.local.json")];
+        if (own.Any(HasStatusLine)) return null;
+
+        relayExe ??= Path.Combine(AppContext.BaseDirectory, "CCWrapper.StatusRelay.exe");
+        // Unquoted with forward slashes so Git Bash and PowerShell both run it.
+        // shortcut: breaks if the install path has spaces; switch to the 8.3 short path if that ever happens.
+        var json = JsonSerializer.Serialize(new { statusLine = new { type = "command", command = relayExe.Replace('\\', '/') } });
+        var path = Path.Combine(dir ?? AppDataDir, "relay-settings.json");
+        try
+        {
+            if (!File.Exists(path) || File.ReadAllText(path) != json)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, json);
+            }
+        }
+        catch (IOException) { } // another window is writing the same content
+        return path;
+    }
+
+    // A raw match survives comments and half-written files; a false positive only skips the relay.
+    static bool HasStatusLine(string settingsPath)
+    {
+        try
+        {
+            using var reader = new StreamReader(JsonlReader.OpenShared(settingsPath));
+            return reader.ReadToEnd().Contains("\"statusLine\"");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false; // missing: no statusLine there
+        }
+    }
+}
