@@ -10,13 +10,19 @@ public static class PasteHandler
     /// <summary>Alt+V: Claude Code's own Windows image paste, which reads the bitmap from the clipboard itself.</summary>
     public const string ImagePasteKeys = "\x1bv";
 
-    /// <summary>Files (Explorer copy) as quoted paths, else the text; null when there is neither (e.g. only a bitmap).
-    /// ESC is dropped from the text: a pasted ESC[201~ would end the bracketed paste early and run the rest as keystrokes.</summary>
+    /// <summary>Files (Explorer copy) as quoted paths, else the text (see <see cref="StripControls"/>); null when there is neither (e.g. only a bitmap).</summary>
     public static string? Text(IDataObject data)
     {
         if (data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) return QuotePaths(files);
-        return data.GetData(DataFormats.UnicodeText) is string raw && raw.Replace("\x1b", "") is { Length: > 0 } text ? text : null;
+        return data.GetData(DataFormats.UnicodeText) is string raw && StripControls(raw) is { Length: > 0 } text ? text : null;
     }
+
+    /// <summary>Drops C0/C1 control characters except tab, CR and LF. ESC most of all: a pasted ESC[201~ would end the
+    /// bracketed paste early and run the rest as keystrokes; the others (Ctrl+C, Ctrl+D, CSI...) could act as keys.</summary>
+    public static string StripControls(string text) => string.Concat(text.Where(c => !char.IsControl(c) || c is '\t' or '\r' or '\n'));
+
+    /// <summary>Text as one bracketed paste for the TUI: newlines as CR (they do not submit inside a paste), no control characters.</summary>
+    public static string Bracketed(string text) => "\x1b[200~" + StripControls(text.ReplaceLineEndings("\r")) + "\x1b[201~";
 
     public static bool HasImage(IDataObject data) => data.GetDataPresent(DataFormats.Bitmap);
 

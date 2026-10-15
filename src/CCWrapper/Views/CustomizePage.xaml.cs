@@ -53,10 +53,9 @@ public partial class CustomizePage : UserControl
 
     async Task SendAsync(string line)
     {
-        var session = AppState.Current.ActiveSession;
-        if (TuiInput.BlockedReason(session) is { } why) { Status.Text = why; return; }
+        if (await TuiInput.SubmitAsync(AppState.Current.ActiveSession, line) is { } why) { Status.Text = why; return; }
         Status.Text = $"Sent {line}: continue in the terminal.";
-        if (await TuiInput.SubmitAsync(session!, line)) Application.Current.MainWindow?.Activate();
+        Application.Current.MainWindow?.Activate();
     }
 
     void OnOpenConnectors(object sender, RoutedEventArgs e) =>
@@ -95,9 +94,12 @@ public static class CustomizeData
     {
         using var installed = JsonUtil.Load(Path.Combine(account.Paths.Plugins, "installed_plugins.json"));
         using var settings = JsonUtil.Load(account.Paths.Settings);
+        using var projectSettings = cwd is null ? null : JsonUtil.Load(Path.Combine(cwd, ".claude", "settings.json"));
+        using var localSettings = cwd is null ? null : JsonUtil.Load(Path.Combine(cwd, ".claude", "settings.local.json"));
         using var global = JsonUtil.Load(account.GlobalConfigPath);
         var g = global?.RootElement ?? default;
-        var plugins = ParsePlugins(installed?.RootElement ?? default, settings?.RootElement ?? default);
+        var plugins = ParsePlugins(installed?.RootElement ?? default,
+            settings?.RootElement ?? default, projectSettings?.RootElement ?? default, localSettings?.RootElement ?? default);
         var skills = ReadSkills(account.Paths.Skills, "user");
         var mcp = ParseMcp(g.Prop("mcpServers"), "user");
         if (cwd is not null)
@@ -116,12 +118,14 @@ public static class CustomizeData
     }
 
     /// <summary>installed_plugins.json {"plugins":{"name@marketplace":[{scope,installPath,version}]}} with the on/off state of
-    /// settings.json "enabledPlugins". The user-scope install wins when a plugin is installed more than once.</summary>
-    public static List<PluginRow> ParsePlugins(JsonElement installed, JsonElement settings)
+    /// the settings files' "enabledPlugins", lowest precedence first (user, project, project local): a later entry wins.
+    /// The user-scope install wins when a plugin is installed more than once.</summary>
+    public static List<PluginRow> ParsePlugins(JsonElement installed, params JsonElement[] settings)
     {
         var plugins = installed.Prop("plugins");
         if (plugins.ValueKind != JsonValueKind.Object) return [];
-        var enabled = settings.Prop("enabledPlugins");
+        bool Enabled(string key) => settings.Select(s => s.Prop("enabledPlugins").Prop(key).ValueKind)
+            .LastOrDefault(k => k is JsonValueKind.True or JsonValueKind.False) == JsonValueKind.True;
         return plugins.EnumerateObject()
             .Select(p =>
             {
@@ -131,7 +135,7 @@ public static class CustomizeData
                 var at = p.Name.LastIndexOf('@');
                 return new PluginRow(at > 0 ? p.Name[..at] : p.Name, at > 0 ? p.Name[(at + 1)..] : "",
                     pick.Prop("version").Str(), pick.Prop("scope").Str(), pick.Prop("installPath").Str(),
-                    enabled.Prop(p.Name).ValueKind == JsonValueKind.True);
+                    Enabled(p.Name));
             })
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -216,7 +220,11 @@ public static class CustomizeData
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
         using var cts = new CancellationTokenSource(timeout);
-        try { await process.WaitForExitAsync(cts.Token); }
+        try
+        {
+            await process.WaitForExitAsync(cts.Token);
+            await Task.WhenAll(stdout, stderr).WaitAsync(cts.Token); // a child left running keeps the pipes open after claude exits
+        }
         catch (OperationCanceledException)
         {
             process.Kill(entireProcessTree: true);

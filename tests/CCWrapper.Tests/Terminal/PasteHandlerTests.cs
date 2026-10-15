@@ -40,6 +40,21 @@ public sealed class PasteHandlerTests : IDisposable
     }
 
     [Fact]
+    public void Control_characters_other_than_tab_cr_lf_are_dropped()
+    {
+        // C0 (Ctrl+C, Ctrl+D, BEL, BS), DEL and C1 (CSI U+009B, NEL U+0085) go; tab, CR, LF and other text stay
+        Assert.Equal("a\tb\r\nc dé€", PasteHandler.StripControls("a\tb\r\n\u0003c\u0004 \u0007\bd\u007f\u009b\u0085é€"));
+        Assert.Equal("x y", PasteHandler.Text(new DataObject(DataFormats.UnicodeText, "x\u0003 \u009by")));
+    }
+
+    [Fact]
+    public void Bracketed_paste_wraps_clean_text_with_cr_newlines()
+    {
+        Assert.Equal("\x1b[200~one\rtwo\rthree[201~x\x1b[201~", PasteHandler.Bracketed("one\r\ntwo\nthree\x1b[201~\u0003x"));
+        Assert.Equal("\x1b[200~\x1b[201~", PasteHandler.Bracketed("\u001b\u009b"));
+    }
+
+    [Fact]
     public void Bitmap_only_has_no_text_and_compose_saves_a_png()
     {
         var data = new DataObject(DataFormats.Bitmap, Bitmap());

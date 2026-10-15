@@ -3,7 +3,6 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 using CCWrapper.Core;
 using CCWrapper.Data;
 using CCWrapper.Terminal;
@@ -16,19 +15,22 @@ public partial class BottomBar : UserControl
     static readonly string[] Efforts = ["low", "medium", "high", "xhigh", "max"];
     static readonly string[] Modes = ["default", "acceptEdits", "plan", "auto"];
     const string ShiftTab = "\x1b[Z";
+    const string SavedAsDefault = "Claude Code saves this as the account's default";
 
-    BarSource? _source;
     BarData? _data;
     LiveSession? _session;
-    TerminalHost? _host;
     (LiveSession Session, string? Mode) _screenMode;
     string? _model, _effort, _mode;
-    bool _switching;
 
     public BottomBar()
     {
         InitializeComponent();
-        _ = new SessionFollower<BarSource, BarData>(this, s => _source = new BarSource(s), r => r.Read(), async d => { _data = d; await ReadScreenModeAsync(); Render(); });
+        _ = new SessionFollower<BarSource, BarData>(this, s => new BarSource(s), r => r.Read(), async d =>
+        {
+            _data = d;
+            if (_session is { } s) await ReadScreenModeAsync(s);
+            Render();
+        });
         _ = new SessionWatch(this, s => { _session = s; Render(); });
     }
 
@@ -46,20 +48,20 @@ public partial class BottomBar : UserControl
         EffortButton.Content = $"effort {_effort ?? BarFormat.None} ▾";
         ModeButton.Content = $"mode {_mode ?? BarFormat.None} ▾";
 
-        var reason = _switching ? "Switching mode…" : TuiInput.BlockedReason(s);
-        foreach (var b in new[] { ModelButton, EffortButton, ModeButton })
-        {
-            b.IsEnabled = reason is null;
-            b.ToolTip = reason;
-        }
+        var reason = TuiInput.BlockedReason(s);
+        foreach (var b in new[] { ModelButton, EffortButton, ModeButton }) b.IsEnabled = reason is null;
+        ModelButton.ToolTip = EffortButton.ToolTip = reason ?? SavedAsDefault;
+        ModeButton.ToolTip = reason;
         CtxText.Text = BarFormat.Ctx(sl, d?.ContextTokens);
         SpendText.Text = BarFormat.Spend(sl, d?.OutputTokens, d?.CostUsd);
         (UsageText.Text, UsageText.ToolTip) = BarFormat.Usage(sl, d?.Account);
     }
 
-    void OnModel(object sender, RoutedEventArgs e) => Open(ModelButton, Models, v => _model?.Contains(v, StringComparison.OrdinalIgnoreCase) == true, v => Send("/model " + v));
+    // A refusal (e.g. text already in the terminal input) shows in the compose box's notice.
+    void OnModel(object sender, RoutedEventArgs e) =>
+        Open(ModelButton, Models, v => _model?.Contains(v, StringComparison.OrdinalIgnoreCase) == true, v => TuiInput.SubmitAsync(_session, "/model " + v));
 
-    void OnEffort(object sender, RoutedEventArgs e) => Open(EffortButton, Efforts, v => v == _effort, v => Send("/effort " + v));
+    void OnEffort(object sender, RoutedEventArgs e) => Open(EffortButton, Efforts, v => v == _effort, v => TuiInput.SubmitAsync(_session, "/effort " + v));
 
     void OnMode(object sender, RoutedEventArgs e) => Open(ModeButton, Modes, v => v == _mode, SetModeAsync);
 
@@ -75,66 +77,54 @@ public partial class BottomBar : UserControl
         menu.IsOpen = true;
     }
 
-    async Task Send(string line)
+    /// <summary>The mode in the terminal's footer (see <see cref="BarFormat.ModeFromScreen"/>), also kept for display; null if
+    /// there is no terminal or no footer.</summary>
+    async Task<string?> ReadScreenModeAsync(LiveSession s)
     {
-        if (_session is { } s) await TuiInput.SubmitAsync(s, line);
+        var tail = s.Channel is IScreenChannel screen ? await screen.ReadTailAsync(BarFormat.FooterRows) : null;
+        _screenMode = (s, BarFormat.ModeFromScreen(tail));
+        return _screenMode.Mode;
     }
 
-    /// <summary>The mode in the terminal's footer (see <see cref="BarFormat.ModeFromScreen"/>); null if there is no terminal or no footer.</summary>
-    async Task ReadScreenModeAsync()
-    {
-        var s = _session;
-        if (s is null) return;
-        _host ??= Window.GetWindow(this) is { } w ? FindHost(w) : null;
-        string? screen = null;
-        try { if (_host is not null) screen = await _host.ReadTextAsync(s); }
-        catch (Exception) { } // WebView2 not up yet or gone: this runs from an async void timer callback, so it must not throw
-        _screenMode = (s, BarFormat.ModeFromScreen(screen));
-    }
-
-    static TerminalHost? FindHost(DependencyObject node)
-    {
-        if (node is TerminalHost host) return host;
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
-            if (FindHost(VisualTreeHelper.GetChild(node, i)) is { } found) return found;
-        return null;
-    }
-
-    async Task<string?> CurrentModeAsync(BarSource src)
-    {
-        _data = await Task.Run(src.Read);
-        await ReadScreenModeAsync();
-        return _screenMode.Session == _session ? _screenMode.Mode ?? _data.Mode : _data.Mode;
-    }
-
-    /// <summary>Shift+Tab until the permission mode is <paramref name="target"/>: at most 6 presses, each waiting up to
-    /// ~3 s for the mode to change. If one never shows, stops and leaves the real mode on display.</summary>
+    /// <summary>Shift+Tab until the footer shows <paramref name="target"/>. Before each press <see cref="ModeCycle.ShouldPress"/>
+    /// decides on the registry read fresh and the footer read just now; after it, waits up to ~3 s for the footer to change.</summary>
     async Task SetModeAsync(string target)
     {
         var s = _session;
-        if (s is null || _source is not { } src || src.Session != s || TuiInput.BlockedReason(s) is not null) return;
-        _switching = true;
+        if (s is null || TuiInput.BlockedReason(s) is not null) return;
+        TuiInput.SetSwitching(s, true);
         Render();
         try
         {
-            var mode = await CurrentModeAsync(src);
-            for (var presses = 0; mode != target && presses < 6 && s.SendKeys(ShiftTab); presses++)
+            var seen = new List<string>();
+            var mode = await ReadScreenModeAsync(s);
+            while (ModeCycle.ShouldPress(await TuiInput.FreshBlockedReasonAsync(s, switching: true), mode, seen, target) && s.SendKeys(ShiftTab))
             {
-                var before = mode;
-                for (var wait = 0; wait < 20 && mode == before; wait++)
+                seen.Add(mode!);
+                for (var wait = 0; wait < 20; wait++)
                 {
                     await Task.Delay(150);
-                    mode = await CurrentModeAsync(src);
+                    if ((mode = await ReadScreenModeAsync(s)) is not null && mode != seen[^1]) break;
                 }
-                if (mode == before) break;
             }
         }
         finally
         {
-            _switching = false;
+            TuiInput.SetSwitching(s, false);
             Render();
         }
     }
+}
+
+/// <summary>The Shift+Tab loop's rule. In a permission dialog Shift+Tab answers "allow all edits", so it only presses on evidence.</summary>
+public static class ModeCycle
+{
+    /// <summary>Whether one more Shift+Tab goes toward <paramref name="target"/>: nothing blocks input (<paramref name="blocked"/>
+    /// read fresh), the footer showed <paramref name="mode"/> just now (never the transcript's), it is not the target yet, and it
+    /// is not in <paramref name="seen"/> (the modes before each earlier press): seeing one again means a full cycle without the
+    /// target, or a press that changed nothing.</summary>
+    public static bool ShouldPress(string? blocked, string? mode, IReadOnlyCollection<string> seen, string target) =>
+        blocked is null && mode is not null && mode != target && !seen.Contains(mode);
 }
 
 /// <summary>What one poll of the active session found. Null fields are unknown.</summary>
@@ -191,12 +181,13 @@ public static class BarFormat
 
     public static string Cost(double? usd) => usd is { } v ? "$" + v.ToString(v < 10 ? "0.00" : "0.0", Inv) : None;
 
-    /// <summary>"ctx 202k/1M 20%". Used tokens are the transcript's last turn, else window x percent; the percent is the status line's, else used / window.</summary>
+    /// <summary>"ctx 200k/1M 20%". Used tokens are window x percent when the status line has both (it stays right after a
+    /// /compact), else the transcript's last turn; the percent is the status line's, else used / window.</summary>
     public static string Ctx(StatusLineData? sl, long? lastTurnTokens)
     {
         var size = sl?.ContextWindowSize;
         var pct = sl?.ContextUsedPercent;
-        var used = lastTurnTokens ?? (size is { } w && pct is { } p ? (long)(w * p / 100) : null);
+        var used = size is { } w && pct is { } p ? (long)(w * p / 100) : lastTurnTokens;
         pct ??= used is { } u && size is > 0 ? u * 100.0 / size : null;
         return used is null && size is null && pct is null ? "ctx " + None : $"ctx {Tokens(used)}/{Tokens(size)} {Percent(pct)}";
     }
@@ -207,15 +198,20 @@ public static class BarFormat
         ["bypass permissions"] = "bypassPermissions", ["don't ask"] = "dontAsk", ["auto mode"] = "auto",
     };
 
-    /// <summary>The permission mode named by the TUI's footer ("⏵⏵ auto mode on (shift+tab to cycle)") among the last rows
-    /// of the terminal text, or null. These are Claude Code's own indicator names.</summary>
+    /// <summary>How many of the screen's last non-blank rows <see cref="ModeFromScreen"/> looks at.</summary>
+    public const int FooterRows = 10;
+
+    /// <summary>The permission mode named by the TUI's footer ("⏵⏵ auto mode on (shift+tab to cycle)") among the last non-blank
+    /// rows of the terminal text, or null. These are Claude Code's own indicator names; the default mode shows none, only
+    /// "? for shortcuts".</summary>
     public static string? ModeFromScreen(string? screen)
     {
         if (screen is null) return null;
-        foreach (var line in screen.Split('\n').TakeLast(10).Reverse())
+        var rows = screen.Split('\n').Where(l => l.Trim().Length > 0).TakeLast(FooterRows).Reverse().ToList();
+        foreach (var line in rows)
             if (Regex.Match(line, @"^\W*(manual mode|plan mode|accept edits|bypass permissions|don't ask|auto mode) on\b") is { Success: true } m)
                 return FooterModes[m.Groups[1].Value];
-        return null;
+        return rows.Any(l => Regex.IsMatch(l, @"^\s*\? for shortcuts")) ? "default" : null;
     }
 
     /// <summary>"in 1.2M out 48k $16.7": the status line's session totals, else the transcript's output and cost.</summary>
