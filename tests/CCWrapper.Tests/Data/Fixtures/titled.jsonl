@@ -1,0 +1,7 @@
+{"type":"mode","mode":"normal","sessionId":"x"}
+{"type":"user","cwd":"C:\\Work\\Alpha","sessionId":"x","message":{"role":"user","content":"hi"}}
+{"type":"ai-title","aiTitle":"Old AI title","sessionId":"x"}
+this line is not json at all
+{"type":"ai-title","aiTitle":"New AI title","sessionId":"x"}
+{"type":"last-prompt","lastPrompt":"the last prompt","sessionId":"x"}
+{"type":"user","cwd":"C:\\Work\\Alpha","message":{"content":"half writ

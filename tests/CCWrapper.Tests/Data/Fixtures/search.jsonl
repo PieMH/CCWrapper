@@ -1,0 +1,5 @@
+{"type":"user","cwd":"C:\\Work\\Beta","message":{"role":"user","content":"Please find the Needle in this haystack"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"thinking","thinking":"needle (thinking only)"},{"type":"text","text":"Found a needle, here it is."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"grep needle"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"needle in tool output"}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"next: say \"hi\" to the NEEDLE"}]}}
+{"type":"system","content":"needle in a system record"}
