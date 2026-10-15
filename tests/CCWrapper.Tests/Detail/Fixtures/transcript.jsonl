@@ -1,0 +1,14 @@
+{"type":"permission-mode","permissionMode":"default","sessionId":"s1"}
+{"type":"user","message":{"role":"user","content":"Fix the bug"},"timestamp":"2026-01-01T10:00:00.000Z","cwd":"C:\\proj","sessionId":"s1"}
+{"type":"user","isMeta":true,"message":{"role":"user","content":"<system-reminder>ignore me</system-reminder>"},"timestamp":"2026-01-01T10:00:00.500Z"}
+{"type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-opus-5-5","content":[{"type":"thinking","thinking":"hm"}],"stop_reason":"tool_use","usage":{"input_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":40}},"effort":"high","timestamp":"2026-01-01T10:00:01.000Z"}
+{"type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":"On it."}],"stop_reason":"tool_use","usage":{"input_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":40}},"effort":"high","timestamp":"2026-01-01T10:00:02.000Z"}
+{"type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"src\\a.cs","old_string":"x","new_string":"y"}}],"stop_reason":"tool_use","usage":{"input_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":40}},"effort":"high","timestamp":"2026-01-01T10:00:03.000Z"}
+{"type":"assistant","message":{"id":"m1","role":"assistant","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"git status\ngit log","description":"Show state"}}],"stop_reason":"tool_use","usage":{"input_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000,"output_tokens":40}},"effort":"high","timestamp":"2026-01-01T10:00:04.000Z"}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]},"timestamp":"2026-01-01T10:00:05.000Z"}
+{"type":"future-record-type","x":1}
+{"type":"assistant","message":{"id":"m2","bro
+{"type":"assistant","message":{"id":"m2","role":"assistant","model":"claude-opus-5-5","content":[{"type":"text","text":"Done."}],"stop_reason":"end_turn","usage":{"input_tokens":6,"cache_creation_input_tokens":0,"cache_read_input_tokens":2000,"output_tokens":10}},"effort":"xhigh","timestamp":"2026-01-01T10:00:06.000Z"}
+{"type":"permission-mode","permissionMode":"acceptEdits","sessionId":"s1"}
+{"type":"cost-state","sessionId":"s1","totalCostUSD":1.25,"totalLinesAdded":12,"totalLinesRemoved":3}
+{"type":"ai-title","aiTitle":"Fix the bug","sessionId":"s1"}
