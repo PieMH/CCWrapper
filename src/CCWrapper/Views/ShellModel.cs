@@ -1,0 +1,132 @@
+using System.Globalization;
+using System.IO;
+using CCWrapper.Core;
+using CCWrapper.Data;
+
+namespace CCWrapper.Views;
+
+/// <summary>Control-free helpers of the app shell (picker, top bar, sidebar), so they can be unit-tested.</summary>
+public static class ShellModel
+{
+    // Fixed palette; the color of an account is picked by its letter (A blue, B amber, C green, ...).
+    static readonly string[] Palette = ["#7AA2F7", "#E0AF68", "#9ECE6A", "#BB9AF7", "#F7768E", "#7DCFFF", "#FF9E64"];
+
+    public static string ColorOf(string letter) =>
+        Palette[letter.Length == 0 ? 0 : ((char.ToLowerInvariant(letter[0]) - 'a') % Palette.Length + Palette.Length) % Palette.Length];
+
+    /// <summary>The avatar text: first character, upper-case.</summary>
+    public static string LetterOf(string letter) => letter.Length == 0 ? "?" : char.ToUpperInvariant(letter[0]).ToString();
+
+    /// <summary>oauthAccount.organizationType as a plan name: claude_team -> Team, claude_pro -> Pro.</summary>
+    public static string? PlanOf(string? organizationType) => organizationType switch
+    {
+        null or "" => null,
+        "claude_team" => "Team",
+        "claude_pro" => "Pro",
+        "claude_max" => "Max",
+        "claude_enterprise" => "Enterprise",
+        var other => other,
+    };
+
+    public static string Age(DateTimeOffset at, DateTimeOffset now) =>
+        now - at is { TotalSeconds: >= 60 } age ? AgentRow.FormatAge(age) : "now";
+
+    public static string AsOf(DateTimeOffset? at, DateTimeOffset now) =>
+        at?.ToLocalTime() is not { } t ? "usage unknown"
+        : t.Date == now.ToLocalTime().Date ? $"as of {t:HH:mm}" : $"as of {t:d MMM HH:mm}";
+
+    public static string Percent(double? value) => value is { } v ? $"{v:0}%" : "—";
+
+    /// <summary>Last folder name of a cwd, "" when unknown.</summary>
+    public static string ProjectOf(string? cwd) =>
+        string.IsNullOrWhiteSpace(cwd) ? "" : Path.GetFileName(Path.TrimEndingDirectorySeparator(cwd)) is { Length: > 0 } name ? name : cwd;
+
+    /// <summary>The registry state of every open session that has a live claude process, matched by session id.
+    /// Exited sessions are left alone.</summary>
+    public static IEnumerable<(LiveSession Session, SessionStatus Status, string? WaitingFor)> MapStatus(
+        IEnumerable<LiveSession> open, IReadOnlyList<RunningSession> running)
+    {
+        var byId = running.GroupBy(r => r.SessionId).ToDictionary(g => g.Key, g => g.MaxBy(r => r.UpdatedAt)!);
+        foreach (var s in open)
+            if (s.Status != SessionStatus.Exited && s.SessionId is { } id && byId.TryGetValue(id, out var r))
+                yield return (s, r.Status, r.WaitingFor);
+    }
+}
+
+/// <summary>One picker card. Utilization values are percents; 0 with a "—" text when unknown.</summary>
+public sealed record AccountCard(Account Account, string Letter, string Color, string Title, string Subtitle,
+    double FiveHour, string FiveHourText, double Week, string WeekText, string AsOf, string Running)
+{
+    public static AccountCard From(Account account, AccountInfo info, int running, DateTimeOffset now) => new(
+        account, ShellModel.LetterOf(account.Letter), ShellModel.ColorOf(account.Letter),
+        info.Email ?? account.Label,
+        string.Join(" · ", new[] { info.DisplayName, ShellModel.PlanOf(info.OrganizationType) }.Where(s => !string.IsNullOrEmpty(s))),
+        info.FiveHour?.Utilization ?? 0, ShellModel.Percent(info.FiveHour?.Utilization),
+        info.SevenDay?.Utilization ?? 0, ShellModel.Percent(info.SevenDay?.Utilization),
+        ShellModel.AsOf(info.UsageFetchedAt, now), running == 0 ? "none running" : $"{running} running");
+}
+
+/// <summary>One row of the picker's recent-sessions list.</summary>
+public sealed record RecentRow(SessionEntry Entry, string Letter, string Color, string Title, string Project, string Age)
+{
+    public static RecentRow From(SessionEntry e, DateTimeOffset now) => new(
+        e, ShellModel.LetterOf(e.Account.Letter), ShellModel.ColorOf(e.Account.Letter), e.Title, ShellModel.ProjectOf(e.Cwd), ShellModel.Age(e.LastActivity, now));
+}
+
+/// <summary>One row of the sidebar: a transcript of the account merged with the session open in this window.
+/// Record equality lets the sidebar leave unchanged rows alone when it refreshes.</summary>
+/// <param name="Live">The tab in this window, or null.</param>
+/// <param name="Entry">The transcript, or null for a session that has not written one yet.</param>
+public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Live, string Title, string Project, string Age,
+    string Dot, string DotColor, bool IsActive, string? Snippet, string Tip)
+{
+    public bool IsOpen => Live is not null;
+
+    /// <summary>A claude process that is not a tab of this window (another window, PowerShell, Desktop).</summary>
+    public bool IsElsewhere => Live is null && Entry?.Running is not null;
+
+    /// <summary>Open sessions plus the account's transcripts, newest first. <paramref name="hits"/> (full-text search)
+    /// restricts the list to the matching transcripts and adds their snippet; otherwise <paramref name="filter"/> is
+    /// matched against title and project.</summary>
+    public static List<SessionRow> Build(IReadOnlyList<SessionEntry> catalog, IEnumerable<LiveSession> open, LiveSession? active,
+        DateTimeOffset now, string? filter = null, IReadOnlyDictionary<string, SearchHit>? hits = null)
+    {
+        var live = new Dictionary<string, LiveSession>();
+        foreach (var s in open) if (s.SessionId is { } id) live.TryAdd(id, s);
+
+        var rows = new List<(DateTimeOffset At, SessionRow Row)>();
+        foreach (var e in catalog)
+            if (hits is null || hits.ContainsKey(e.Id))
+                rows.Add((e.LastActivity, Make(e, live.GetValueOrDefault(e.Id), e.Id, active, now, hits?.GetValueOrDefault(e.Id)?.Snippet)));
+        if (hits is null)
+        {
+            var known = catalog.Select(e => e.Id).ToHashSet();
+            foreach (var (id, l) in live)
+                if (!known.Contains(id)) rows.Add((now, Make(null, l, id, active, now, null))); // no transcript yet: newest
+        }
+
+        var all = rows.OrderByDescending(r => r.At).Select(r => r.Row);
+        return hits is not null || string.IsNullOrWhiteSpace(filter) ? all.ToList()
+            : all.Where(r => r.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) || r.Project.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
+    }
+
+    static SessionRow Make(SessionEntry? entry, LiveSession? live, string id, LiveSession? active, DateTimeOffset now, string? snippet)
+    {
+        var cwd = entry?.Cwd ?? live?.Cwd;
+        var hasProcess = live is not null || entry?.Running is not null;
+        var status = live?.Status ?? entry?.Running?.Status ?? SessionStatus.Unknown;
+        var waitingFor = live?.WaitingFor ?? entry?.Running?.WaitingFor;
+        var (dot, color) = !hasProcess ? ("", "#9A9A9A") : status switch
+        {
+            SessionStatus.Busy => ("●", "#6FCF97"),
+            SessionStatus.Waiting => ("◉", "#F2C94C"),
+            _ => ("○", "#9A9A9A"),
+        };
+        var state = live is not null ? status == SessionStatus.Exited ? "Ended in this window" : "Open in this window"
+            : entry?.Running is not null ? "Running elsewhere: opens read-only" : "Closed: click to resume";
+        if (status == SessionStatus.Waiting) state += $" · waiting for {waitingFor ?? "input"}";
+        return new SessionRow(id, entry, live, entry?.Title ?? live?.Title ?? "New session", ShellModel.ProjectOf(cwd),
+            entry is null ? "now" : ShellModel.Age(entry.LastActivity, now), dot, color, live is not null && live == active, snippet,
+            string.Join("\n", new[] { cwd, state }.Where(s => !string.IsNullOrEmpty(s))));
+    }
+}

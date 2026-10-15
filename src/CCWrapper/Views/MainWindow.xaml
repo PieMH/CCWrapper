@@ -4,14 +4,20 @@
         xmlns:views="clr-namespace:CCWrapper.Views"
         xmlns:terminal="clr-namespace:CCWrapper.Terminal"
         Title="CCWrapper" Width="1400" Height="900">
+    <Window.TaskbarItemInfo>
+        <TaskbarItemInfo x:Name="Taskbar" />
+    </Window.TaskbarItemInfo>
     <DockPanel>
-        <!-- Top bar: app name, account + Switch, GitHub label (T5) -->
+        <!-- Top bar: app name, account + Switch, GitHub label -->
         <Border DockPanel.Dock="Top" Padding="8,6" BorderThickness="0,0,0,1" BorderBrush="#33FFFFFF">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="CCWrapper" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <TextBlock x:Name="AccountLabel" Margin="16,0,8,0" VerticalAlignment="Center" />
-                <Button x:Name="SwitchButton" Content="Switch" />
-                <TextBlock x:Name="GitHubLabel" Text="GitHub: —" Margin="16,0,0,0" VerticalAlignment="Center" />
+                <Border x:Name="Badge" Width="22" Height="22" CornerRadius="11" Margin="16,0,8,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="BadgeText" Foreground="#1E1E1E" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock x:Name="AccountLabel" Margin="0,0,10,0" VerticalAlignment="Center" />
+                <Button x:Name="SwitchButton" Content="⇄ Switch" Padding="10,2" Click="OnSwitch" />
+                <TextBlock x:Name="GitHubLabel" Text="GitHub: none" Margin="16,0,0,0" VerticalAlignment="Center" />
             </StackPanel>
         </Border>
 
@@ -37,6 +43,14 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <terminal:TerminalHost x:Name="TerminalView" />
+                <!-- No session open: the terminal is collapsed (WPF cannot draw over WebView2), this takes its cell. -->
+                <Border x:Name="EmptyState" Background="#1E1E1E">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="No session open" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                        <TextBlock Text="Start a new session, or pick one from the list to resume it." Opacity="0.6" Margin="0,6,0,0" HorizontalAlignment="Center" />
+                        <Button Content="＋ New session" Padding="18,6" Margin="0,16,0,0" HorizontalAlignment="Center" Click="OnNewSession" />
+                    </StackPanel>
+                </Border>
                 <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="#33FFFFFF">
                     <views:ComposeBox />
                 </Border>
