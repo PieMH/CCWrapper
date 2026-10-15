@@ -1,0 +1,1 @@
+{ "mcpServers": { "fromfile": { "command": "npx", "args": ["-y", "pkg"] } } }
