@@ -1,6 +1,11 @@
 <Window x:Class="CCWrapper.Views.FileDiffWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="FileDiffWindow" Width="800" Height="600">
-    <TextBlock Text="FileDiffWindow (TODO T7)" Margin="8" Opacity="0.6" />
+        xmlns:diff="clr-namespace:DiffPlex.Wpf.Controls;assembly=DiffPlex.Wpf"
+        Title="Diff" Width="900" Height="700">
+    <DockPanel>
+        <TextBlock x:Name="Header" DockPanel.Dock="Top" Margin="8,6" TextTrimming="CharacterEllipsis" />
+        <TextBlock x:Name="Note" DockPanel.Dock="Top" Margin="8,0,8,6" Opacity="0.7" Visibility="Collapsed" />
+        <diff:DiffViewer x:Name="Diff" IsSideBySide="False" IgnoreUnchanged="False" IsCommandBarVisible="False" />
+    </DockPanel>
 </Window>
