@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CCWrapper terminal</title>
+  <link rel="stylesheet" href="vendor/xterm.css">
+  <link rel="stylesheet" href="terminal.css">
+</head>
+<body>
+  <div id="terms"></div>
+  <div id="find" role="search" hidden>
+    <input id="find-q" type="text" placeholder="Find in terminal" aria-label="Find in terminal" spellcheck="false" autocomplete="off">
+    <span id="find-count" aria-live="polite"></span>
+    <button id="find-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">&#8593;</button>
+    <button id="find-next" title="Next match (Enter)" aria-label="Next match">&#8595;</button>
+    <button id="find-full" title="Open the transcript with matches highlighted">Search full transcript</button>
+    <button id="find-close" title="Close (Esc)" aria-label="Close find">&#215;</button>
+  </div>
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="vendor/addon-search.js"></script>
+  <script src="vendor/addon-web-links.js"></script>
+  <script src="vendor/addon-webgl.js"></script>
+  <script src="vendor/addon-unicode11.js"></script>
+  <script src="vendor/addon-clipboard.js"></script>
+  <script src="terminal.js"></script>
+</body>
+</html>
