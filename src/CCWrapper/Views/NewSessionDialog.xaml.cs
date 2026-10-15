@@ -25,12 +25,15 @@ public partial class NewSessionDialog : Window
     async Task LoadAsync()
     {
         var account = AppState.Current.Account;
-        var (info, projects) = await Task.Run(() => (AccountReader.Read(account), SessionCatalog.RecentProjects(account))); // file IO
+        AccountInfo? info = null;
+        IReadOnlyList<RecentProject> projects = [];
+        try { (info, projects) = await Task.Run(() => (AccountReader.Read(account), SessionCatalog.RecentProjects(account))); } // file IO
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // a file vanished mid-read: empty lists, the user can still type
         Folder.ItemsSource = projects.Select(p => p.Path).ToList();
         if (Folder.Text.Length == 0 && projects.Count > 0) Folder.SelectedIndex = 0;
-        Fill(Model, ["opus", "sonnet", "haiku"], info.Model);
-        Fill(Effort, ["low", "medium", "high", "xhigh", "max"], info.Effort);
-        Fill(Mode, ["acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"], info.DefaultMode);
+        Fill(Model, ["opus", "sonnet", "haiku"], info?.Model);
+        Fill(Effort, ["low", "medium", "high", "xhigh", "max"], info?.Effort);
+        Fill(Mode, ["acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"], info?.DefaultMode);
     }
 
     static void Fill(ComboBox box, string[] items, string? accountDefault)
@@ -45,7 +48,7 @@ public partial class NewSessionDialog : Window
         return string.IsNullOrWhiteSpace(text) || text.StartsWith(Default) ? null : text.Trim();
     }
 
-    string FolderPath => Folder.Text.Trim().Trim('"');
+    string FolderPath => ShellModel.NormalizeFolder(Folder.Text);
 
     void OnFolderChanged(object sender, TextChangedEventArgs e) => StartButton.IsEnabled = Directory.Exists(FolderPath);
 

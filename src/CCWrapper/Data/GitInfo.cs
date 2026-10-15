@@ -14,7 +14,7 @@ public sealed record GitInfo(bool InRepo, string? PushAccount, string? UserName,
     public string Label => !InRepo ? "none" : PushAccount ?? "—";
 
     /// <summary>Asks git (and, last, gh) about <paramref name="cwd"/>. Never throws except on cancellation; a failing or hung tool just yields less.</summary>
-    public static async Task<GitInfo> ReadAsync(string? cwd, CancellationToken ct = default)
+    public static Task<GitInfo> ReadAsync(string? cwd, CancellationToken ct = default) => Task.Run(async () => // off the caller's (UI) thread: starting a process is slow
     {
         if (!Directory.Exists(cwd)) return None;
         if (await Run("git", ["rev-parse", "--is-inside-work-tree"], cwd, ct) != "true") return None;
@@ -25,7 +25,7 @@ public sealed record GitInfo(bool InRepo, string? PushAccount, string? UserName,
         var email = Run("git", ["config", "--get", "user.email"], cwd, ct);
         var account = await credential ?? UrlUser(await origin) ?? await Run("gh", ["config", "get", "-h", "github.com", "user"], cwd, ct);
         return new GitInfo(true, account, await name, await email);
-    }
+    }, ct);
 
     // Only the user part: https://user:token@github.com/... must never leak its token.
     static string? UrlUser(string? url) =>
