@@ -83,7 +83,33 @@ public sealed class InputTests
         public void Write() => File.WriteAllText(Path.Combine(Account.Paths.Sessions, $"{Environment.ProcessId}.json"),
             $$"""{ "pid": {{Environment.ProcessId}}, "sessionId": "s1", "status": "waiting", "waitingFor": "permission prompt" }""");
 
+        public void WriteRaw(string json) =>
+            File.WriteAllText(Path.Combine(Account.Paths.Sessions, $"{Environment.ProcessId}.json"), json);
+
         public void Dispose() => Directory.Delete(_root, recursive: true);
+    }
+
+    [Theory]
+    [InlineData(null)]                    // no entry at all
+    [InlineData("{ \"pid\": 123, \"sessi")] // torn mid-write
+    public async Task Submit_is_blocked_when_the_tabs_own_registry_entry_cannot_be_read(string? entry)
+    {
+        using var registry = new WaitingRegistry();
+        if (entry is not null) registry.WriteRaw(entry);
+        var s = Session(SessionStatus.Idle, account: registry.Account);
+        s.Pid = Environment.ProcessId;
+        Assert.Contains("Could not read", await TuiInput.SubmitAsync(s, "hello"));
+        Assert.Empty(Sent(s));
+    }
+
+    [Fact]
+    public async Task Fresh_read_passes_when_the_tabs_entry_says_idle()
+    {
+        using var registry = new WaitingRegistry();
+        registry.WriteRaw($$"""{ "pid": {{Environment.ProcessId}}, "sessionId": "s1", "status": "idle" }""");
+        var s = Session(SessionStatus.Idle, account: registry.Account);
+        s.Pid = Environment.ProcessId;
+        Assert.Null(await TuiInput.FreshBlockedReasonAsync(s));
     }
 
     [Fact]
@@ -129,6 +155,8 @@ public sealed class InputTests
     [InlineData("❯", false)]
     [InlineData("│ >                          │", false)]
     [InlineData("> Try \"refactor ui.py\"", false)] // placeholder
+    [InlineData("! ls -la", true)]                  // bash mode
+    [InlineData("!", false)]
     public void Prompt_row_text_is_found_under_the_rule(string row, bool typed) =>
         Assert.Equal(typed, TuiInput.HasPromptText($"> old prompt\n  ⎿ answer\n{Rule}\n{row}\n{Rule}\n  ? for shortcuts\n> statusline\n\n\n"));
 
@@ -138,6 +166,39 @@ public sealed class InputTests
         Assert.False(TuiInput.HasPromptText("> echoed prompt\n  ⎿ answer"));
         Assert.False(TuiInput.HasPromptText(null));
         Assert.True(TuiInput.HasPromptText("╭──────────╮\n│ > typed  │\n╰──────────╯"));
+    }
+
+    [Fact]
+    public void Prompt_row_needs_a_rule_below_it_too()
+    {
+        Assert.False(TuiInput.HasPromptText($"{Rule}\n> typed"));                         // cut off: no bottom rule
+        Assert.False(TuiInput.HasPromptText($"{Rule}\n> \n{Rule}\n❯ main · 3 files"));     // a status line under the box is not the input
+        Assert.True(TuiInput.HasPromptText($"{Rule}\n> typed\n{Rule}\n❯ main · 3 files")); // ... and does not hide the input
+        Assert.True(TuiInput.HasPromptText($"{Rule}\n> \n  second line\n{Rule}"));         // multi-line input
+    }
+
+    [Theory]
+    [InlineData("!", true)]
+    [InlineData("! ls -la", true)]
+    [InlineData("│ ! ls        │", true)]
+    [InlineData("> ! not bash", false)]
+    [InlineData("> ls", false)]
+    public void Bash_mode_is_the_prompt_rows_marker(string row, bool bash)
+    {
+        Assert.Equal(bash, TuiInput.InBashMode($"{Rule}\n{row}\n{Rule}\n  ? for shortcuts"));
+        Assert.False(TuiInput.InBashMode($"! echoed\n  ⎿ out\n{Rule}\n> \n{Rule}")); // a "!" row in the transcript
+    }
+
+    [Theory]
+    [InlineData("!")]
+    [InlineData("! ls")]
+    public async Task Any_submit_is_refused_while_the_terminal_input_is_in_bash_mode(string row)
+    {
+        var s = Session(SessionStatus.Idle, channel: false);
+        s.Channel = new FakeChannel($"{Rule}\n{row}\n{Rule}");
+        Assert.Equal(TuiInput.BashModeFirst, await TuiInput.SubmitAsync(s, "hello"));
+        Assert.Equal(TuiInput.BashModeFirst, await TuiInput.SubmitAsync(s, "/model opus"));
+        Assert.Empty(Sent(s));
     }
 
     [Fact]

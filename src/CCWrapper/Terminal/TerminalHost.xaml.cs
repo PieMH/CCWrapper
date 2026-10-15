@@ -21,6 +21,7 @@ public partial class TerminalHost : UserControl
     readonly TaskCompletionSource _pageReady = new();
     Task? _ready;
     Tab? _shown; // the terminal the page is showing
+    bool _browserGone; // the WebView2 browser process exited: this control cannot show a terminal any more
 
     /// <summary>The exit overlay's Close button was clicked; the handler removes the session and calls <see cref="Close"/>.</summary>
     public event EventHandler<LiveSession>? CloseRequested;
@@ -111,6 +112,7 @@ public partial class TerminalHost : UserControl
     async Task StartAsync(Tab tab, string app, List<string> args, string cwd, Dictionary<string, string> env)
     {
         await Ready;
+        if (_browserGone) throw new InvalidOperationException("The terminal's browser process ended. Close this window and open it again.");
         tab.Size = new();
         _shown = tab;
         Post(new { t = "open", id = tab.Id }); // the page shows the terminal, fits it and answers with its size
@@ -195,9 +197,11 @@ public partial class TerminalHost : UserControl
 
     // Renderer crash: the xterm buffers and the acks that unblock PtySession are gone and claude.exe would stall. Choice: end every
     // running session (Resume restores it from its transcript) and reload, rather than re-attach to blank screens.
+    // Browser process exit: the same, but the WebView2 is dead and not rebuilt (shortcut: the user reopens the window).
     void OnProcessFailed(object? sender, CoreWebView2ProcessFailedEventArgs e)
     {
-        if (e.ProcessFailedKind != CoreWebView2ProcessFailedKind.RenderProcessExited) return;
+        var browser = e.ProcessFailedKind == CoreWebView2ProcessFailedKind.BrowserProcessExited;
+        if (!browser && e.ProcessFailedKind != CoreWebView2ProcessFailedKind.RenderProcessExited) return;
         foreach (var tab in _tabs.Values.Where(t => t.Pty is not null).ToList())
         {
             var pty = tab.Pty;
@@ -208,7 +212,10 @@ public partial class TerminalHost : UserControl
             tab.Session.Pid = null;
             tab.Session.Status = SessionStatus.Exited;
         }
-        Web.CoreWebView2.Reload();
+        if (!browser) { Web.CoreWebView2.Reload(); return; }
+        _browserGone = true;
+        MessageBox.Show("The terminal's browser process ended, so the running sessions ended with it. Close this window and open it again; Resume restores them from the session list.",
+            "CCWrapper: terminal stopped", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
     // The reloaded page has no terminals: recreate them, with the exit overlay (Resume, Close) on the ended ones.
@@ -289,7 +296,10 @@ public partial class TerminalHost : UserControl
         else Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
     }
 
-    void Post(object message) => Web.CoreWebView2?.PostWebMessageAsString(JsonSerializer.Serialize(message));
+    void Post(object message)
+    {
+        if (!_browserGone) Web.CoreWebView2?.PostWebMessageAsString(JsonSerializer.Serialize(message));
+    }
 
     sealed class Tab(TerminalHost host, LiveSession session) : IScreenChannel
     {

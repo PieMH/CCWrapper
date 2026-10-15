@@ -29,13 +29,16 @@ public partial class App : Application
     bool _showingError;
 
     // Shows the error once: a timer that keeps failing must not stack boxes while one is open.
+    // With no window left (the first one threw while opening) it would run on invisibly: show the error and exit instead.
     void OnUnhandled(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
     {
+        var windowOpen = Windows.OfType<Window>().Any(w => w.IsVisible);
         e.Handled = true;
         if (_showingError) return;
         _showingError = true;
-        try { MessageBox.Show($"{e.Exception.GetType().Name}: {e.Exception.Message}\n\nCCWrapper keeps running.", "CCWrapper: unexpected error", MessageBoxButton.OK, MessageBoxImage.Error); }
+        try { MessageBox.Show($"{e.Exception.GetType().Name}: {e.Exception.Message}\n\n{(windowOpen ? "CCWrapper keeps running." : "CCWrapper will close.")}", "CCWrapper: unexpected error", MessageBoxButton.OK, MessageBoxImage.Error); }
         finally { _showingError = false; }
+        if (!windowOpen) Shutdown(1);
     }
 
     /// <summary>Relaunches this exe with <c>--account x</c> and exits; this window's sessions end and stay resumable.
