@@ -33,11 +33,19 @@ public static class ClaudeLaunch
         return args;
     }
 
-    /// <summary>The parent env copied, then the account's keys, then CCW_TAB and COLORTERM.</summary>
+    // Set by a Claude Code session that started this app; a tab must not inherit them (the child would think it is nested in it).
+    static readonly string[] ParentSessionVars =
+    [
+        "CLAUDECODE", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_EFFORT", "CLAUDE_CODE_SSE_PORT",
+        "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SESSION_ATTENDED", "CLAUDE_CODE_MESSAGING_SOCKET", "CLAUDE_CODE_MESSAGING_TOKEN", "CLAUDE_PID",
+    ];
+
+    /// <summary>The parent env copied minus the parent Claude Code session's variables, then the account's keys, then CCW_TAB and COLORTERM.</summary>
     public static Dictionary<string, string> Env(Account account, Guid tabId, IDictionary parent)
     {
         var env = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (DictionaryEntry e in parent) env[(string)e.Key] = e.Value as string ?? "";
+        foreach (var name in ParentSessionVars) env.Remove(name);
         account.ApplyEnv(env);
         env["CCW_TAB"] = tabId.ToString();
         env["COLORTERM"] = "truecolor";

@@ -1,5 +1,117 @@
 <UserControl x:Class="CCWrapper.Views.Sidebar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <TextBlock Text="Sidebar (TODO T5)" Margin="8" Opacity="0.6" />
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:CCWrapper.Views">
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <TextBox x:Name="Search" TextChanged="OnSearchChanged" PreviewKeyDown="OnSearchKey"
+                     ToolTip="Filters titles and projects as you type. Enter searches the full text of every transcript; Esc clears." />
+            <TextBlock Text="🔍 Search sessions" IsHitTestVisible="False" Opacity="0.5" Margin="11,0,0,0" VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Text, ElementName=Search}" Value="">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
+        <TextBlock x:Name="SearchStatus" Grid.Row="1" Opacity="0.6" FontSize="11" Margin="2,4,0,0" Visibility="Collapsed" TextTrimming="CharacterEllipsis" />
+
+        <Button x:Name="SettingsButton" Grid.Row="2" Content="⚙ Settings ▾" Margin="0,8,0,0" Padding="10,5"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="OnSettings">
+            <Button.ContextMenu>
+                <ContextMenu x:Name="SettingsMenu" Placement="Bottom" Opened="OnSettingsOpened">
+                    <MenuItem Header="Open settings.json" Tag="Settings" Click="OnOpenFile" />
+                    <MenuItem Header="Open user CLAUDE.md" Tag="ClaudeMd" Click="OnOpenFile" />
+                    <MenuItem Header="Open config folder" Tag="Root" Click="OnOpenFile" />
+                    <Separator />
+                    <MenuItem Header="Run /config" Tag="/config" Click="OnSlash" />
+                    <MenuItem Header="Run /permissions" Tag="/permissions" Click="OnSlash" />
+                    <MenuItem Header="Run /hooks" Tag="/hooks" Click="OnSlash" />
+                    <MenuItem Header="Run /memory" Tag="/memory" Click="OnSlash" />
+                </ContextMenu>
+            </Button.ContextMenu>
+        </Button>
+        <Button Grid.Row="3" Content="✦ Customize" Margin="0,4,0,0" Padding="10,5"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="OnCustomize" />
+        <Button Grid.Row="4" Content="＋ New session" Margin="0,4,0,8" Padding="10,5"
+                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Click="OnNewSession" />
+
+        <ListBox x:Name="List" Grid.Row="5" BorderThickness="0,1,0,0" BorderBrush="#33FFFFFF" HorizontalContentAlignment="Stretch"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel" KeyDown="OnListKey">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+                    <EventSetter Event="MouseLeftButtonUp" Handler="OnRowClick" />
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type views:SessionRow}">
+                    <Grid Margin="0,3" ToolTip="{Binding Tip}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Dot}" Foreground="{Binding DotColor}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                        <StackPanel Grid.Column="1">
+                            <DockPanel>
+                                <TextBlock Text="{Binding Age}" DockPanel.Dock="Right" Opacity="0.6" Margin="6,0,0,0" />
+                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="FontWeight" Value="Bold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DockPanel>
+                            <TextBlock Text="{Binding Project}" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Snippet}" Opacity="0.8" FontSize="11" TextWrapping="Wrap" MaxHeight="48" TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Snippet}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="✕" Padding="0" Width="20" Height="20" Margin="4,0,0,0" VerticalAlignment="Top"
+                                ToolTip="Close this session (it stays resumable)" Click="OnCloseClick">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="Empty" Grid.Row="5" Margin="0,16,0,0" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Top" />
+    </Grid>
 </UserControl>
