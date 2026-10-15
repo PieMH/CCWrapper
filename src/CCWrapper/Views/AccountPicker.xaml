@@ -1,0 +1,6 @@
+<Window x:Class="CCWrapper.Views.AccountPicker"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AccountPicker" Width="800" Height="600">
+    <TextBlock Text="AccountPicker (TODO T5)" Margin="8" Opacity="0.6" />
+</Window>
