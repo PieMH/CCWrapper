@@ -17,7 +17,7 @@
         <Button x:Name="ModelButton" Click="OnModel" />
         <Button x:Name="EffortButton" Click="OnEffort" />
         <Button x:Name="ModeButton" Click="OnMode" />
-        <TextBlock x:Name="CtxText" ToolTip="Context window: last turn's tokens / window size" />
+        <TextBlock x:Name="CtxText" ToolTip="Context window: tokens used / window size" />
         <TextBlock x:Name="SpendText" ToolTip="Session tokens in / out, and cost" />
         <TextBlock x:Name="UsageText" />
     </WrapPanel>

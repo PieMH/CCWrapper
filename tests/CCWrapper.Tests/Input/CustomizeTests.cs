@@ -38,7 +38,20 @@ public sealed class CustomizeTests
 
     [Fact]
     public void Plugins_missing_files_give_nothing() =>
-        Assert.Empty(CustomizeData.ParsePlugins(default, default));
+        Assert.Empty(CustomizeData.ParsePlugins(default, default(JsonElement)));
+
+    [Fact]
+    public void Project_and_local_settings_override_the_user_enabledPlugins()
+    {
+        var project = JsonDocument.Parse("""{ "enabledPlugins": { "loose": true, "alpha@market": true } }""").RootElement;
+        var local = JsonDocument.Parse("""{ "enabledPlugins": { "alpha@market": false } }""").RootElement;
+        var enabled = CustomizeData.ParsePlugins(Json("installed_plugins.json"), Json("settings.json"), project, local, default)
+            .ToDictionary(p => p.Name, p => p.Enabled);
+
+        Assert.True(enabled["zeta"]);   // user settings only
+        Assert.True(enabled["loose"]);  // project settings
+        Assert.False(enabled["alpha"]); // user off, project on, local off
+    }
 
     [Fact]
     public void Mcp_servers_show_url_without_query_or_command_with_args()
@@ -105,6 +118,14 @@ public sealed class CustomizeTests
     public async Task McpList_gives_up_after_the_timeout()
     {
         var text = await CustomizeData.McpListAsync(Acct, null, TimeSpan.FromMilliseconds(300), Cmd, "/c ping -n 30 127.0.0.1");
+        Assert.StartsWith("Timed out", text);
+    }
+
+    [Fact]
+    public async Task McpList_gives_up_when_a_child_keeps_the_output_open_after_exit()
+    {
+        // start /b leaves ping holding the inherited stdout pipe after cmd exits
+        var text = await CustomizeData.McpListAsync(Acct, null, TimeSpan.FromSeconds(1), Cmd, "/c start /b ping -n 15 127.0.0.1 >nul & echo done");
         Assert.StartsWith("Timed out", text);
     }
 

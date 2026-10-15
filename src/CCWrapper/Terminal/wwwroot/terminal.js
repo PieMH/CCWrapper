@@ -205,13 +205,24 @@ host.addEventListener('message', e => {
   }
 });
 
-// Read back by the host: TerminalHost.ReadTextAsync (smoke test, bottom bar).
+// Read back by the host: TerminalHost.ReadTextAsync (smoke test) and ReadTailAsync (bottom bar, TuiInput).
 window.ccw = {
   text(id) {
     const buf = tabs.get(id)?.term.buffer.active;
     if (!buf) return null;
     const lines = [];
     for (let i = 0; i < buf.length; i++) lines.push(buf.getLine(i)?.translateToString(true) ?? '');
+    return lines.join('\n');
+  },
+  // The last n non-blank rows of the screen (the bottom page, wherever the user has scrolled), top to bottom.
+  tail(id, n) {
+    const term = tabs.get(id)?.term;
+    if (!term) return null;
+    const buf = term.buffer.active, lines = [];
+    for (let i = buf.baseY + term.rows - 1; i >= buf.baseY && lines.length < n; i--) {
+      const line = buf.getLine(i)?.translateToString(true) ?? '';
+      if (line.trim()) lines.unshift(line);
+    }
     return lines.join('\n');
   },
   visibleId: () => visible?.id ?? null,

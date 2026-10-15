@@ -98,9 +98,13 @@ public partial class TerminalHost : UserControl
     internal async Task<string?> ReadTextAsync(LiveSession session) =>
         JsonSerializer.Deserialize<string?>(await Web.CoreWebView2.ExecuteScriptAsync($"ccw.text('{session.TabId}')"));
 
+    /// <summary>The last <paramref name="rows"/> non-blank rows of the terminal's screen (not the scrollback), one line per row.</summary>
+    internal async Task<string?> ReadTailAsync(LiveSession session, int rows) =>
+        JsonSerializer.Deserialize<string?>(await Web.CoreWebView2.ExecuteScriptAsync($"ccw.tail('{session.TabId}', {rows})"));
+
     Tab GetOrAdd(LiveSession session)
     {
-        if (!_tabs.TryGetValue(session.TabId, out var tab)) _tabs[session.TabId] = tab = new Tab(session);
+        if (!_tabs.TryGetValue(session.TabId, out var tab)) _tabs[session.TabId] = tab = new Tab(this, session);
         return tab;
     }
 
@@ -287,7 +291,7 @@ public partial class TerminalHost : UserControl
 
     void Post(object message) => Web.CoreWebView2?.PostWebMessageAsString(JsonSerializer.Serialize(message));
 
-    sealed class Tab(LiveSession session) : ITerminalChannel
+    sealed class Tab(TerminalHost host, LiveSession session) : IScreenChannel
     {
         public LiveSession Session { get; } = session;
         public string Id { get; } = session.TabId.ToString();
@@ -298,9 +302,22 @@ public partial class TerminalHost : UserControl
         public readonly StringBuilder Pending = new();
         public bool FlushQueued;
 
-        // Claude Code always enables bracketed paste; ESC is dropped so the text cannot end the paste early.
-        public void SendText(string text) => Pty?.Write("\x1b[200~" + text.Replace("\x1b", "").ReplaceLineEndings("\r") + "\x1b[201~");
+        // Claude Code always enables bracketed paste; control characters are dropped so the text cannot end the paste early.
+        public void SendText(string text) => Pty?.Write(PasteHandler.Bracketed(text));
 
         public void SendKeys(string keys) => Pty?.Write(keys);
+
+        public async Task<string?> ReadTailAsync(int rows)
+        {
+            try { return await host.ReadTailAsync(Session, rows); }
+            catch (Exception) { return null; } // WebView2 not up yet, reloading or gone: callers run from async void handlers
+        }
     }
+}
+
+/// <summary>A terminal whose screen can be read back. Must be called on the UI thread.</summary>
+public interface IScreenChannel : ITerminalChannel
+{
+    /// <summary>The last <paramref name="rows"/> non-blank rows of the screen, one line per row; null when it cannot be read.</summary>
+    Task<string?> ReadTailAsync(int rows);
 }
