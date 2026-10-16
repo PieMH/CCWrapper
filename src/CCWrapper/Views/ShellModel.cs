@@ -159,7 +159,7 @@ public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Li
             _ => ("○", "#9A9A9A"),
         };
         var state = live is not null ? status == SessionStatus.Exited ? "Ended in this window" : "Open in this window"
-            : entry?.Running is not null ? "Running elsewhere: opens read-only" : "Closed: click to resume";
+            : entry?.Running is not null ? "Open in another terminal: shown read-only here" : "Closed: click to resume";
         if (status == SessionStatus.Waiting) state += $" · waiting for {waitingFor ?? "input"}";
         return new SessionRow(id, entry, live, entry?.Title ?? live?.Title ?? "New session", ShellModel.ProjectOf(cwd),
             entry is null ? "now" : ShellModel.Age(entry.LastActivity, now), dot, color, live is not null && live == active, snippet,

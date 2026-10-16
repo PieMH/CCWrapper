@@ -29,6 +29,8 @@ public sealed class ClaudeLaunchTests : IDisposable
     {
         Assert.Equal(["--resume", "old", "--effort", "low"],
             ClaudeLaunch.Args(new LaunchOptions(@"C:\p", ResumeId: "old", Effort: "low", Name: " "), "ignored", null));
+        Assert.Equal(["--resume", "old", "--fork-session"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", ResumeId: "old", Fork: true), "ignored", null));
+        Assert.Equal(["--session-id", "s1"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", Fork: true), "s1", null)); // nothing to copy
     }
 
     [Fact]

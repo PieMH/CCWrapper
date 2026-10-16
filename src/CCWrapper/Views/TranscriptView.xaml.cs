@@ -10,10 +10,10 @@ using CCWrapper.Data;
 
 namespace CCWrapper.Views;
 
-public partial class TranscriptWindow : Window
+public partial class TranscriptView : UserControl
 {
     public static readonly DependencyProperty QueryProperty =
-        DependencyProperty.Register(nameof(Query), typeof(string), typeof(TranscriptWindow), new PropertyMetadata(""));
+        DependencyProperty.Register(nameof(Query), typeof(string), typeof(TranscriptView), new PropertyMetadata(""));
 
     /// <summary>The search text; the rows bind to it to highlight their matches.</summary>
     public string Query { get => (string)GetValue(QueryProperty); set => SetValue(QueryProperty, value); }
@@ -25,16 +25,15 @@ public partial class TranscriptWindow : Window
     MessageRow? _marked; // the row carrying the current-match marker
     ScrollViewer? _scroll;
 
-    /// <summary>Live read-only transcript, matches of <paramref name="query"/> highlighted.
-    /// Constructed by MainWindow's IAppCommands.ShowTranscript; keep this signature.</summary>
-    public TranscriptWindow(string transcriptPath, string title, string? query = null)
+    /// <summary>Live read-only transcript, matches of <paramref name="query"/> highlighted. It follows the file until unloaded.
+    /// Hosted by MainWindow: in a window (IAppCommands.ShowTranscript) or in the center (a session open elsewhere).</summary>
+    public TranscriptView(string transcriptPath, string? query = null)
     {
         InitializeComponent();
-        Title = title;
         List.ItemsSource = _rows;
         List.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((_, e) => _scroll = e.OriginalSource as ScrollViewer));
         SearchBox.Text = query ?? "";
-        Closed += (_, _) => _cts.Cancel();
+        Unloaded += (_, _) => _cts.Cancel();
         _ = FollowAsync(transcriptPath, _cts.Token);
     }
 
@@ -50,7 +49,7 @@ public partial class TranscriptWindow : Window
                 if (await Task.Run(() => reader.Poll() ? reader.Messages.ToArray() : null, ct) is { } messages) Apply(messages);
             } while (await timer.WaitForNextTickAsync(ct));
         }
-        catch (OperationCanceledException) { } // window closed
+        catch (OperationCanceledException) { } // unloaded
     }
 
     void Apply(TranscriptMessage[] messages)

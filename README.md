@@ -44,8 +44,8 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 **Sidebar**
 - **Session search:** typing filters by title and project. Enter searches the full text of every transcript of the account.
 - **Session list:** every session of the account, including ones started outside the app, newest first, with live status dots.
-  - Click a session to switch to it, or to resume it in its original folder.
-  - A session that's running somewhere else opens as a read-only live transcript.
+  - Click a session to open it in the center, resumed in its original folder. The session that was there ends first (you're asked if Claude is still working) and stays resumable.
+  - A session open in another terminal shows read-only in the center, with **Resume here** (once you close it there) or **Continue here as a copy**.
 - **Settings menu:** opens `settings.json`, your `CLAUDE.md` or the config folder, or runs `/config`, `/permissions`, `/hooks` or `/memory`.
 - **Customize page:** lists your plugins, skills, MCP servers and connectors in one place. Changes go through Claude Code's own `/plugin` and `/mcp`.
 - **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
@@ -130,7 +130,7 @@ CCWrapper.exe --smoke         # terminal self-test, exits 0 on success
 ```
 
 A few tips:
-- ● means Claude is working and ◉ means it's waiting for you. When a background session of the window needs you, the taskbar button flashes.
+- ● means Claude is working and ◉ means it's waiting for you. When a session needs you while the window is in the background, the taskbar button flashes.
 - When a session's process exits, the terminal offers **Resume** or **Close**.
 - The model and effort switches send Claude Code's own `/model` and `/effort`, which **save the choice as that account's default**. That's Claude Code's behavior, not the app's.
 - Accounts using Claude Code's fullscreen renderer (`"tui": "fullscreen"`) stay fullscreen. Ctrl+F then searches the visible screen, and "Search full transcript" searches the whole session.
