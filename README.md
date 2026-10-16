@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-264%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-270%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -48,13 +48,14 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 - **Settings:** a window for the account's `settings.json` and the project folder's shared and local ones, without opening the files.
   - **General:** model, effort (also per model), output style, language, theme, time format, update channel, commit trailer and claude.ai connectors.
   - **Permissions:** the default mode and the allow, ask and deny rules. **Hooks** and **Environment** variables can be added, edited and removed; values that look like keys or tokens stay hidden until clicked.
+  - **Interface:** the switches of `/config`: auto-compact, rewind checkpoints, verbose output, turn duration, tips, reduced motion, terminal progress bar, `.gitignore` in the file picker, editor mode and notifications.
   - Each setting says where its value comes from: set in this file, taken from a broader one, or overridden by a more specific one (*Project overrides this*).
   - **CLAUDE.md:** edit the user, project and local `CLAUDE.md` files. **JSON** shows a whole file for anything else.
   - Changes wait for **Save**, which writes only the files you changed and keeps every key the window doesn't show. Open sessions pick settings up as soon as they are saved.
 - **Plugins & connectors:** a window of its own for everything `/plugin` and `/mcp` do, without touching your open sessions.
   - **Plugins:** turn installed plugins on and off; see each one's skills, MCP servers, context cost and notes; update, configure or uninstall it. Plugins synced from your claude.ai account are listed too.
   - **Discover and Marketplaces:** search the marketplaces' catalogs and install to the user, project or local scope; add, update and remove marketplaces.
-  - **MCP servers and connectors:** every server with its health (connected, needs sign-in, failed), your own and those of plugins; add or remove your own, and sign in to servers and claude.ai connectors.
+  - **MCP servers and connectors:** every server with its health (connected, needs sign-in, failed), your own and those of plugins; add or remove your own, and sign in to servers and claude.ai connectors. A switch on each one turns it off for one project folder only, as `/mcp disable` does.
   - Every change runs Claude Code's own `claude plugin` or `claude mcp` command in the background, shown in the window's status strip. New sessions get the change; **Reload idle sessions** sends `/reload-plugins` to the open ones that are idle.
 - **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
 
@@ -160,6 +161,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **It reads only files Claude Code already writes:** each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts, session status files, file-history backups, and plugin and skill lists.
 - **It never reads** `.credentials.json` and never calls Anthropic APIs. Plugin and MCP changes you make in Plugins & connectors are done by Claude Code's own `claude plugin` and `claude mcp` commands.
 - **It edits Claude Code's files only from the Settings window, when you click Save:** the `settings.json` and `CLAUDE.md` files you changed there. A file that changed on disk since the window read it is not overwritten, and the previous version of each saved file is kept in `%LOCALAPPDATA%\CCWrapper\backups`.
+- **It edits `.claude.json` only when you flip a server's folder switch** in Plugins & connectors, the one change there that no `claude` command makes. Like Claude Code itself, it takes the file's lock, reads the file as it is at that moment, changes that folder's list of servers turned off and writes it back; the previous version goes to the same backups folder.
 - **Check health** in Plugins & connectors runs `claude mcp list`, which connects to every MCP server (and starts the local ones) to see if it answers, as `/mcp` does.
 - **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, settings backups, and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
@@ -197,7 +199,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 264 tests on synthetic fixtures.
+- xUnit, with 270 tests on synthetic fixtures.
 
 ## Development
 

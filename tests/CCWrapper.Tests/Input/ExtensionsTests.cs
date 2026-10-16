@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CCWrapper.Core;
 using CCWrapper.Data;
 using CCWrapper.Terminal;
@@ -207,6 +208,37 @@ public sealed class ExtensionsTests
         Assert.Equal((McpState.Connected, "Connected", (string?)null), McpData.StatusOf("claude.ai Notion:\n  Scope: claude.ai config\n  Status: √ Connected\n"));
         Assert.Equal((McpState.Failed, "Failed to connect", "no route"), McpData.StatusOf("x:\n  Status: × Failed to connect — no route\n  Type: http"));
         Assert.Null(McpData.StatusOf("No MCP server named \"x\"."));
+    }
+
+    [Fact]
+    public void A_server_off_in_this_folder_is_disabled()
+    {
+        Assert.Equal(McpState.Disabled,
+            Assert.Single(McpData.ParseList("claude.ai Gmail: https://gmail.example/mcp - ⊘ Disabled for this project (re-enable via /mcp)")).State);
+        Assert.Equal(McpState.Disabled, McpData.StatusOf("x:\n  Status: ⊘ Disabled for this project (re-enable via /mcp)\n")?.State);
+    }
+
+    [Fact]
+    public void Turning_a_server_off_lists_it_for_that_folder_only_and_on_again_unlists_it()
+    {
+        var root = JsonNode.Parse("""{"projects":{"C:/Work/Proj":{"allowedTools":[]},"C:/Work/Other":{"disabledMcpServers":["x"]}}}""")!.AsObject();
+        string? Off(string folder) => root["projects"]![folder]!["disabledMcpServers"]?.ToJsonString();
+
+        Assert.Null(McpData.SetOff(root, @"c:\work\proj\", "claude.ai Gmail ", off: true));
+        Assert.Null(McpData.SetOff(root, @"C:\Work\Proj", "claude.ai Gmail ", off: true)); // already off: listed once
+        Assert.Equal("""["claude.ai Gmail "]""", Off("C:/Work/Proj"));
+        Assert.Null(McpData.SetOff(root, @"C:\Work\Proj", "claude.ai Gmail ", off: false));
+        Assert.Equal("[]", Off("C:/Work/Proj"));
+        Assert.Equal("""["x"]""", Off("C:/Work/Other"));
+    }
+
+    [Fact]
+    public void Turning_on_a_server_that_is_on_changes_nothing_and_an_unknown_folder_is_refused()
+    {
+        var root = JsonNode.Parse("""{"projects":{"C:/Work/Proj":{}}}""")!.AsObject();
+        Assert.Null(McpData.SetOff(root, @"C:\Work\Proj", "x", off: false));
+        Assert.Equal("""{"projects":{"C:/Work/Proj":{}}}""", root.ToJsonString());
+        Assert.Equal("Claude Code has no entry for this folder yet: start a session there once.", McpData.SetOff(root, @"C:\Elsewhere", "x", off: true));
     }
 
     [Fact]

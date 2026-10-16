@@ -1,12 +1,13 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using CCWrapper.Core;
 
 namespace CCWrapper.Data;
 
-public enum McpState { Unknown, Connected, NeedsAuth, Failed, NotSetUp, Pending }
+public enum McpState { Unknown, Connected, NeedsAuth, Failed, NotSetUp, Pending, Disabled }
 
 /// <summary>One line of <c>claude mcp list</c>. <see cref="Name"/> is exactly as claude prints it and is what its commands
 /// take back ("claude.ai CoinGecko " ends in a space).</summary>
@@ -32,7 +33,8 @@ public sealed record McpRow(string Name, string Source, string Detail);
 public static class McpData
 {
     /// <summary>Lines like "name: endpoint - √ Connected", "plugin:p:s: url (HTTP) - ! Needs authentication",
-    /// "claude.ai X:  (HTTP) - - Not configured" or "x: url - × Failed to connect — why". Other lines are skipped.</summary>
+    /// "claude.ai X:  (HTTP) - - Not configured", "x: url - × Failed to connect — why" or "x: url - ⊘ Disabled for this
+    /// project (re-enable via /mcp)". Other lines are skipped.</summary>
     public static List<McpServer> ParseList(string text)
     {
         var servers = new List<McpServer>();
@@ -65,6 +67,7 @@ public static class McpData
         : status.StartsWith("Failed") ? McpState.Failed
         : status.StartsWith("Not configured") ? McpState.NotSetUp
         : status.StartsWith("Pending") ? McpState.Pending
+        : status.StartsWith("Disabled") ? McpState.Disabled
         : McpState.Unknown;
 
     /// <summary>The user's own servers: user scope, this folder's in .claude.json (local scope), and its .mcp.json
@@ -93,15 +96,39 @@ public static class McpData
         }).ToList();
     }
 
-    /// <summary>projects[cwd].mcpServers of .claude.json. Its keys use '/', the session's cwd '\'.</summary>
+    /// <summary>projects[cwd].mcpServers of .claude.json.</summary>
     public static JsonElement ProjectServers(JsonElement globalConfig, string cwd)
     {
-        static string Norm(string path) => path.Replace('/', '\\').TrimEnd('\\');
         var projects = globalConfig.Prop("projects");
         if (projects.ValueKind != JsonValueKind.Object) return default;
         foreach (var p in projects.EnumerateObject())
-            if (string.Equals(Norm(p.Name), Norm(cwd), StringComparison.OrdinalIgnoreCase)) return p.Value.Prop("mcpServers");
+            if (SameFolder(p.Name, cwd)) return p.Value.Prop("mcpServers");
         return default;
+    }
+
+    /// <summary>Whether a "projects" key of .claude.json, which uses '/', names the folder <paramref name="cwd"/>.</summary>
+    public static bool SameFolder(string key, string cwd)
+    {
+        static string Norm(string path) => path.Replace('/', '\\').TrimEnd('\\');
+        return string.Equals(Norm(key), Norm(cwd), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Turns a server off in one folder, or back on, as /mcp disable and enable do: its name in
+    /// projects[folder].disabledMcpServers of .claude.json (<paramref name="globalConfig"/>). Null when done, else why not.</summary>
+    public static string? SetOff(JsonObject globalConfig, string cwd, string name, bool off)
+    {
+        if (globalConfig["projects"] is not JsonObject projects || projects.FirstOrDefault(p => SameFolder(p.Key, cwd)).Value is not JsonObject project)
+            return "Claude Code has no entry for this folder yet: start a session there once.";
+        bool Named(JsonNode? n) => n is JsonValue v && v.TryGetValue<string>(out var s) && s == name;
+        var list = project["disabledMcpServers"] as JsonArray;
+        if (off && list?.Any(Named) != true)
+        {
+            if (list is null) project["disabledMcpServers"] = list = [];
+            list.Add(name);
+        }
+        if (!off && list is not null)
+            foreach (var n in list.Where(Named).ToList()) list.Remove(n);
+        return null;
     }
 
     /// <summary>The arguments of <c>claude mcp add</c> for the Add server form, or why not. <paramref name="transport"/> is
