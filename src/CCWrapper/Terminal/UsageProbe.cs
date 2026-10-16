@@ -10,14 +10,14 @@ namespace CCWrapper.Terminal;
 /// Nothing is read from the screen; the app still never calls Anthropic or reads credentials.</summary>
 public static class UsageProbe
 {
-    static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30), MinGap = TimeSpan.FromMinutes(2);
+    static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30), MinGap = TimeSpan.FromMinutes(10);
     static readonly Dictionary<string, Task<bool>> InFlight = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Raised on a pool thread when an account's saved usage is fresh.</summary>
     public static event Action<Account>? Refreshed;
 
     /// <summary>True when Claude Code saved fresh usage. One run per account at a time; unless <paramref name="force"/>d,
-    /// skipped while the saved usage is younger than 2 minutes (e.g. the start screen just refreshed it).</summary>
+    /// skipped while the saved usage is younger than 10 minutes (each check adds a /usage line to that project's prompt history).</summary>
     public static Task<bool> RefreshAsync(Account account, bool force = false)
     {
         lock (InFlight)

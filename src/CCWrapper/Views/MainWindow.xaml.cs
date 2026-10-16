@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CCWrapper.Core;
@@ -23,7 +24,7 @@ public partial class MainWindow : Window, IAppCommands
     SessionEntry? _elsewhere; // shown read-only in the center: open in another claude process
     string? _gitCwd;
     CancellationTokenSource? _gitCts;
-    bool _polling, _confirmedEnd;
+    bool _polling, _confirmedEnd, _resuming;
 
     public MainWindow(Account account)
     {
@@ -37,9 +38,9 @@ public partial class MainWindow : Window, IAppCommands
         Badge.Background = new SolidColorBrush(color);
         Taskbar.Overlay = BadgeImage(letter, color);
 
-        ShowTerminal(false);
+        UpdateCenter();
         TerminalView.CloseRequested += (_, session) => CloseSession(session);
-        _state.OpenSessions.CollectionChanged += (_, _) => ShowTerminal(_state.OpenSessions.Count > 0);
+        _state.OpenSessions.CollectionChanged += (_, _) => UpdateCenter();
         _state.PropertyChanged += OnStateChanged;
         _statusTimer.Tick += async (_, _) => await PollStatusAsync();
         _gitTimer.Tick += async (_, _) => await ReadGitAsync();
@@ -60,21 +61,24 @@ public partial class MainWindow : Window, IAppCommands
         };
     }
 
-    // ---- sessions ----
+    // ---- sessions: a tab card per open session (SessionTabs), and at most one read-only card ----
 
-    /// <summary>WPF cannot draw over WebView2, so without a session the terminal is collapsed and a WPF panel takes its cell:
-    /// the read-only view of a session open elsewhere, else the empty state.</summary>
-    void ShowTerminal(bool visible)
+    /// <summary>The center shows the active card's terminal, else the read-only view, else the empty state. WPF cannot draw
+    /// over WebView2, so whatever is not shown is collapsed.</summary>
+    void UpdateCenter()
     {
-        TerminalView.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        ElsewhereState.Visibility = !visible && _elsewhere is not null ? Visibility.Visible : Visibility.Collapsed;
-        EmptyState.Visibility = !visible && _elsewhere is null ? Visibility.Visible : Visibility.Collapsed;
+        var live = _state.ActiveSession is not null;
+        var readOnly = !live && _elsewhere is not null;
+        TerminalView.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        ElsewhereState.Visibility = readOnly ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = !live && !readOnly ? Visibility.Visible : Visibility.Collapsed;
+        Tabs.ShowReadOnly(_elsewhere?.Title, readOnly);
     }
 
-    /// <summary>Starts claude.exe for the session in a new tab and makes it the active one.</summary>
+    /// <summary>Starts claude.exe for the session in a new card and makes it the active one.</summary>
     async Task OpenSessionAsync(LiveSession session, LaunchOptions options)
     {
-        ShowTerminal(true); // the page sizes a new terminal while it is visible
+        TerminalView.Visibility = Visibility.Visible; // the page sizes a new terminal while it is visible
         try
         {
             var started = TerminalView.OpenAsync(session, options); // sets SessionId, Cwd and TranscriptPath before its first await
@@ -93,55 +97,121 @@ public partial class MainWindow : Window, IAppCommands
     internal async Task NewSessionAsync()
     {
         var dialog = new NewSessionDialog { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Result is { } options && ClearCenter())
+        if (dialog.ShowDialog() == true && dialog.Result is { } options)
             await OpenSessionAsync(new LiveSession(_state.Account) { Title = options.Name }, options);
     }
 
-    /// <summary>The center shows one session at a time: ends the one there (asking first when it is busy or waiting; it stays
-    /// resumable) and drops a read-only view. False when the user declines.</summary>
-    bool ClearCenter()
-    {
-        if (!ConfirmEnd("Opening another session", _state.OpenSessions)) return false;
-        foreach (var s in _state.OpenSessions.ToList()) CloseSession(s);
-        ShowElsewhere(null);
-        return true;
-    }
-
-    /// <summary>Puts the live read-only transcript of a session open in another claude process in the center, or removes it (null).</summary>
-    void ShowElsewhere(SessionEntry? entry, string? query = null)
+    /// <summary>Shows the live read-only transcript of a session open in another claude process, as the read-only card.</summary>
+    void ShowElsewhere(SessionEntry entry, string? query = null)
     {
         _elsewhere = entry;
-        ElsewhereTitle.Text = entry?.Title ?? "";
-        ElsewhereView.Content = entry is null ? null : new TranscriptView(entry.Path, query); // the old view stops following when unloaded
-        ShowTerminal(_state.OpenSessions.Count > 0);
+        ElsewhereTitle.Text = entry.Title;
+        ElsewhereWhere.Text = $"  is open in {(entry.Running is { } r ? ProcessTree.Describe(r.Pid) : "another terminal")}: read-only, updates live.";
+        ElsewhereView.Content = new TranscriptView(entry.Path, query); // the previous view stops following when unloaded
+        ShowReadOnlyCard();
     }
 
+    /// <summary>Brings the read-only card forward; no live card is active while it shows.</summary>
+    internal void ShowReadOnlyCard()
+    {
+        if (_elsewhere is null) return;
+        _state.ActiveSession = null;
+        UpdateCenter();
+    }
+
+    /// <summary>Removes the read-only card; the last live card comes forward when none is.</summary>
+    internal void CloseElsewhere()
+    {
+        _elsewhere = null;
+        ElsewhereView.Content = null;
+        if (_state.ActiveSession is null && _state.OpenSessions.Count > 0) Activate(_state.OpenSessions[^1]);
+        UpdateCenter();
+    }
+
+    /// <summary>The tab bar's search: the find bar over the terminal, or the read-only transcript's search box.</summary>
+    internal void OpenFind()
+    {
+        if (_state.ActiveSession is not null) TerminalView.OpenFind();
+        else (ElsewhereView.Content as TranscriptView)?.FocusSearch();
+    }
+
+    /// <summary>Resumes the session here. Still open elsewhere: says where and offers to close it there first (the claude
+    /// process is ended, as closing its terminal would; the conversation so far is saved).</summary>
     async void OnResumeHere(object sender, RoutedEventArgs e)
     {
-        if (_elsewhere is not { } entry) return;
-        var running = await Task.Run(() => SessionCatalog.Running(_state.Account));
-        if (running.Any(r => r.SessionId == entry.Id))
-            MessageBox.Show(this, "It is still open in another terminal. Close it there first, or continue here as a copy.",
-                "Resume here", MessageBoxButton.OK, MessageBoxImage.Information);
-        else await OpenEntry(entry with { Running = null });
+        if (_elsewhere is not { } entry || _resuming) return;
+        _resuming = true;
+        SetResumeBusy("Checking…");
+        try
+        {
+            var holders = await HoldersAsync(entry.Id, TimeSpan.FromSeconds(3)); // a terminal closed just now may still be shutting down
+            if (holders.Count > 0)
+            {
+                var where = string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)));
+                var busy = holders.Any(h => h.Status is SessionStatus.Busy or SessionStatus.Waiting)
+                    ? "\n\nClaude is working or waiting for an answer there: that stops." : "";
+                if (MessageBox.Show(this, $"“{entry.Title}” is still open in:\n{where}\n\nClose it there and resume it here? The conversation so far is saved.{busy}",
+                        "Resume here", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+                SetResumeBusy("Closing it there…");
+                foreach (var h in holders) ProcessTree.End(h.Pid);
+                if ((holders = await HoldersAsync(entry.Id, TimeSpan.FromSeconds(5))).Count > 0)
+                {
+                    MessageBox.Show(this, $"It could not be closed:\n{string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)))}\n\nClose it there, then try again.",
+                        "Resume here", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+            SetResumeBusy("Opening…");
+            await OpenEntry(entry with { Running = null });
+        }
+        finally
+        {
+            _resuming = false;
+            SetResumeBusy(null);
+        }
+    }
+
+    /// <summary>Resume here at work: greyed and not clickable, a gradient sweeping along its bottom edge (a still bar when
+    /// Windows animations are off) and what it is doing. Null puts it back.</summary>
+    void SetResumeBusy(string? doing)
+    {
+        var busy = doing is not null;
+        ResumeLabel.Text = doing ?? "Resume here";
+        ResumeLabel.Opacity = busy ? 0.6 : 1;
+        ResumeButton.IsHitTestVisible = !busy;
+        CopyButton.IsEnabled = !busy;
+        ResumeSweepBar.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        ResumeSweep.BeginAnimation(TranslateTransform.XProperty, busy && SystemParameters.ClientAreaAnimation
+            ? new DoubleAnimation(-ResumeSweepBar.Width, ResumeButton.ActualWidth, TimeSpan.FromSeconds(1.1)) { RepeatBehavior = RepeatBehavior.Forever }
+            : null);
+    }
+
+    /// <summary>The live claude processes of this account that have the session open, waiting up to <paramref name="wait"/> for them to go.</summary>
+    async Task<List<RunningSession>> HoldersAsync(string sessionId, TimeSpan wait)
+    {
+        for (var until = DateTime.UtcNow + wait; ; await Task.Delay(300))
+        {
+            var holders = (await Task.Run(() => SessionCatalog.Running(_state.Account))).Where(r => r.SessionId == sessionId).ToList();
+            if (holders.Count == 0 || DateTime.UtcNow >= until) return holders;
+        }
     }
 
     async void OnContinueAsCopy(object sender, RoutedEventArgs e)
     {
-        if (_elsewhere is not { } entry) return;
+        if (_elsewhere is not { } entry || _resuming) return;
         if (entry.Cwd is not { } cwd || !Directory.Exists(cwd)) { FolderGone(entry); return; }
-        ShowElsewhere(null);
+        CloseElsewhere();
         await OpenSessionAsync(new LiveSession(_state.Account) { Title = entry.Title }, new LaunchOptions(cwd, entry.Id, Fork: true));
     }
 
     void FolderGone(SessionEntry entry) =>
         MessageBox.Show(this, $"The session's folder does not exist any more:\n{entry.Cwd ?? "(unknown)"}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
 
-    /// <summary>Shows the open session (with one session per window, that is the one already in the center).</summary>
+    /// <summary>Brings an open session's card forward.</summary>
     internal void Activate(LiveSession session)
     {
+        _state.ActiveSession = session; // first: the terminal is visible before it is shown and fitted
         TerminalView.Show(session);
-        _state.ActiveSession = session;
     }
 
     /// <summary>Kills the session's claude.exe, removes its tab (it stays resumable from the list) and shows a neighbor.</summary>
@@ -155,15 +225,15 @@ public partial class MainWindow : Window, IAppCommands
         if (_state.ActiveSession is { } next) TerminalView.Show(next);
     }
 
-    /// <summary>Opens the session in the center, replacing what is there (see <see cref="ClearCenter"/>). Already open: show it.
-    /// Running in another claude process: its live transcript, read-only. Otherwise resumed in its folder.</summary>
+    /// <summary>Already open here: its card comes forward. Open in another claude process: the read-only card. Otherwise it
+    /// is resumed in its folder in a new card; nothing open is closed.</summary>
     public async Task OpenEntry(SessionEntry entry, string? query = null)
     {
         if (ShellModel.Match(_state.OpenSessions, entry.Running?.Pid, entry.Id) is { } open) { Activate(open); return; }
-        if (entry.Running is null && (entry.Cwd is null || !Directory.Exists(entry.Cwd))) { FolderGone(entry); return; }
-        if (!ClearCenter()) return;
-        if (entry.Running is not null) ShowElsewhere(entry, query);
-        else await OpenSessionAsync(new LiveSession(_state.Account) { Title = entry.Title }, new LaunchOptions(entry.Cwd!, entry.Id));
+        if (entry.Running is not null) { ShowElsewhere(entry, query); return; }
+        if (entry.Cwd is null || !Directory.Exists(entry.Cwd)) { FolderGone(entry); return; }
+        if (_elsewhere?.Id == entry.Id) CloseElsewhere(); // its read-only card becomes this live one
+        await OpenSessionAsync(new LiveSession(_state.Account) { Title = entry.Title }, new LaunchOptions(entry.Cwd, entry.Id));
     }
 
     // `--resume <id>`: set by the picker when it restarts this process as another account.
@@ -209,6 +279,7 @@ public partial class MainWindow : Window, IAppCommands
         if (_watched is not null) _watched.PropertyChanged -= OnWatchedChanged;
         _watched = _state.ActiveSession;
         if (_watched is not null) _watched.PropertyChanged += OnWatchedChanged;
+        UpdateCenter();
         ScheduleGit();
     }
 

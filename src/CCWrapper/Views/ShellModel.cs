@@ -38,6 +38,13 @@ public static class ShellModel
 
     public static string Percent(double? value) => value is { } v ? $"{v:0}%" : "—";
 
+    public const double MinCardWidth = 120, MaxCardWidth = 220;
+
+    /// <summary>A tab card's width: <paramref name="count"/> cards share <paramref name="available"/> px (2 px apart), between
+    /// 120 and 220 px; below 120 the bar scrolls sideways instead.</summary>
+    public static double CardWidth(double available, int count) =>
+        Math.Clamp(available / Math.Max(1, count) - 2, MinCardWidth, MaxCardWidth);
+
     /// <summary>The top bar's git chip tooltip: who commits and pushes, and the branch against its upstream as of the last fetch.</summary>
     public static string GitTip(GitInfo info)
     {

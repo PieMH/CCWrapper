@@ -76,6 +76,13 @@ public partial class TerminalHost : UserControl
         Web.Focus();
     }
 
+    /// <summary>Opens the find bar over the visible terminal (as Ctrl+F does).</summary>
+    public void OpenFind()
+    {
+        Post(new { t = "find" });
+        Web.Focus();
+    }
+
     /// <summary>Kills the session's claude.exe and removes its terminal.</summary>
     public void Close(LiveSession session)
     {

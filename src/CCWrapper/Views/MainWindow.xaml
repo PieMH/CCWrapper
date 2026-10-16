@@ -22,7 +22,7 @@
                     </StackPanel>
                 </Border>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Image Source="/CCWrapper.ico" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Image Source="/logo.png" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="CCWrapper" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
                     <TextBlock Text="/" Foreground="#4A525D" Margin="10,0" VerticalAlignment="Center" />
                     <Border x:Name="Badge" Width="22" Height="22" CornerRadius="6" VerticalAlignment="Center">
@@ -58,14 +58,16 @@
 
             <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <terminal:TerminalHost x:Name="TerminalView" />
+                <views:SessionTabs x:Name="Tabs" />
+                <terminal:TerminalHost x:Name="TerminalView" Grid.Row="1" />
                 <!-- No session open: the terminal is collapsed (WPF cannot draw over WebView2), this takes its cell. -->
-                <Border x:Name="EmptyState" Background="{StaticResource TerminalBg}">
+                <Border x:Name="EmptyState" Grid.Row="1" Background="{StaticResource TerminalBg}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Image Source="/CCWrapper.ico" Width="56" Height="56" Opacity="0.9" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,14" />
+                        <Image Source="/logo.png" Width="56" Height="56" Opacity="0.9" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,14" />
                         <TextBlock Text="No session open" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         <TextBlock Text="Start a new session, or pick one from the list to resume it." Foreground="{StaticResource Muted}" Margin="0,6,0,0" HorizontalAlignment="Center" />
                         <Button Style="{StaticResource Primary}" Margin="0,18,0,0" HorizontalAlignment="Center" Click="OnNewSession">
@@ -77,22 +79,39 @@
                     </StackPanel>
                 </Border>
                 <!-- A session open in another claude process: its live transcript, read-only, in the terminal's cell. -->
-                <DockPanel x:Name="ElsewhereState" Background="{StaticResource TerminalBg}" Visibility="Collapsed">
+                <DockPanel x:Name="ElsewhereState" Grid.Row="1" Background="{StaticResource TerminalBg}" Visibility="Collapsed">
                     <Border DockPanel.Dock="Top" Padding="12,8" Background="{StaticResource Panel}" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Line}">
                         <DockPanel>
-                            <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Continue here as a copy" Margin="8,0,0,0" Click="OnContinueAsCopy"
+                            <Button x:Name="CopyButton" DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Continue here as a copy" Margin="8,0,0,0" Click="OnContinueAsCopy"
                                     ToolTip="Opens a copy of the conversation under a new id; the original stays as it is" />
-                            <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Resume here" Click="OnResumeHere"
-                                    ToolTip="Works once the session is closed in the other terminal" />
+                            <Button x:Name="ResumeButton" DockPanel.Dock="Right" Style="{StaticResource Outlined}" Click="OnResumeHere"
+                                    ToolTip="Resumes it here; if it is still open elsewhere, offers to close it there first">
+                                <!-- While it works: a gradient sweeps along the bottom edge (see SetResumeBusy) -->
+                                <Grid Margin="-10,0" Height="24" ClipToBounds="True">
+                                    <TextBlock x:Name="ResumeLabel" Text="Resume here" Margin="10,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Rectangle x:Name="ResumeSweepBar" Width="56" Height="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed">
+                                        <Rectangle.Fill>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                <GradientStop Color="#004A9BE8" Offset="0" />
+                                                <GradientStop Color="#FF4A9BE8" Offset="0.5" />
+                                                <GradientStop Color="#004A9BE8" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Rectangle.Fill>
+                                        <Rectangle.RenderTransform>
+                                            <TranslateTransform x:Name="ResumeSweep" />
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
+                                </Grid>
+                            </Button>
                             <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                 <Run x:Name="ElsewhereTitle" FontWeight="SemiBold" />
-                                <Run Text="  is open in another terminal: read-only, updates live." Foreground="{StaticResource Warn}" />
+                                <Run x:Name="ElsewhereWhere" Foreground="{StaticResource Warn}" />
                             </TextBlock>
                         </DockPanel>
                     </Border>
                     <ContentControl x:Name="ElsewhereView" />
                 </DockPanel>
-                <Border Grid.Row="1" Background="{StaticResource Panel}" BorderThickness="0,1,0,0" BorderBrush="{StaticResource Line}">
+                <Border Grid.Row="2" Background="{StaticResource Panel}" BorderThickness="0,1,0,0" BorderBrush="{StaticResource Line}">
                     <views:ComposeBox />
                 </Border>
             </Grid>

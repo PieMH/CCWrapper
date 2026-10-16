@@ -137,9 +137,15 @@ public partial class TranscriptView : UserControl
     void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.F || Keyboard.Modifiers != ModifierKeys.Control) return;
+        FocusSearch();
+        e.Handled = true;
+    }
+
+    /// <summary>The keyboard into the search box: Ctrl+F, and the tab bar's search button.</summary>
+    public void FocusSearch()
+    {
         SearchBox.Focus();
         SearchBox.SelectAll();
-        e.Handled = true;
     }
 }
 

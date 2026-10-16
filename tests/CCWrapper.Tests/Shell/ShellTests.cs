@@ -54,6 +54,32 @@ public sealed class ShellTests
         Assert.Equal("2m", new SessionRow("k", null, null, "t", "", "2m", "", "#fff", false, null, "").Meta);
     }
 
+    [Theory]
+    [InlineData(1000, 1, 220)]  // a lone card stops at the maximum
+    [InlineData(1000, 5, 198)]  // five share the bar
+    [InlineData(1000, 20, 120)] // many: the minimum, the bar scrolls
+    [InlineData(0, 0, 120)]     // not laid out yet
+    public void Tab_cards_share_the_bar_between_a_minimum_and_a_maximum(double available, int count, double width) =>
+        Assert.Equal(width, ShellModel.CardWidth(available, count));
+
+    [Theory]
+    [InlineData("powershell", "PowerShell")]
+    [InlineData("pwsh", "PowerShell")]
+    [InlineData("CCWrapper", "a CCWrapper window")]
+    [InlineData("WindowsTerminal", "Windows Terminal")]
+    [InlineData("nu", "nu")]
+    [InlineData(null, "another terminal")]
+    public void Host_names_are_what_the_user_calls_the_program(string? process, string name) =>
+        Assert.Equal(name, ProcessTree.HostName(process));
+
+    [Fact]
+    public void Describe_names_a_live_process_by_its_parent_with_pid_and_start_time()
+    {
+        var text = ProcessTree.Describe(Environment.ProcessId); // the test host, started by dotnet or an IDE
+        Assert.Contains($"(pid {Environment.ProcessId}, since ", text);
+        Assert.Equal("another terminal (pid 3)", ProcessTree.Describe(3)); // no such process: Windows pids are multiples of 4
+    }
+
     [Fact]
     public void Git_tip_names_the_committer_the_push_account_and_the_branch_state()
     {

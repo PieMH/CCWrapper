@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <None Update="Terminal\wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
-    <Resource Include="CCWrapper.ico" /> <!-- also the logo in the top bar and the empty state -->
+    <Resource Include="logo.png" /> <!-- the logo inside the app, 256 px: WPF shows an .ico through one of its small frames -->
     <InternalsVisibleTo Include="CCWrapper.Tests" />
   </ItemGroup>
 
