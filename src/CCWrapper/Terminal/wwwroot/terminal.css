@@ -24,26 +24,6 @@ html, body {
 #terms, .tab { position: absolute; inset: 0; }
 .tab .xterm { padding: 8px 0 0 12px; height: 100%; box-sizing: border-box; }
 
-/* Search this session: a quiet corner button; the find bar takes its place while open */
-#find-open {
-  position: absolute;
-  top: 8px;
-  right: 20px;
-  z-index: 9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  color: #aeb7c2;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  opacity: 0.75;
-}
-#find-open:hover { opacity: 1; color: var(--text); background: #242830; }
-
 #find {
   position: absolute;
   top: 8px;

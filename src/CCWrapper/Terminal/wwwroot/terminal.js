@@ -132,7 +132,6 @@ new ResizeObserver(() => {
 function openFind() {
   if (!visible) return;
   $('find').hidden = false;
-  $('find-open').hidden = true;
   $('find-q').select();
   $('find-q').focus();
   if ($('find-q').value) find(true, true);
@@ -141,7 +140,6 @@ function openFind() {
 function closeFind() {
   if ($('find').hidden) return;
   $('find').hidden = true;
-  $('find-open').hidden = false;
   visible?.search.clearDecorations();
   visible?.term.focus();
 }
@@ -168,7 +166,6 @@ $('find-q').addEventListener('keydown', e => {
 $('find-next').onclick = () => find(true);
 $('find-prev').onclick = () => find(false);
 $('find-close').onclick = closeFind;
-$('find-open').onclick = openFind;
 $('find-full').onclick = () => visible && post({ t: 'transcript', id: visible.id, q: $('find-q').value });
 
 // Files dropped anywhere else must not navigate the page away.
@@ -191,6 +188,7 @@ host.addEventListener('message', e => {
       if (tab) tab.term.write(m.d, () => post({ t: 'ack', id: m.id, n: m.d.length }));
       break;
     case 'show': show(m.id); break;
+    case 'find': openFind(); break; // the tab bar's search button
     case 'paste': tab?.term.paste(m.d); break;
     case 'exit':
       if (!tab) break;

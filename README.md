@@ -45,11 +45,16 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 **Sidebar**
 - **Session search:** typing filters by title and project. Enter searches the full text of every transcript of the account.
 - **Session list:** every session of the account, including ones started outside the app, newest first, with live status dots.
-  - Click a session to open it in the center, resumed in its original folder. The session that was there ends first (you're asked if Claude is still working) and stays resumable.
-  - A session open in another terminal shows read-only in the center, with **Resume here** (once you close it there) or **Continue here as a copy**.
+  - Click a session to open it: if it already has a tab, that tab comes forward; otherwise it is resumed in its original folder in a new tab. Nothing open is closed.
+  - A session open in another terminal gets a read-only tab, naming where it is open. **Resume here** offers to close it there and turns the tab into a live one; **Continue here as a copy** forks it.
 - **Settings menu:** opens `settings.json`, your `CLAUDE.md` or the config folder, or runs `/config`, `/permissions`, `/hooks` or `/memory`.
 - **Customize page:** lists your plugins, skills, MCP servers and connectors in one place. Changes go through Claude Code's own `/plugin` and `/mcp`.
 - **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
+
+**Tabs**
+- Every open session is a tab above the terminal, running in parallel: its status (● working, ◎ waiting for you, gently pulsing, ○ idle), its name and a × to close it (asks first if Claude is busy; it stays resumable).
+- The blue underline marks the tab you are looking at. Drag tabs to reorder them; **+** starts a new session in a new tab.
+- Many tabs shrink to a minimum width, then the bar scrolls sideways with the mouse wheel.
 
 **The terminal, improved**
 
@@ -60,7 +65,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 | Drag & drop | Inserts the dropped files' paths |
 | Ctrl+C | Copies when text is selected, otherwise interrupts (Ctrl+Shift+C always copies) |
 | Right-click | Copies the selection, or pastes when nothing is selected |
-| Ctrl+F | Find in the chat (also the search button in the terminal's top right corner), with highlights and a match count. "Search full transcript" covers the whole session. |
+| Ctrl+F | Find in the chat (also the search button at the right of the tab bar), with highlights and a match count. "Search full transcript" covers the whole session. |
 | Links | `localhost` links open in the built-in browser, all others in your default browser |
 
 **Compose box** (optional, under the terminal)

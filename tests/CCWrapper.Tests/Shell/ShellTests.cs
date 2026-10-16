@@ -55,6 +55,14 @@ public sealed class ShellTests
     }
 
     [Theory]
+    [InlineData(1000, 1, 220)]  // a lone card stops at the maximum
+    [InlineData(1000, 5, 198)]  // five share the bar
+    [InlineData(1000, 20, 120)] // many: the minimum, the bar scrolls
+    [InlineData(0, 0, 120)]     // not laid out yet
+    public void Tab_cards_share_the_bar_between_a_minimum_and_a_maximum(double available, int count, double width) =>
+        Assert.Equal(width, ShellModel.CardWidth(available, count));
+
+    [Theory]
     [InlineData("powershell", "PowerShell")]
     [InlineData("pwsh", "PowerShell")]
     [InlineData("CCWrapper", "a CCWrapper window")]
