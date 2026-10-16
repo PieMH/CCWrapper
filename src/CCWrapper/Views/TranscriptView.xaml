@@ -1,8 +1,8 @@
-<Window x:Class="CCWrapper.Views.TranscriptWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:CCWrapper.Views"
-        Title="Transcript" Width="900" Height="700" PreviewKeyDown="OnPreviewKeyDown">
+<UserControl x:Class="CCWrapper.Views.TranscriptView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:CCWrapper.Views"
+             PreviewKeyDown="OnPreviewKeyDown">
     <DockPanel>
         <Grid DockPanel.Dock="Top" Margin="8">
             <Grid.ColumnDefinitions>
@@ -39,7 +39,7 @@
                                     <Run Text="{Binding When, Mode=OneWay}" />
                                 </TextBlock>
                                 <local:MatchTextBlock TextWrapping="Wrap" FullText="{Binding Text}" Current="{Binding CurText}"
-                                                      Query="{Binding Query, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                      Query="{Binding Query, RelativeSource={RelativeSource AncestorType=local:TranscriptView}}">
                                     <local:MatchTextBlock.Style>
                                         <Style TargetType="local:MatchTextBlock">
                                             <Style.Triggers>
@@ -51,7 +51,7 @@
                                     </local:MatchTextBlock.Style>
                                 </local:MatchTextBlock>
                                 <local:MatchTextBlock TextWrapping="Wrap" FontFamily="Consolas" Opacity="0.75" FullText="{Binding Tools}" Current="{Binding CurTools}"
-                                                      Query="{Binding Query, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                      Query="{Binding Query, RelativeSource={RelativeSource AncestorType=local:TranscriptView}}">
                                     <local:MatchTextBlock.Style>
                                         <Style TargetType="local:MatchTextBlock">
                                             <Style.Triggers>
@@ -70,4 +70,4 @@
             <TextBlock x:Name="Empty" Text="No messages yet" Margin="12" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Top" />
         </Grid>
     </DockPanel>
-</Window>
+</UserControl>

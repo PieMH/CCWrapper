@@ -19,6 +19,7 @@ public partial class MainWindow : Window, IAppCommands
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
     readonly DispatcherTimer _gitTimer = new() { Interval = TimeSpan.FromMilliseconds(400) }; // debounce
     LiveSession? _watched; // the active session whose cwd the GitHub label follows
+    SessionEntry? _elsewhere; // shown read-only in the center: open in another claude process
     string? _gitCwd;
     CancellationTokenSource? _gitCts;
     bool _polling, _confirmedEnd;
@@ -55,11 +56,13 @@ public partial class MainWindow : Window, IAppCommands
 
     // ---- sessions ----
 
-    /// <summary>WPF cannot draw over WebView2, so without a session the terminal is collapsed and a WPF panel takes its cell.</summary>
+    /// <summary>WPF cannot draw over WebView2, so without a session the terminal is collapsed and a WPF panel takes its cell:
+    /// the read-only view of a session open elsewhere, else the empty state.</summary>
     void ShowTerminal(bool visible)
     {
         TerminalView.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        EmptyState.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+        ElsewhereState.Visibility = !visible && _elsewhere is not null ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = !visible && _elsewhere is null ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Starts claude.exe for the session in a new tab and makes it the active one.</summary>
@@ -84,11 +87,51 @@ public partial class MainWindow : Window, IAppCommands
     internal async Task NewSessionAsync()
     {
         var dialog = new NewSessionDialog { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.Result is { } options)
+        if (dialog.ShowDialog() == true && dialog.Result is { } options && ClearCenter())
             await OpenSessionAsync(new LiveSession(_state.Account) { Title = options.Name }, options);
     }
 
-    /// <summary>Shows an open session; the others keep running in the background.</summary>
+    /// <summary>The center shows one session at a time: ends the one there (asking first when it is busy or waiting; it stays
+    /// resumable) and drops a read-only view. False when the user declines.</summary>
+    bool ClearCenter()
+    {
+        if (!ConfirmEnd("Opening another session", _state.OpenSessions)) return false;
+        foreach (var s in _state.OpenSessions.ToList()) CloseSession(s);
+        ShowElsewhere(null);
+        return true;
+    }
+
+    /// <summary>Puts the live read-only transcript of a session open in another claude process in the center, or removes it (null).</summary>
+    void ShowElsewhere(SessionEntry? entry, string? query = null)
+    {
+        _elsewhere = entry;
+        ElsewhereTitle.Text = entry?.Title ?? "";
+        ElsewhereView.Content = entry is null ? null : new TranscriptView(entry.Path, query); // the old view stops following when unloaded
+        ShowTerminal(_state.OpenSessions.Count > 0);
+    }
+
+    async void OnResumeHere(object sender, RoutedEventArgs e)
+    {
+        if (_elsewhere is not { } entry) return;
+        var running = await Task.Run(() => SessionCatalog.Running(_state.Account));
+        if (running.Any(r => r.SessionId == entry.Id))
+            MessageBox.Show(this, "It is still open in another terminal. Close it there first, or continue here as a copy.",
+                "Resume here", MessageBoxButton.OK, MessageBoxImage.Information);
+        else await OpenEntry(entry with { Running = null });
+    }
+
+    async void OnContinueAsCopy(object sender, RoutedEventArgs e)
+    {
+        if (_elsewhere is not { } entry) return;
+        if (entry.Cwd is not { } cwd || !Directory.Exists(cwd)) { FolderGone(entry); return; }
+        ShowElsewhere(null);
+        await OpenSessionAsync(new LiveSession(_state.Account) { Title = entry.Title }, new LaunchOptions(cwd, entry.Id, Fork: true));
+    }
+
+    void FolderGone(SessionEntry entry) =>
+        MessageBox.Show(this, $"The session's folder does not exist any more:\n{entry.Cwd ?? "(unknown)"}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+    /// <summary>Shows the open session (with one session per window, that is the one already in the center).</summary>
     internal void Activate(LiveSession session)
     {
         TerminalView.Show(session);
@@ -106,14 +149,15 @@ public partial class MainWindow : Window, IAppCommands
         if (_state.ActiveSession is { } next) TerminalView.Show(next);
     }
 
-    /// <summary>Open here: show it. Running elsewhere: read-only transcript. Otherwise resume it in its folder.</summary>
+    /// <summary>Opens the session in the center, replacing what is there (see <see cref="ClearCenter"/>). Already open: show it.
+    /// Running in another claude process: its live transcript, read-only. Otherwise resumed in its folder.</summary>
     public async Task OpenEntry(SessionEntry entry, string? query = null)
     {
-        if (ShellModel.Match(_state.OpenSessions, entry.Running?.Pid, entry.Id) is { } open) Activate(open);
-        else if (entry.Running is not null) ShowTranscript(entry.Path, entry.Title, query);
-        else if (entry.Cwd is not { } cwd || !Directory.Exists(cwd))
-            MessageBox.Show(this, $"The session's folder does not exist any more:\n{entry.Cwd ?? "(unknown)"}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
-        else await OpenSessionAsync(new LiveSession(_state.Account) { Title = entry.Title }, new LaunchOptions(cwd, entry.Id));
+        if (ShellModel.Match(_state.OpenSessions, entry.Running?.Pid, entry.Id) is { } open) { Activate(open); return; }
+        if (entry.Running is null && (entry.Cwd is null || !Directory.Exists(entry.Cwd))) { FolderGone(entry); return; }
+        if (!ClearCenter()) return;
+        if (entry.Running is not null) ShowElsewhere(entry, query);
+        else await OpenSessionAsync(new LiveSession(_state.Account) { Title = entry.Title }, new LaunchOptions(entry.Cwd!, entry.Id));
     }
 
     // `--resume <id>`: set by the picker when it restarts this process as another account.
@@ -240,7 +284,7 @@ public partial class MainWindow : Window, IAppCommands
     }
 
     public void ShowTranscript(string transcriptPath, string title, string? query = null) =>
-        new TranscriptWindow(transcriptPath, title, query) { Owner = this }.Show();
+        new Window { Title = title, Width = 900, Height = 700, Owner = this, Content = new TranscriptView(transcriptPath, query) }.Show();
 
     public void OpenInBrowser(string url)
     {

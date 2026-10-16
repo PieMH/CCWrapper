@@ -29,6 +29,8 @@ public sealed class ClaudeLaunchTests : IDisposable
     {
         Assert.Equal(["--resume", "old", "--effort", "low"],
             ClaudeLaunch.Args(new LaunchOptions(@"C:\p", ResumeId: "old", Effort: "low", Name: " "), "ignored", null));
+        Assert.Equal(["--resume", "old", "--fork-session"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", ResumeId: "old", Fork: true), "ignored", null));
+        Assert.Equal(["--session-id", "s1"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", Fork: true), "s1", null)); // nothing to copy
     }
 
     [Fact]
@@ -118,6 +120,17 @@ public sealed class ClaudeLaunchTests : IDisposable
         Assert.Equal(0, RunRelay(@"..\..\evil", "{}", out var stdout));
         Assert.Equal("", stdout);
         Assert.False(File.Exists(Path.Combine(StatusLineFeed.LiveDir, @"..\..\evil.json")));
+    }
+
+    [Fact]
+    public async Task UsageProbe_skips_without_starting_claude_while_the_saved_usage_is_fresh()
+    {
+        var account = AccountC();
+        Directory.CreateDirectory(account.ConfigDir!);
+        File.WriteAllText(account.GlobalConfigPath, $$"""{ "cachedUsageUtilization": { "fetchedAtMs": {{DateTimeOffset.Now.AddSeconds(-30).ToUnixTimeMilliseconds()}} } }""");
+        var sw = Stopwatch.StartNew();
+        Assert.False(await UsageProbe.RefreshAsync(account));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1.5)); // a real /usage run takes 2 s or more
     }
 
     static int RunRelay(string tab, string stdin, out string stdout)

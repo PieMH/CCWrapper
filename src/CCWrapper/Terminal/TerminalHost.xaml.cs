@@ -64,7 +64,7 @@ public partial class TerminalHost : UserControl
     /// <summary>Relaunches an exited session in its terminal with <c>--resume &lt;SessionId&gt;</c> (the overlay's Resume).</summary>
     public Task ResumeAsync(LiveSession session) =>
         _tabs.TryGetValue(session.TabId, out var tab) && tab.Pty is null && tab.Size is null && tab.Options is { } o && session.SessionId is { } id
-            ? OpenAsync(session, o with { ResumeId = id, Name = null })
+            ? OpenAsync(session, o with { ResumeId = id, Name = null, Fork = false }) // a copy resumes as itself: its id was adopted
             : Task.CompletedTask;
 
     /// <summary>Brings the session's terminal forward; the others keep running hidden.</summary>
