@@ -130,13 +130,14 @@ public sealed class SettingsFile
     public void Revert() => Pending = (JsonObject)_original.DeepClone();
 
     /// <summary>What saving writes: the pending object, indented by 2 as Claude Code writes it, with the file's line ends.</summary>
-    public string Text
+    public string Text => Format(Pending, LoadedText);
+
+    /// <summary><paramref name="root"/> as Claude Code writes JSON, with the line ends and final newline of <paramref name="loaded"/>
+    /// (null: a new file, ending in one).</summary>
+    internal static string Format(JsonObject root, string? loaded)
     {
-        get
-        {
-            var eol = LoadedText?.Contains("\r\n") == true ? "\r\n" : "\n";
-            return Pending.ToJsonString(Out).ReplaceLineEndings(eol) + (LoadedText is null || LoadedText.EndsWith('\n') ? eol : "");
-        }
+        var eol = loaded?.Contains("\r\n") == true ? "\r\n" : "\n";
+        return root.ToJsonString(Out).ReplaceLineEndings(eol) + (loaded is null || loaded.EndsWith('\n') ? eol : "");
     }
 
     /// <summary>The JSON page's text becomes the pending object. Null when it parsed, else why not (nothing changes then).</summary>
@@ -158,7 +159,7 @@ public sealed class SettingsFile
         return null;
     }
 
-    static string? Parse(string text, out JsonObject? root)
+    internal static string? Parse(string text, out JsonObject? root)
     {
         root = null;
         try

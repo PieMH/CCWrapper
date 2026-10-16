@@ -502,7 +502,8 @@ public partial class ExtensionsWindow : Window
     void ShowServers()
     {
         var health = _health ?? [];
-        ServerRowView Row(McpServer s, string origin, string? removeScope) => new(s, origin, removeScope, StateBrush(s.State));
+        ServerRowView Row(McpServer s, string origin, string? removeScope) =>
+            new(s, origin, removeScope, StateBrush(s.State), _cwd is not null && s.State != McpState.Unknown);
 
         // Yours: the config files' servers with their health, plus any other non-plugin, non-connector server claude listed.
         var own = _own.Select(o => Row(health.FirstOrDefault(h => h.Name.Trim() == o.Name)
@@ -580,6 +581,24 @@ public partial class ExtensionsWindow : Window
         var updated = server with { State = fresh.State, Status = fresh.Status, Error = fresh.Error };
         if (i >= 0) _health[i] = updated; else _health.Add(updated);
         ShowServers();
+    }
+
+    /// <summary>The "use in this folder" switch: .claude.json's disabledMcpServers of the project folder, as /mcp disable and
+    /// enable write it. No CLI command does this, so it is written under Claude Code's own lock (<see cref="ClaudeJson"/>).</summary>
+    async void OnToggleServer(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not ServerRowView row || _cwd is not { } cwd) return;
+        ((UIElement)sender).IsEnabled = false; // until the rows are rebuilt: a second click would repeat the change
+        var (path, name, off) = (_account.GlobalConfigPath, row.Server.Name, row.On);
+        string? error;
+        await _writes.WaitAsync();
+        try { error = await Task.Run(() => ClaudeJson.Update(path, root => McpData.SetOff(root, cwd, name, off), SettingsWindow.BackupDir)); }
+        finally { _writes.Release(); }
+        if (error is null) await RecheckAsync(row.Server); // now off, or connecting again
+        ShowServers(); // a refused change puts the switch back
+        var folder = Path.GetFileName(cwd.TrimEnd('\\'));
+        SetLast(error is null ? $"✓ {row.Display} {(off ? "off" : "on")} in {folder}. Sessions started there from now on {(off ? "go without it" : "use it")}."
+            : $"✗ {row.Display}: {error}", error is null ? "TextSoft" : "Bad");
     }
 
     async void OnRemoveServer(object sender, RoutedEventArgs e)
@@ -707,9 +726,14 @@ public sealed class MarketRowView(MarketplaceInfo info, int? plugins)
 }
 
 /// <param name="removeScope">The scope <c>claude mcp remove</c> takes for the user's own server; null for plugin servers and connectors.</param>
-public sealed class ServerRowView(McpServer server, string origin, string? removeScope, Brush statusBrush)
+/// <param name="canSwitch">A project folder is picked and claude reported the server: its "use in this folder" switch works.</param>
+public sealed class ServerRowView(McpServer server, string origin, string? removeScope, Brush statusBrush, bool canSwitch)
 {
     public McpServer Server { get; } = server;
+    public bool On => Server.State != McpState.Disabled;
+    public bool CanSwitch { get; } = canSwitch;
+    public string SwitchTip => !CanSwitch ? "Pick a project folder and check health to turn this off for the folder"
+        : (On ? "Turn off " : "Turn on ") + Display + " in this folder";
     public string? RemoveScope { get; } = removeScope;
     public string Origin { get; } = origin;
     public Brush StatusBrush { get; } = statusBrush;
@@ -725,6 +749,7 @@ public sealed class ServerRowView(McpServer server, string origin, string? remov
         McpState.Failed => "Failed",
         McpState.NotSetUp => "Not set up",
         McpState.Pending => "Pending approval",
+        McpState.Disabled => "Off in this folder",
         _ => Server.Status,
     };
     public string Action => Server.State switch { McpState.NeedsAuth => "Sign in", McpState.Failed => "Retry", _ => "" };

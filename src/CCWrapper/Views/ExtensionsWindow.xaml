@@ -10,11 +10,13 @@
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
             <Setter Property="FontSize" Value="13" />
         </Style>
-        <!-- An MCP server: status dot, name and origin, endpoint, status, Sign in / Retry, Remove… -->
+        <!-- An MCP server: status dot, name and origin, endpoint, status, Sign in / Retry, Remove…, use in this folder -->
         <DataTemplate x:Key="ServerRow" DataType="{x:Type local:ServerRowView}">
-            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="12,8,6,8">
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="12,8,10,8">
                 <DockPanel>
                     <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding On, Mode=OneWay}" IsEnabled="{Binding CanSwitch}" Margin="8,0,0,0"
+                                  ToolTip="{Binding SwitchTip}" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="{Binding SwitchTip}" Click="OnToggleServer" />
                     <Button DockPanel.Dock="Right" Style="{StaticResource SmallDanger}" Content="Remove…" Margin="8,0,0,0" Visibility="{Binding RemoveVisibility}" Click="OnRemoveServer" />
                     <Button DockPanel.Dock="Right" Style="{StaticResource Small}" Content="{Binding Action}" MinWidth="76" Visibility="{Binding ActionVisibility}" Click="OnServerAction" />
                     <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontSize="12" Width="120" VerticalAlignment="Center" />
@@ -188,14 +190,14 @@
                         </DockPanel>
                         <TextBlock x:Name="InstalledStatus" DockPanel.Dock="Top" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="4,0,0,6" />
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
+                            <StackPanel Margin="0,0,12,0">
                                 <TextBlock x:Name="LocalHeader" Text="On this computer" Style="{StaticResource SmallLabel}" Margin="4,4,0,4" />
                                 <ListBox x:Name="LocalList" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                          SelectionChanged="OnPluginSelected">
                                     <ListBox.ItemContainerStyle>
                                         <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
-                                            <Setter Property="Padding" Value="8,6,4,6" />
+                                            <Setter Property="Padding" Value="8,6,10,6" />
                                             <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
                                         </Style>
                                     </ListBox.ItemContainerStyle>
@@ -467,7 +469,7 @@
 
                 <!-- ============ MCP servers ============ -->
                 <ScrollViewer x:Name="ServersPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel Margin="0,0,12,0">
                         <TextBlock Text="Yours · user, project and local scopes" Style="{StaticResource Label}" Margin="0,0,0,8" />
                         <Border x:Name="OwnEmpty" BorderBrush="{StaticResource ControlLine}" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,8">
                             <DockPanel>
@@ -531,17 +533,17 @@
                         </DockPanel>
                         <TextBlock x:Name="ServersStatus" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,0,0,8" />
                         <ItemsControl x:Name="PluginServers" ItemTemplate="{StaticResource ServerRow}" />
-                        <TextBlock Text="Plugin servers come and go with their plugin. New servers reach a session when it starts." Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                        <TextBlock Text="Plugin servers come and go with their plugin. The switch turns a server off in the project folder only, as /mcp disable does. New servers and switches reach a session when it starts." Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,10,0,0" />
                     </StackPanel>
                 </ScrollViewer>
 
                 <!-- ============ Connectors ============ -->
                 <DockPanel x:Name="ConnectorsPage" Visibility="Collapsed">
-                    <TextBlock DockPanel.Dock="Bottom" Text="Sign in opens your browser, as /mcp does. Open sessions use a new sign-in after /mcp reconnects or they restart."
+                    <TextBlock DockPanel.Dock="Bottom" Text="Sign in opens your browser, as /mcp does. Open sessions use a new sign-in after /mcp reconnects or they restart. The switches turn a connector off in the project folder only, for sessions started there afterwards."
                                Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,10,0,0" />
                     <TextBlock x:Name="ConnectorsStatus" DockPanel.Dock="Top" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,0,0,8" />
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="Connectors">
+                        <ItemsControl x:Name="Connectors" Margin="0,0,12,0">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -554,6 +556,8 @@
                                             <Border Style="{StaticResource Monogram}" Width="30" Height="30" Margin="0,0,10,0">
                                                 <TextBlock Text="{Binding Mono}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
+                                            <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding On, Mode=OneWay}" IsEnabled="{Binding CanSwitch}" Margin="6,0,0,0"
+                                                          ToolTip="{Binding SwitchTip}" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="{Binding SwitchTip}" Click="OnToggleServer" />
                                             <Button DockPanel.Dock="Right" Style="{StaticResource Small}" Content="{Binding Action}" Visibility="{Binding ActionVisibility}" Click="OnServerAction" />
                                             <StackPanel VerticalAlignment="Center">
                                                 <TextBlock Text="{Binding Display}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Endpoint}" />

@@ -17,9 +17,9 @@ public enum FieldKind { Select, Combo, Segments, Text }
 
 /// <summary>One setting row. <paramref name="Values"/> are the JSON values the options write when that isn't the option's
 /// own text (a boolean); <paramref name="AnyTrueWins"/>: true in any file wins (disableClaudeAiConnectors), not the most
-/// specific file.</summary>
+/// specific file; <paramref name="SessionOnly"/>: one more segment, shown disabled, that Claude Code takes only per session.</summary>
 public sealed record FieldDef(string[] Path, string Label, string Description, FieldKind Kind, string[] Options,
-    JsonNode?[]? Values = null, string? Placeholder = null, bool AnyTrueWins = false)
+    JsonNode?[]? Values = null, string? Placeholder = null, bool AnyTrueWins = false, string? SessionOnly = null)
 {
     public string Key => string.Join('.', Path);
     public JsonNode ValueOf(int i) => Values?[i]?.DeepClone() ?? JsonValue.Create(Options[i])!;
@@ -30,7 +30,7 @@ public sealed record FieldDef(string[] Path, string Label, string Description, F
 /// they were read, after a backup to %LOCALAPPDATA%\CCWrapper\backups.</summary>
 public partial class SettingsWindow : Window
 {
-    static readonly string BackupDir = Path.Combine(ClaudeLaunch.AppDataDir, "backups");
+    internal static readonly string BackupDir = Path.Combine(ClaudeLaunch.AppDataDir, "backups");
     static readonly string[] Effort = ["low", "medium", "high", "xhigh"];
     static readonly string[] HookEvents =
         ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Notification", "Stop", "SubagentStop", "SessionStart", "SessionEnd", "PreCompact", "PostCompact", "ConfigChange", "InstructionsLoaded"];
@@ -113,7 +113,8 @@ public partial class SettingsWindow : Window
     string Folder => _cwd is null ? "this folder" : Path.GetFileName(_cwd.TrimEnd('\\'));
 
     string Page => SearchBox.Text.Trim().Length > 0 ? "search"
-        : NavPermissions.IsChecked == true ? "permissions" : NavHooks.IsChecked == true ? "hooks" : NavEnv.IsChecked == true ? "env"
+        : NavPermissions.IsChecked == true ? "permissions" : NavInterface.IsChecked == true ? "interface"
+        : NavHooks.IsChecked == true ? "hooks" : NavEnv.IsChecked == true ? "env"
         : NavMemory.IsChecked == true ? "memory" : NavJson.IsChecked == true ? "json" : "general";
 
     Brush B(string key) => (Brush)FindResource(key);
@@ -146,7 +147,7 @@ public partial class SettingsWindow : Window
     {
         var page = Page;
         static Visibility V(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
-        FieldsPage.Visibility = V(page is "general" or "permissions" or "search");
+        FieldsPage.Visibility = V(page is "general" or "permissions" or "interface" or "search");
         RulesPanel.Visibility = V(page == "permissions");
         HooksPage.Visibility = V(page == "hooks");
         EnvPage.Visibility = V(page == "env");
@@ -159,11 +160,12 @@ public partial class SettingsWindow : Window
         (PageTitle.Text, PageSubtitle.Text) = page switch
         {
             "permissions" => ("Permissions", "What Claude may do without asking, must ask about, or may never do. Rules of every file apply together."),
+            "interface" => ("Interface", "The switches of Claude Code's /config, for how sessions look and behave."),
             "hooks" => ("Hooks", "Commands Claude Code runs on its events. Hooks of every file run."),
             "env" => ("Environment", "Variables every session starts with."),
             "memory" => ("CLAUDE.md", "Instructions Claude reads at the start of every session."),
             "json" => ("JSON", "The whole file, for anything the pages above do not cover."),
-            "search" => ($"Settings matching \"{SearchBox.Text.Trim()}\"", "From General and Permissions."),
+            "search" => ($"Settings matching \"{SearchBox.Text.Trim()}\"", "From General, Permissions and Interface."),
             _ => ("General", $"Model, look and updates for Claude Code sessions of account {letter}."),
         };
         if (_files.Count == 0) return; // still loading
@@ -222,14 +224,16 @@ public partial class SettingsWindow : Window
     {
         yield return new(["model"], "Model", "What new sessions start with. /model still changes one session.", FieldKind.Combo,
             ["default", "opus", "sonnet", "haiku", "opus[1m]", "sonnet[1m]"]);
-        yield return new(["effortLevel"], "Effort", "How hard the model thinks, for models without their own effort below.", FieldKind.Segments, Effort);
+        yield return new(["effortLevel"], "Effort", "How hard the model thinks, for models without their own effort below.", FieldKind.Segments, Effort,
+            SessionOnly: "max");
         foreach (var id in _files.Values.SelectMany(f => f.Pending["modelSettings"] is JsonObject m ? m.Select(p => p.Key) : []).Distinct().Order())
-            yield return new(["modelSettings", id, "effortLevel"], $"Effort · {id}", "This model's own effort: it wins over Effort.", FieldKind.Segments, Effort);
+            yield return new(["modelSettings", id, "effortLevel"], $"Effort · {id}", "This model's own effort: it wins over Effort.", FieldKind.Segments, Effort,
+                SessionOnly: "max");
         yield return new(["outputStyle"], "Output style", "How Claude writes its answers. Your own styles work too: type the name.", FieldKind.Combo,
             ["Default", "Explanatory", "Learning"]);
         yield return new(["language"], "Language", "The language Claude answers in. Empty is English.", FieldKind.Text, [], Placeholder: "e.g. italian");
         yield return new(["theme"], "Theme", "The terminal theme inside each session.", FieldKind.Combo,
-            ["dark", "light", "dark-daltonized", "light-daltonized", "dark-ansi", "light-ansi"]);
+            ["auto", "dark", "light", "dark-daltonized", "light-daltonized", "dark-ansi", "light-ansi"]);
         yield return new(["timeFormat"], "Time format", "Clock times in the session.", FieldKind.Segments, ["auto", "12-hour", "24-hour"]);
         yield return new(["autoUpdatesChannel"], "Update channel", "latest gets new versions first, stable about a week later, rc gets release candidates.",
             FieldKind.Segments, ["latest", "stable", "rc"]);
@@ -245,6 +249,26 @@ public partial class SettingsWindow : Window
             FieldKind.Select, ["default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions"]);
     }
 
+    /// <summary>/config's switches. Claude Code reads these from settings.json first (/config writes them to the user file);
+    /// .claude.json holds only values older versions saved there.</summary>
+    static IEnumerable<FieldDef> InterfaceFields()
+    {
+        string[] onOff = ["on", "off"];
+        JsonNode?[] bools = [true, false];
+        FieldDef Switch(string key, string label, string description) => new([key], label, description, FieldKind.Segments, onOff, bools);
+        yield return Switch("autoCompactEnabled", "Auto-compact", "Compact the conversation when the context fills up. On by default.");
+        yield return Switch("fileCheckpointingEnabled", "Rewind code (checkpoints)", "Snapshot edited files so /rewind can restore them. On by default.");
+        yield return Switch("verbose", "Verbose output", "Full tool output instead of summaries. Off by default.");
+        yield return Switch("showTurnDuration", "Show turn duration", "How long each answer took, after it. On by default.");
+        yield return Switch("spinnerTipsEnabled", "Show tips", "Tips while Claude works. On by default.");
+        yield return Switch("prefersReducedMotion", "Reduce motion", "Fewer animations: spinners, shimmer and flashes. Off by default.");
+        yield return Switch("terminalProgressBarEnabled", "Terminal progress bar", "Progress shown by terminals that support it. On by default.");
+        yield return Switch("respectGitignore", "Respect .gitignore in file picker", "Files .gitignore excludes stay out of @ mentions. On by default.");
+        yield return new(["editorMode"], "Editor mode", "Key bindings of the prompt.", FieldKind.Segments, ["normal", "vim"]);
+        yield return new(["preferredNotifChannel"], "Notifications", "How a finished task or a permission prompt is signaled.", FieldKind.Select,
+            ["auto", "terminal_bell", "notifications_disabled"]);
+    }
+
     void BuildRows()
     {
         _rows.Clear();
@@ -253,7 +277,8 @@ public partial class SettingsWindow : Window
         var defs = (Page switch
         {
             "permissions" => PermissionFields(),
-            "search" => GeneralFields().Concat(PermissionFields()).Where(d => new[] { d.Label, d.Key, d.Description }.Any(t => t.Contains(q, StringComparison.OrdinalIgnoreCase))),
+            "interface" => InterfaceFields(),
+            "search" => GeneralFields().Concat(PermissionFields()).Concat(InterfaceFields()).Where(d => new[] { d.Label, d.Key, d.Description }.Any(t => t.Contains(q, StringComparison.OrdinalIgnoreCase))),
             _ => GeneralFields(),
         }).ToList();
         foreach (var def in defs) FieldRows.Children.Add(BuildRow(def));
@@ -314,6 +339,14 @@ public partial class SettingsWindow : Window
                     var choice = new RadioButton { Style = (Style)FindResource("Segment"), GroupName = group, Content = def.Options[i], IsChecked = i == index };
                     choice.Checked += (_, _) => { file?.Set(def.Path, def.ValueOf(option)); Changed(); };
                     panel.Children.Add(choice);
+                }
+                if (def.SessionOnly is { } only)
+                {
+                    // Claude Code drops it from settings.json without a word: offering it would save nothing.
+                    var off = new RadioButton { Style = (Style)FindResource("Segment"), Content = only, IsEnabled = false,
+                        ToolTip = $"Claude Code doesn't save {only} in settings. Use /effort {only} in a session." };
+                    ToolTipService.SetShowOnDisabled(off, true);
+                    panel.Children.Add(off);
                 }
                 return new Border { Background = B("Bg"), BorderBrush = B("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(2), Child = panel };
             }

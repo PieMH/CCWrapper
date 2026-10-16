@@ -68,6 +68,12 @@
                             <TextBlock Text="Permissions" />
                         </DockPanel>
                     </RadioButton>
+                    <RadioButton x:Name="NavInterface" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE9E9;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock Text="Interface" />
+                        </DockPanel>
+                    </RadioButton>
                     <RadioButton x:Name="NavHooks" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
                         <DockPanel>
                             <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" Width="16" Margin="0,0,10,0" />

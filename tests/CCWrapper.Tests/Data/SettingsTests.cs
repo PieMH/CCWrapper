@@ -236,4 +236,54 @@ public sealed class SettingsTests : IDisposable
         var fresh = TextFile.Load(P("CLAUDE.local.md"));
         Assert.Equal((null, "", false), (fresh.LoadedText, fresh.Pending, fresh.Dirty));
     }
+
+    // ---- .claude.json ----
+
+    [Fact]
+    public void Claude_json_changes_under_its_lock_keep_the_rest_and_back_up_the_old_file()
+    {
+        var path = P(".claude.json");
+        const string text = "{\n  \"numStartups\": 3,\n  \"projects\": {\n    \"C:/Work\": {\n      \"allowedTools\": []\n    }\n  },\n  \"oauthAccount\": {\n    \"emailAddress\": \"t@example.com\"\n  }\n}";
+        File.WriteAllText(path, text); // no final newline, as Claude Code writes it
+
+        Assert.Null(ClaudeJson.Update(path, root => McpData.SetOff(root, @"C:\Work", "s", off: true), Backups));
+
+        Assert.Equal(text.Replace("\"allowedTools\": []", "\"allowedTools\": [],\n      \"disabledMcpServers\": [\n        \"s\"\n      ]"), File.ReadAllText(path));
+        Assert.False(Directory.Exists(path + ".lock"));
+        Assert.Equal(text, File.ReadAllText(Assert.Single(Directory.GetFiles(Backups))));
+    }
+
+    [Fact]
+    public void Claude_json_waits_for_a_held_lock_and_takes_over_a_stale_one()
+    {
+        var path = P(".claude.json");
+        File.WriteAllText(path, "{}");
+        Directory.CreateDirectory(path + ".lock"); // a claude is writing
+        static string? SetX(JsonObject root) { root["x"] = 1; return null; }
+
+        Assert.Equal("Claude Code is writing its config file right now. Try again in a moment.", ClaudeJson.Update(path, SetX, Backups));
+        Assert.Equal("{}", File.ReadAllText(path));
+        Assert.True(Directory.Exists(path + ".lock")); // not ours to remove
+
+        Directory.SetLastWriteTimeUtc(path + ".lock", DateTime.UtcNow.AddMinutes(-1)); // left by a claude that ended
+        Assert.Null(ClaudeJson.Update(path, SetX, Backups));
+        Assert.Equal("{\n  \"x\": 1\n}", File.ReadAllText(path));
+        Assert.False(Directory.Exists(path + ".lock"));
+    }
+
+    [Fact]
+    public void Claude_json_is_not_written_when_the_change_is_refused_or_changes_nothing_or_the_file_is_broken()
+    {
+        var path = P(".claude.json");
+        File.WriteAllText(path, "{\"a\": 1}"); // indented unlike Claude Code: any write would show
+
+        Assert.Equal("no", ClaudeJson.Update(path, _ => "no", Backups));
+        Assert.Null(ClaudeJson.Update(path, _ => null, Backups));
+        Assert.Equal("{\"a\": 1}", File.ReadAllText(path));
+
+        File.WriteAllText(path, "{\"a\": ");
+        Assert.StartsWith("Claude Code's config file is not valid JSON", ClaudeJson.Update(path, _ => null, Backups));
+        Assert.False(Directory.Exists(Backups));
+        Assert.False(Directory.Exists(path + ".lock"));
+    }
 }
