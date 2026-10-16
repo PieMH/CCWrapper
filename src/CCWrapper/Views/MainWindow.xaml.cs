@@ -140,6 +140,7 @@ public partial class MainWindow : Window, IAppCommands
     async void OnResumeHere(object sender, RoutedEventArgs e)
     {
         if (_elsewhere is not { } entry || _resuming) return;
+        if (entry.Cwd is null || !Directory.Exists(entry.Cwd)) { FolderGone(entry); return; } // before anything is closed elsewhere
         _resuming = true;
         SetResumeBusy("Checking…");
         try

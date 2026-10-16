@@ -42,7 +42,8 @@ public static class SessionCatalog
             var id = Path.GetFileNameWithoutExtension(file.Name);
             var probe = ProbeOf(file);
             var title = CustomTitle(file, id) ?? probe.AiTitle ?? probe.LastPrompt ?? history.Value.GetValueOrDefault(id) ?? id;
-            list.Add(new SessionEntry(account, id, file.FullName, probe.Cwd, file.LastWriteTimeUtc, Collapse(title)) { Running = running.GetValueOrDefault(id) });
+            var live = running.GetValueOrDefault(id);
+            list.Add(new SessionEntry(account, id, file.FullName, probe.Cwd ?? live?.Cwd, file.LastWriteTimeUtc, Collapse(title)) { Running = live });
         }
         return list.OrderByDescending(s => s.LastActivity).ToList();
     }
@@ -111,11 +112,15 @@ public static class SessionCatalog
                 if (line.Contains("\"cwd\"") && JsonlReader.TryParse(line) is { } r && Text(r, "cwd") is { } c) { cwd = c; break; }
                 if (next > HeadBytes) break;
             }
+            // A continued or resumed transcript can open with title records and file-history snapshots bigger than the head
+            // (one had its first cwd at 83 KB): then the tail's records, nearly all of which carry it, give the cwd.
+            var headHadCwd = cwd is not null;
             // The first tail line is usually cut mid-record; it fails to parse and is skipped like any bad line.
             foreach (var (line, _) in JsonlReader.ReadLines(file.FullName, Math.Max(0, size - TailBytes)))
             {
-                if (!line.Contains("\"ai-title\"") && !line.Contains("\"last-prompt\"")) continue;
-                if (JsonlReader.TryParse(line) is not { } r) continue;
+                var wanted = line.Contains("\"ai-title\"") || line.Contains("\"last-prompt\"") || (!headHadCwd && line.Contains("\"cwd\""));
+                if (!wanted || JsonlReader.TryParse(line) is not { } r) continue;
+                if (!headHadCwd && Text(r, "cwd") is { } c) cwd = c;
                 switch (r.Prop("type").Str())
                 {
                     case "ai-title": ai = Text(r, "aiTitle") ?? ai; break;

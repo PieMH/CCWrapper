@@ -45,6 +45,20 @@ public sealed class SessionCatalogTests : IDisposable
     }
 
     [Fact]
+    public void Cwd_comes_from_the_tail_when_the_head_is_all_snapshots()
+    {
+        var a = _home.AddAccount("a");
+        // A continued session: title records, then file-history snapshots far bigger than the head, and only then a cwd.
+        var snapshot = "{\"type\":\"file-history-snapshot\",\"snapshot\":\"" + new string('x', 40 * 1024) + "\"}\n";
+        var pad = string.Concat(Enumerable.Repeat("{\"type\":\"user\",\"cwd\":\"C:\\\\Work\\\\Alpha\",\"message\":{\"content\":\"padding padding\"}}\n", 2000));
+        var path = a.Paths.Transcript(Alpha, "continued");
+        FakeHome.WriteFile(path, "{\"type\":\"custom-title\",\"customTitle\":\"planv3\"}\n" + snapshot + snapshot + snapshot + pad);
+        Assert.True(new FileInfo(path).Length > 192 * 1024);
+
+        Assert.Equal(Alpha, Assert.Single(SessionCatalog.List(a)).Cwd);
+    }
+
+    [Fact]
     public void Only_the_tail_is_read_for_titles()
     {
         var a = _home.AddAccount("a");
