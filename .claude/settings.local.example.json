@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git push -u origin:*)",
+      "Bash(gh pr create:*)",
+      "Bash(./src/CCWrapper/bin/Debug/net10.0-windows/CCWrapper.exe --smoke)",
+      "Bash(./src/CCWrapper/bin/Release/net10.0-windows/CCWrapper.exe --smoke)"
+    ],
+    "additionalDirectories": [
+      "~/AppData/Local/CCWrapper"
+    ]
+  }
+}
