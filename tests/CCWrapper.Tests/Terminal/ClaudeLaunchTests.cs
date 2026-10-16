@@ -52,17 +52,30 @@ public sealed class ClaudeLaunchTests : IDisposable
         Assert.Equal(Path.Combine(_dir, ".claude-c"), c["CLAUDE_CONFIG_DIR"]);
     }
 
-    [Fact]
-    public void RelaySettings_written_when_no_statusLine_with_forward_slash_command()
+    string Relay()
     {
-        var path = ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), @"C:\Apps\CCW\CCWrapper.StatusRelay.exe", _dir);
+        var exe = Path.Combine(_dir, "CCW", "CCWrapper.StatusRelay.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(exe)!);
+        File.WriteAllText(exe, "");
+        return exe;
+    }
 
-        Assert.Equal(Path.Combine(_dir, "relay-settings.json"), path);
-        using var doc = JsonDocument.Parse(File.ReadAllText(path!));
+    [Fact]
+    public void RelaySettings_is_inline_json_with_a_forward_slash_command_and_writes_no_file()
+    {
+        var exe = Relay();
+        var json = ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), exe);
+
+        using var doc = JsonDocument.Parse(json!);
         var statusLine = doc.RootElement.GetProperty("statusLine");
         Assert.Equal("command", statusLine.GetProperty("type").GetString());
-        Assert.Equal("C:/Apps/CCW/CCWrapper.StatusRelay.exe", statusLine.GetProperty("command").GetString());
+        Assert.Equal(exe.Replace('\\', '/'), statusLine.GetProperty("command").GetString());
+        Assert.Equal([exe], Directory.GetFiles(_dir, "*", SearchOption.AllDirectories));
     }
+
+    [Fact]
+    public void RelaySettings_skipped_when_the_relay_exe_is_missing() =>
+        Assert.Null(ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), Path.Combine(_dir, "gone.exe")));
 
     [Theory]
     [InlineData(".claude-c/settings.json")]
@@ -74,8 +87,7 @@ public sealed class ClaudeLaunchTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, """{ "model": "opus", "statusLine": { "type": "command", "command": "mine.sh" } }""");
 
-        Assert.Null(ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), @"C:\r.exe", _dir));
-        Assert.False(File.Exists(Path.Combine(_dir, "relay-settings.json")));
+        Assert.Null(ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), Relay()));
     }
 
     [Fact]
