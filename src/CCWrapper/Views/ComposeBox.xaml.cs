@@ -179,7 +179,8 @@ public partial class ComposeBox : UserControl
     }
 }
 
-/// <summary>What may go into the TUI input, and how it goes in. Shared by the compose box, the bottom bar and the Customize page.</summary>
+/// <summary>What may go into the TUI input, and how it goes in. Shared by the compose box, the bottom bar, the sidebar's Settings menu
+/// and the reload button of Plugins &amp; connectors.</summary>
 public static class TuiInput
 {
     public const string ClearInputFirst = "Clear the terminal input first: the command would be added to the text there";

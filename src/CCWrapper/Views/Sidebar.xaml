@@ -58,10 +58,10 @@
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>
-            <Button Style="{StaticResource Nav}" Click="OnCustomize">
+            <Button Style="{StaticResource Nav}" Click="OnExtensions" ToolTip="Plugins, marketplaces, skills, MCP servers and claude.ai connectors">
                 <DockPanel>
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE71D;" Width="16" Margin="0,0,10,0" />
-                    <TextBlock Text="Customize" VerticalAlignment="Center" />
+                    <TextBlock Text="Plugins &amp; connectors" VerticalAlignment="Center" />
                 </DockPanel>
             </Button>
         </StackPanel>
