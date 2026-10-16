@@ -4,3 +4,4 @@ obj/
 *.user
 .agents-team/
 docs/PLAN.md
+.claude/settings.local.json

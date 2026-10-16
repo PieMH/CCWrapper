@@ -1,6 +1,6 @@
 # CCWrapper
 
-**A lightweight native Windows GUI around the real Claude Code terminal. One account per window, as many windows as you like.**
+**A lightweight native Windows GUI around the real Claude Code terminal. Sessions as tabs, one account per window, as many windows as you like.**
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
@@ -11,23 +11,20 @@ Claude Code in a bare PowerShell window works, but it's clumsy. There's no searc
 
 CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style app around it. The chat, permission prompts, slash commands and menus all stay Claude Code's own TUI, so every Claude Code update works the day it ships.
 
-```
-┌ CCWrapper │ ● C · Personal Pro  ⇄ Switch │ octocat · main ↑2 ──────────────────────┐
-├────────────────────┬─────────────────────────────────────┬─────────────────────────┤
-│ Search sessions... │ [find in chat ____ 3/12 ↑↓] Ctrl+F │ Files │ Agents │ Browser │
-│ Settings ▾         │                                     │ ▾ src/                  │
-│ Customize          │   the real Claude Code TUI,         │     App.cs     +12 −3   │
-│ + New session      │   with your account's own settings  │     New.cs     +40  A   │
-│ ────────────────── │                                     │ ▾ assets/               │
-│ ● my-api      now  │                                     │     logo.png  +1.2 KB   │
-│ ◉ docs-site    2m  │ ┌ compose ────────────────────────┐ │                         │
-│ ○ scratch      3d  │ │ multi-line prompt, paste, drop  │ │                         │
-│                    │ └───────────────────────── Send ──┘ │                         │
-├────────────────────┴─────────────────────────────────────┴─────────────────────────┤
-│ opus ▾ │ high ▾ │ auto ▾ │ ctx 202k/1M 20% │ in 1.2M out 48k $16.7 │ 5h 58% wk 12% │
-└────────────────────────────────────────────────────────────────────────────────────┘
- ● working   ◉ needs your input   ○ open / idle
-```
+![CCWrapper: sessions in the sidebar, the terminal with its tab bar, changed files on the right, plan usage in the bottom bar, and the account switcher open on top](docs/screenshot.png)
+
+*The main window with the account switcher open. Names, emails and session titles in the screenshot are made up.*
+
+## What it is
+
+CCWrapper is for people who live in Claude Code on Windows, often with more than one account (a work Team plan and a personal Pro, for example). Each window is one account, started the way Claude Code itself would be (`CLAUDE_CONFIG_DIR`), with that account's own settings, plugins and hooks. Inside the window:
+
+- **Every session is a tab** running in parallel, with a live status icon, so you see at a glance which one is working, which one waits for you and which one is done.
+- **The sidebar knows every session of the account**, including ones you started in plain PowerShell. Click one to bring it here; if it is open in another terminal, CCWrapper says where and can take it over for you.
+- **Usage is live:** the 5-hour and weekly plan limits come from Claude Code's own `/usage`, for every account, on the start screen and in the bottom bar.
+- **The terminal gets the comforts it lacks:** Ctrl+V for screenshots and files, Shift+Enter for new lines, search, a compose box, changed files with diffs, subagents, a built-in browser, and the git state of the folder you are in.
+
+It stays light: a native WPF app (no Electron), Windows' own icon font, a dark slate theme with the logo's blue, and no heavy animation.
 
 ## Features
 
@@ -44,9 +41,9 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 
 **Sidebar**
 - **Session search:** typing filters by title and project. Enter searches the full text of every transcript of the account.
-- **Session list:** every session of the account, including ones started outside the app, newest first, with live status dots.
+- **Session list:** every session of the account, including ones started outside the app, newest first, with a status label (*working*, *needs you*, *open*) and a blue marker on the one you are looking at.
   - Click a session to open it: if it already has a tab, that tab comes forward; otherwise it is resumed in its original folder in a new tab. Nothing open is closed.
-  - A session open in another terminal gets a read-only tab, naming where it is open. **Resume here** offers to close it there and turns the tab into a live one; **Continue here as a copy** forks it.
+  - A session open in another terminal gets a read-only tab that says where it is open, e.g. "PowerShell (pid 51708, since 15:07)". **Resume here** offers to close it there (the conversation is saved) and turns the tab into a live one; **Continue here as a copy** forks it instead.
 - **Settings menu:** opens `settings.json`, your `CLAUDE.md` or the config folder, or runs `/config`, `/permissions`, `/hooks` or `/memory`.
 - **Customize page:** lists your plugins, skills, MCP servers and connectors in one place. Changes go through Claude Code's own `/plugin` and `/mcp`.
 - **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
@@ -69,18 +66,18 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 | Links | `localhost` links open in the built-in browser, all others in your default browser |
 
 **Compose box** (optional, under the terminal)
-- A real multi-line editor: Enter sends, Shift+Enter adds a line, and Up recalls earlier prompts.
+- A real multi-line editor with a round send button: Enter sends, Shift+Enter adds a line, and Up recalls earlier prompts.
 - Pasted screenshots become image files.
 - It never types into a permission prompt or a dialog. Those you always answer in the terminal.
 
 **Right panel**
-- **Files:** a tree of every file Claude changed this session, with `+/−` lines or the size change for binaries. Click a file to see all of it with the changes highlighted.
+- **Files:** a tree of every file Claude changed this session, with `+/−` lines in green and red, or the size change for binaries. Click a file to see all of it with the changes highlighted.
 - **Agents:** this session's subagents, running or finished, with model, effort, context and tokens. Click one to see its live transcript.
 - **Browser:** a built-in WebView2 browser for your dev server.
 
 **Bottom bar**
 - Model, effort and permission-mode switches that drive Claude Code's own `/model`, `/effort` and Shift+Tab.
-- Meters for context window, session tokens and cost, and 5-hour and weekly plan usage. Usage shows even with no session open, is checked when the window opens and every 30 minutes, and the ↻ button checks it now.
+- Meters with small bars for the context window and the 5-hour and weekly plan usage (amber from 80%), plus session tokens and cost. Usage shows even with no session open, is checked when the window opens and every 30 minutes, and the ↻ button checks it now.
 
 ## Requirements
 
@@ -136,7 +133,8 @@ CCWrapper.exe --smoke         # terminal self-test, exits 0 on success
 ```
 
 A few tips:
-- ● means Claude is working and ◉ means it's waiting for you. When a session needs you while the window is in the background, the taskbar button flashes.
+- On a tab, ● means Claude is working, a pulsing ◎ means it's waiting for you and ○ means it's done. When a session needs you while the window is in the background, the taskbar button flashes.
+- Running the same session in two places at once isn't possible: open it here with **Resume here**, which can close the other terminal's copy for you. Note that `claude --continue` in a folder reopens that folder's latest session, wherever else it is open.
 - When a session's process exits, the terminal offers **Resume** or **Close**.
 - The model and effort switches send Claude Code's own `/model` and `/effort`, which **save the choice as that account's default**. That's Claude Code's behavior, not the app's.
 - Accounts using Claude Code's fullscreen renderer (`"tui": "fullscreen"`) stay fullscreen. Ctrl+F then searches the visible screen, and "Search full transcript" searches the whole session.
@@ -145,12 +143,13 @@ A few tips:
 
 CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 
+- **It ends a `claude` process only when you confirm it:** Resume here's "Close it there and resume it here?" ends that terminal's `claude`, as closing the terminal would. Nothing else is ever stopped for you.
 - **It reads only files Claude Code already writes:** each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts, session status files, file-history backups, and plugin and skill lists.
 - **It never reads** `.credentials.json`, never calls Anthropic APIs, and never edits your settings.
 - **It writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
 - **It makes no network calls of its own.** The Browser panel loads only what you open in it.
-- **Plan usage is checked with Claude Code's own `/usage`:** a hidden `claude "/usage"` (MCP servers off) runs in the folder of the account's most recent session, and Claude Code saves the result in `.claude.json`. Each check takes a few seconds, adds `/usage` to that folder's prompt history (Up arrow), and runs your startup hooks like any `claude` start. A check that can't finish in 30 seconds (not logged in, a trust question) is stopped and the last numbers stay.
+- **Plan usage is checked with Claude Code's own `/usage`:** a hidden `claude "/usage"` (MCP servers off) runs in the folder of the account's most recent session, and Claude Code saves the result in `.claude.json`. Each check takes a few seconds, adds `/usage` to that folder's prompt history (Up arrow), and runs your startup hooks like any `claude` start, so automatic checks are skipped when the last one is under 10 minutes old. A check that can't finish in 30 seconds (not logged in, a trust question) is stopped and the last numbers stay.
 - Every session is the unmodified `claude.exe`, run under your own login.
 
 ## Known limits
@@ -174,7 +173,9 @@ CCWrapper was built in about a day, almost entirely by Claude Code agents:
 3. **The review.** An independent QA agent reviewed the whole change over several rounds and found more than 30 issues. The most important fixes keep the app from ever typing into a permission prompt by accident. They went into 5 fix tasks (F1–F5), and the last round passed.
 4. **The scars.** An antivirus behavior shield killed the agents' own UI-test scripts (screenshots, synthetic keystrokes, WebView2 remote debugging) halfway through. From then on, verification was unit tests and a headless smoke test only.
 
-Every step is in the history: `git log --first-parent` shows the merge of each task (T1–T7, F1–F5).
+5. **The polish.** After v1, everything went through pull requests in the same Claude Code session: live plan usage, a takeover for sessions open in other terminals, a design pass (two directions mocked up side by side, then the chosen one built into the app), the app icon, and session tabs with drag to reorder.
+
+Every step is in the history: `git log --first-parent` shows the merge of each task (T1–T7, F1–F5) and of each pull request after it.
 
 **Stack**
 - C# / .NET 10 + WPF;
@@ -192,16 +193,20 @@ dotnet test
 ```
 
 ```
-src/CCWrapper/             WPF app
+src/CCWrapper/             WPF app (Theme.xaml: colors and styles, App.xaml: Fluent recolored)
   Core/                    accounts, paths, the LiveSession contract
   Data/                    read-only parsers for Claude Code's files (all tolerant of unknown fields)
-  Terminal/                ConPTY session, WebView2 + xterm.js host, paste handling
-  Views/                   picker, main window, sidebar, panels, bottom bar, compose box
+  Terminal/                ConPTY session, WebView2 + xterm.js host, paste, hidden /usage, process helpers
+  Views/                   picker, main window, tab bar, sidebar, panels, bottom bar, compose box
 src/CCWrapper.StatusRelay/ silent statusLine relay → %LOCALAPPDATA%\CCWrapper\live
-tests/CCWrapper.Tests/     xUnit tests
+tests/CCWrapper.Tests/     xUnit tests (one builds every view with the theme loaded)
+docs/                      the screenshot
 ```
 
-Issues and pull requests are welcome.
+**Contributing.** Issues and pull requests are welcome; `main` only takes pull requests.
+- [`CLAUDE.md`](CLAUDE.md) gives Claude Code (and you) the project's rules: what the app must never do, how to build and verify, and why.
+- [`.claude/settings.json`](.claude/settings.json) is the shared project setup: common build, test and read-only git commands need no approval, and `.credentials.json` files, pushes to `main` and force-pushes are denied.
+- For your own additions, copy [`.claude/settings.local.example.json`](.claude/settings.local.example.json) to `.claude/settings.local.json` (git-ignored) and edit it.
 
 ## License
 
