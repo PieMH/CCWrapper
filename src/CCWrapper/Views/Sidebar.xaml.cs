@@ -12,7 +12,7 @@ using CCWrapper.Data;
 
 namespace CCWrapper.Views;
 
-/// <summary>Search, Settings menu, Customize, New session and the session list of this window's account.</summary>
+/// <summary>Search, Settings menu, Plugins &amp; connectors, New session and the session list of this window's account.</summary>
 public partial class Sidebar : UserControl
 {
     readonly ObservableCollection<SessionRow> _rows = [];
@@ -22,7 +22,7 @@ public partial class Sidebar : UserControl
     string? _query;
     CancellationTokenSource? _search;
     bool _refreshing;
-    Window? _customize;
+    Window? _extensions;
 
     static AppState State => AppState.Current;
     MainWindow Main => (MainWindow)Window.GetWindow(this);
@@ -166,7 +166,7 @@ public partial class Sidebar : UserControl
         if (path is null) return;
         if (!File.Exists(path) && !Directory.Exists(path))
         {
-            MessageBox.Show(Main, $"{path}\n\ndoes not exist.", "Nothing to open", MessageBoxButton.OK, MessageBoxImage.Information);
+            Dialog.Show(Main, $"{path}\n\ndoes not exist.", "Nothing to open", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
@@ -179,15 +179,11 @@ public partial class Sidebar : UserControl
         if (State.ActiveSession is { } session && sender is MenuItem { Tag: string command }) await TuiInput.SubmitAsync(session, command);
     }
 
-    void OnCustomize(object sender, RoutedEventArgs e)
+    void OnExtensions(object sender, RoutedEventArgs e)
     {
-        if (_customize is { IsLoaded: true }) { _customize.Activate(); return; }
-        _customize = new Window
-        {
-            Title = $"Customize · {ShellModel.LetterOf(State.Account.Letter)}", Owner = Main, Content = new CustomizePage(),
-            Width = 900, Height = 700, WindowStartupLocation = WindowStartupLocation.CenterOwner,
-        };
-        _customize.Show();
+        if (_extensions is { IsLoaded: true }) { _extensions.Activate(); return; }
+        _extensions = new ExtensionsWindow(State.Account, State.ActiveSession?.Cwd) { Owner = Main };
+        _extensions.Show();
     }
 
     async void OnNewSession(object sender, RoutedEventArgs e) => await Main.NewSessionAsync();

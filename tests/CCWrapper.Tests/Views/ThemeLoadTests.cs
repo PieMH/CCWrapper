@@ -21,8 +21,15 @@ public sealed class ThemeLoadTests
                 var main = new MainWindow(new Account("c", @"C:\none\.claude-c", @"C:\none\.claude-c\.claude.json", "t@example.com"));
                 _ = new AccountPicker();
                 _ = new NewSessionDialog();
-                _ = new CustomizePage();
+                _ = new ExtensionsWindow(new Account("c", @"C:\none\.claude-c", @"C:\none\.claude-c\.claude.json", "t@example.com"), null);
+                _ = new PluginOptionsDialog("p",
+                [
+                    new("region", "Region", "Where", true, false, "eu", ["eu", "us"], true),
+                    new("token", "Token", null, false, true, "", null, false),
+                    new("folder", "Folder", null, false, false, "C:\\", null, false),
+                ]);
                 _ = new TranscriptView(@"C:\none\t.jsonl");
+                _ = new Dialog("message", "title", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
                 Assert.NotNull(main.FindResource("Accent"));
             }
             catch (Exception ex) { error = ex; }

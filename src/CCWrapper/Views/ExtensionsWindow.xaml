@@ -1,0 +1,610 @@
+<Window x:Class="CCWrapper.Views.ExtensionsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CCWrapper.Views"
+        xmlns:data="clr-namespace:CCWrapper.Data"
+        Title="Plugins &amp; connectors" Width="1120" Height="760" MinWidth="860" MinHeight="560"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource Bg}" Foreground="{StaticResource Text}">
+    <Window.Resources>
+        <Style x:Key="SmallLabel" TargetType="TextBlock" BasedOn="{StaticResource Label}">
+            <Setter Property="Margin" Value="4,14,0,6" />
+        </Style>
+        <Style x:Key="Dim" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        </Style>
+        <Style x:Key="Mono" TargetType="TextBlock" BasedOn="{StaticResource Dim}">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+        </Style>
+        <Style x:Key="Monogram" TargetType="Border">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Background" Value="{StaticResource Raised}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlLine}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Panel}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+        </Style>
+        <Style x:Key="Small" TargetType="Button" BasedOn="{StaticResource Outlined}">
+            <Setter Property="Height" Value="30" />
+        </Style>
+        <Style x:Key="SmallDanger" TargetType="Button" BasedOn="{StaticResource Danger}">
+            <Setter Property="Height" Value="30" />
+        </Style>
+        <Style x:Key="Field" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <!-- Placeholder over an empty TextBox (WPF has none); each use adds the DataTrigger on its TextBox -->
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+        <!-- An MCP server: status dot, name and origin, endpoint, status, Sign in / Retry, Remove… -->
+        <DataTemplate x:Key="ServerRow" DataType="{x:Type local:ServerRowView}">
+            <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="12,8,6,8">
+                <DockPanel>
+                    <Ellipse Width="8" Height="8" Fill="{Binding StatusBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource SmallDanger}" Content="Remove…" Margin="8,0,0,0" Visibility="{Binding RemoveVisibility}" Click="OnRemoveServer" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Small}" Content="{Binding Action}" MinWidth="76" Visibility="{Binding ActionVisibility}" Click="OnServerAction" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}" Foreground="{Binding StatusBrush}" FontSize="12" Width="120" VerticalAlignment="Center" />
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Display}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Origin}" Style="{StaticResource Dim}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Endpoint}" Style="{StaticResource Mono}" ToolTip="{Binding Endpoint}" />
+                        <TextBlock Text="{Binding Error}" Foreground="{StaticResource Bad}" FontSize="12" TextWrapping="Wrap" Visibility="{Binding ErrorVisibility}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- Status strip: what ran last -->
+        <Border DockPanel.Dock="Bottom" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="14,5">
+            <DockPanel>
+                <TextBlock Style="{StaticResource Icon}" Text="&#xEA18;" FontSize="13" Foreground="{StaticResource Good}" Margin="0,0,8,0" />
+                <Button x:Name="CancelRun" DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Cancel" Margin="10,0,0,0" Visibility="Collapsed" Click="OnCancelRun" />
+                <TextBlock x:Name="LastCommand" DockPanel.Dock="Right" FontFamily="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource TextSoft}"
+                           TextTrimming="CharacterEllipsis" MaxWidth="620" VerticalAlignment="Center" />
+                <TextBlock x:Name="Promise" Style="{StaticResource Dim}" VerticalAlignment="Center" />
+            </DockPanel>
+        </Border>
+
+        <!-- Left rail -->
+        <Border DockPanel.Dock="Left" Width="230" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0" Padding="10,14">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom">
+                    <TextBlock Text="Project folder" Style="{StaticResource Label}" Margin="4,0,0,4" />
+                    <ComboBox x:Name="ProjectBox" SelectionChanged="OnProjectChanged" HorizontalAlignment="Stretch" />
+                    <TextBlock Text="The project and local scopes apply to this folder." Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="4,6,0,0" />
+                </StackPanel>
+                <StackPanel>
+                    <DockPanel Margin="4,0,0,4">
+                        <Border Style="{StaticResource Monogram}" Width="30" Height="30" Margin="0,0,10,0">
+                            <TextBlock x:Name="AccountLetter" FontWeight="SemiBold" Foreground="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="AccountName" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock x:Name="AccountLabel" Style="{StaticResource Dim}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <TextBlock Text="Plugins" Style="{StaticResource SmallLabel}" />
+                    <RadioButton x:Name="NavInstalled" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav" IsChecked="True">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE7B8;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock x:Name="InstalledCount" DockPanel.Dock="Right" Style="{StaticResource Dim}" FontWeight="Normal" />
+                            <TextBlock Text="Installed" />
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavDiscover" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock Text="Discover" />
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavMarketplaces" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE719;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock x:Name="MarketplacesCount" DockPanel.Dock="Right" Style="{StaticResource Dim}" FontWeight="Normal" />
+                            <TextBlock Text="Marketplaces" />
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavSkills" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock x:Name="SkillsCount" DockPanel.Dock="Right" Style="{StaticResource Dim}" FontWeight="Normal" />
+                            <TextBlock Text="Skills" />
+                        </DockPanel>
+                    </RadioButton>
+
+                    <TextBlock Text="MCP" Style="{StaticResource SmallLabel}" />
+                    <RadioButton x:Name="NavServers" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE703;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock x:Name="ServersCount" DockPanel.Dock="Right" Style="{StaticResource Dim}" FontWeight="Normal" />
+                            <TextBlock Text="Servers" />
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavConnectors" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE71B;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock x:Name="ConnectorsCount" DockPanel.Dock="Right" Style="{StaticResource Dim}" FontWeight="Normal" />
+                            <TextBlock Text="Connectors" />
+                        </DockPanel>
+                    </RadioButton>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Content -->
+        <Grid Margin="24,20,24,16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <DockPanel Margin="0,0,0,14">
+                <StackPanel x:Name="InstalledActions" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <Button Style="{StaticResource Outlined}" Height="32" Content="Check for updates" ToolTip="Updates the marketplaces, then lists the plugins again" Click="OnCheckUpdates" />
+                </StackPanel>
+                <StackPanel x:Name="ServersActions" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom" Visibility="Collapsed">
+                    <TextBlock x:Name="CheckedAt" Style="{StaticResource Dim}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                    <Button x:Name="CheckHealthButton" Style="{StaticResource Outlined}" Height="32" Content="Check health" ToolTip="Runs claude mcp list" Click="OnCheckHealth" />
+                    <Button Style="{StaticResource Primary}" Content="Add server" Margin="8,0,0,0" Click="OnOpenAdd" />
+                </StackPanel>
+                <StackPanel x:Name="ConnectorsActions" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Bottom" Visibility="Collapsed">
+                    <Button Style="{StaticResource Outlined}" Height="32" Click="OnManageConnectors">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Add or remove on claude.ai" VerticalAlignment="Center" />
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8A7;" FontSize="11" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock x:Name="PageTitle" FontSize="20" FontWeight="SemiBold" />
+                    <TextBlock x:Name="PageSubtitle" Style="{StaticResource Dim}" FontSize="13" Margin="0,4,0,0" TextWrapping="Wrap" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- After a plugin change: open sessions keep the old setup -->
+            <Border x:Name="Banner" Grid.Row="1" Background="{StaticResource Raised}" BorderBrush="{StaticResource ControlLine}" BorderThickness="1"
+                    CornerRadius="8" Padding="14,9" Margin="0,0,0,14" Visibility="Collapsed">
+                <DockPanel>
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE946;" Foreground="{StaticResource Accent}" Margin="0,0,10,0" />
+                    <Button x:Name="ReloadButton" DockPanel.Dock="Right" Style="{StaticResource Primary}" MinHeight="30" Padding="12,0" Content="Reload idle sessions"
+                            ToolTip="Sends /reload-plugins to each open session that is idle" Click="OnReloadSessions" />
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Height="30" Content="Later" Margin="0,0,8,0" Click="OnDismissBanner" />
+                    <TextBlock x:Name="BannerText" Foreground="{StaticResource TextSoft}" FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <!-- ============ Installed ============ -->
+                <Grid x:Name="InstalledPage">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <Border DockPanel.Dock="Right" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="2" Margin="8,0,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="ShowAll" Style="{StaticResource Segment}" GroupName="Show" IsChecked="True" Checked="OnInstalledFilter" />
+                                    <RadioButton x:Name="ShowLocal" Style="{StaticResource Segment}" GroupName="Show" Checked="OnInstalledFilter" />
+                                    <RadioButton x:Name="ShowSynced" Style="{StaticResource Segment}" GroupName="Show" Checked="OnInstalledFilter" />
+                                </StackPanel>
+                            </Border>
+                            <Grid>
+                                <TextBox x:Name="InstalledFilter" Padding="30,6,8,6" TextChanged="OnInstalledFilter" />
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="13" Foreground="{StaticResource Muted}" Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False" />
+                                <TextBlock Text="Filter installed" Margin="31,0,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=InstalledFilter}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </DockPanel>
+                        <TextBlock x:Name="InstalledStatus" DockPanel.Dock="Top" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="4,0,0,6" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock x:Name="LocalHeader" Text="On this computer" Style="{StaticResource SmallLabel}" Margin="4,4,0,4" />
+                                <ListBox x:Name="LocalList" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                         SelectionChanged="OnPluginSelected">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
+                                            <Setter Property="Padding" Value="8,6,4,6" />
+                                            <Setter Property="AutomationProperties.Name" Value="{Binding Name}" />
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type local:PluginRowView}">
+                                            <DockPanel>
+                                                <ToggleButton DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding Enabled, Mode=OneWay}"
+                                                              ToolTip="{Binding SwitchTip}" AutomationProperties.Name="{Binding SwitchTip}" Click="OnTogglePlugin" />
+                                                <Border Style="{StaticResource Monogram}" Margin="0,0,12,0">
+                                                    <TextBlock Text="{Binding Mono}" FontWeight="SemiBold" Foreground="{Binding Tint}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                        <Border BorderBrush="{StaticResource Warn}" BorderThickness="1" CornerRadius="8" Padding="7,0" Margin="8,0,0,0"
+                                                                VerticalAlignment="Center" Visibility="{Binding BadgeVisibility}">
+                                                            <TextBlock Text="{Binding Badge}" FontSize="11" Foreground="{StaticResource Warn}" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource Dim}" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <StackPanel x:Name="SyncedHeader" Orientation="Horizontal" Margin="4,16,0,6">
+                                    <TextBlock Text="Synced from claude.ai" Style="{StaticResource Label}" />
+                                    <TextBlock Text=" · managed in your claude.ai account" Style="{StaticResource Dim}" />
+                                </StackPanel>
+                                <ItemsControl x:Name="SyncedList">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type data:PluginInfo}">
+                                            <Border Style="{StaticResource Tile}" CornerRadius="8" Width="196" Padding="10,7" Margin="0,0,6,6">
+                                                <DockPanel>
+                                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE753;" FontSize="13" Foreground="{StaticResource Muted}" Margin="0,0,8,0" />
+                                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Main.Version}" Style="{StaticResource Dim}" Margin="6,0,0,0" />
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" ToolTip="{Binding Id}" />
+                                                </DockPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </DockPanel>
+
+                    <Border x:Name="Details" Grid.Column="2" Style="{StaticResource Tile}" Padding="18" Visibility="Hidden">
+                        <DockPanel>
+                            <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,12,0,0">
+                                <DockPanel>
+                                    <Button x:Name="UninstallButton" DockPanel.Dock="Right" Style="{StaticResource Danger}" Height="32" Content="Uninstall…" Click="OnUninstall" />
+                                    <Button x:Name="UpdateButton" Style="{StaticResource Outlined}" Height="32" Content="Update" Click="OnUpdatePlugin" />
+                                    <Button x:Name="ConfigureButton" Style="{StaticResource Outlined}" Height="32" Content="Configure…" Margin="8,0,0,0" Click="OnConfigure" HorizontalAlignment="Left" />
+                                </DockPanel>
+                            </Border>
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <Border Style="{StaticResource Monogram}" Width="40" Height="40" CornerRadius="10" Margin="0,0,12,0">
+                                            <TextBlock x:Name="DetailMono" FontSize="17" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <Border x:Name="DetailStatePill" DockPanel.Dock="Right" Background="{StaticResource Raised}" CornerRadius="9" Padding="8,2" VerticalAlignment="Center">
+                                            <TextBlock x:Name="DetailState" FontSize="12" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock x:Name="DetailName" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock x:Name="DetailSub" Style="{StaticResource Dim}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <TextBlock x:Name="DetailDescription" Foreground="{StaticResource TextSoft}" FontSize="13" TextWrapping="Wrap" Margin="0,14,0,0" />
+                                    <Grid Margin="0,14,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.Resources>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="FontSize" Value="13" />
+                                                <Setter Property="Margin" Value="0,0,16,6" />
+                                                <Setter Property="TextWrapping" Value="Wrap" />
+                                            </Style>
+                                        </Grid.Resources>
+                                        <TextBlock Text="Scopes" Foreground="{StaticResource Muted}" />
+                                        <TextBlock x:Name="DetailScopes" Grid.Column="1" />
+                                        <TextBlock Grid.Row="1" Text="Installed" Foreground="{StaticResource Muted}" />
+                                        <TextBlock x:Name="DetailInstalled" Grid.Row="1" Grid.Column="1" />
+                                        <TextBlock Grid.Row="2" Text="Updated" Foreground="{StaticResource Muted}" />
+                                        <TextBlock x:Name="DetailUpdated" Grid.Row="2" Grid.Column="1" />
+                                        <TextBlock Grid.Row="3" Text="Context cost" Foreground="{StaticResource Muted}" />
+                                        <TextBlock x:Name="DetailCost" Grid.Row="3" Grid.Column="1" />
+                                    </Grid>
+                                    <TextBlock Text="Components" Style="{StaticResource Label}" Margin="0,10,0,6" />
+                                    <ItemsControl x:Name="DetailComponents">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type data:PluginComponent}">
+                                                <Border Background="{StaticResource Raised}" BorderBrush="{StaticResource ControlLine}" BorderThickness="1" CornerRadius="12" Padding="9,3" Margin="0,0,6,6"
+                                                        ToolTip="{Binding Names}">
+                                                    <TextBlock FontSize="12">
+                                                        <Run Text="{Binding Count, Mode=OneWay}" /> <Run Text="{Binding Kind, Mode=OneWay}" />
+                                                    </TextBlock>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock x:Name="DetailSkills" Style="{StaticResource Dim}" TextWrapping="Wrap" TextTrimming="None" />
+                                    <Border x:Name="DetailNoteBox" Background="{StaticResource NoteFill}" BorderBrush="{StaticResource NoteLine}" BorderThickness="1" CornerRadius="8" Padding="12,10" Margin="0,14,0,0">
+                                        <DockPanel>
+                                            <TextBlock Style="{StaticResource Icon}" Text="&#xE7BA;" Foreground="{StaticResource Warn}" VerticalAlignment="Top" Margin="0,1,10,0" />
+                                            <TextBlock x:Name="DetailNote" Foreground="{StaticResource NoteText}" FontSize="12" TextWrapping="Wrap" />
+                                        </DockPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ============ Discover ============ -->
+                <DockPanel x:Name="DiscoverPage" Visibility="Collapsed">
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <TextBlock Text="From" Style="{StaticResource Dim}" FontSize="13" VerticalAlignment="Center" Margin="12,0,6,0" />
+                            <ComboBox x:Name="CatalogMarket" MinWidth="200" SelectionChanged="OnCatalogFilter" />
+                            <TextBlock Text="Install to" Style="{StaticResource Dim}" FontSize="13" VerticalAlignment="Center" Margin="12,0,6,0" />
+                            <ComboBox x:Name="InstallScope" MinWidth="200" SelectedIndex="0">
+                                <ComboBoxItem Tag="user" Content="User · every folder" />
+                                <ComboBoxItem Tag="project" Content="Project · shared with the repo" />
+                                <ComboBoxItem Tag="local" Content="Local · just me, this folder" />
+                            </ComboBox>
+                        </StackPanel>
+                        <Grid>
+                            <TextBox x:Name="CatalogSearch" Padding="30,6,8,6" TextChanged="OnCatalogFilter" />
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="13" Foreground="{StaticResource Muted}" Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False" />
+                            <TextBlock x:Name="CatalogHint" Text="Search plugins" Margin="31,0,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=CatalogSearch}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </DockPanel>
+                    <TextBlock x:Name="CatalogStatus" DockPanel.Dock="Bottom" Style="{StaticResource Dim}" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="Cards">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:CardView}">
+                                    <Border Style="{StaticResource Tile}" Width="272" Height="168" Padding="14" Margin="0,0,12,12">
+                                        <DockPanel>
+                                            <DockPanel DockPanel.Dock="Top">
+                                                <Border Style="{StaticResource Monogram}" Width="30" Height="30" Margin="0,0,10,0">
+                                                    <TextBlock Text="{Binding Mono}" FontWeight="SemiBold" Foreground="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Entry.Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Entry.Id}" />
+                                                    <TextBlock Text="{Binding Entry.Marketplace}" Style="{StaticResource Dim}" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                            <DockPanel DockPanel.Dock="Bottom">
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource Primary}" MinHeight="30" Padding="14,0" Content="Install"
+                                                        Visibility="{Binding InstallVisibility}" Click="OnInstall" />
+                                                <TextBlock DockPanel.Dock="Right" Text="Installed" Foreground="{StaticResource Good}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                           Visibility="{Binding InstalledVisibility}" />
+                                                <TextBlock Text="{Binding InstallsText}" Style="{StaticResource Dim}" VerticalAlignment="Center" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding Entry.Description}" Foreground="{StaticResource TextSoft}" FontSize="13" TextWrapping="Wrap"
+                                                       TextTrimming="WordEllipsis" Margin="0,8" ToolTip="{Binding Entry.Description}" />
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+
+                <!-- ============ Marketplaces ============ -->
+                <DockPanel x:Name="MarketplacesPage" Visibility="Collapsed">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource Tile}" Padding="12" Margin="0,0,0,12">
+                        <DockPanel>
+                            <TextBlock Text="Add a marketplace" Style="{StaticResource Dim}" FontSize="13" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Button DockPanel.Dock="Right" Style="{StaticResource Primary}" Content="Add" Margin="8,0,0,0" Click="OnAddMarketplace" />
+                            <ComboBox x:Name="MarketScope" DockPanel.Dock="Right" MinWidth="110" SelectedIndex="0" Margin="8,0,0,0">
+                                <ComboBoxItem Tag="user" Content="User" />
+                                <ComboBoxItem Tag="project" Content="Project" />
+                                <ComboBoxItem Tag="local" Content="Local" />
+                            </ComboBox>
+                            <Grid>
+                                <TextBox x:Name="MarketSource" Style="{StaticResource Field}" />
+                                <TextBlock Text="owner/repo, a git URL or a folder" Margin="10,0,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=MarketSource}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </DockPanel>
+                    </Border>
+                    <TextBlock x:Name="MarketsStatus" DockPanel.Dock="Top" Style="{StaticResource Dim}" Margin="4,0,0,8" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="Markets">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:MarketRowView}">
+                                    <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="14,12">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource SmallDanger}" Content="Remove…" Margin="8,0,0,0" Click="OnRemoveMarketplace" />
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource Small}" Content="Update" Click="OnUpdateMarketplace" />
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" Style="{StaticResource Dim}" VerticalAlignment="Center" Margin="0,0,14,0" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Info.Name}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{Binding Info.Origin}" Style="{StaticResource Dim}" ToolTip="{Binding Info.Where}" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+
+                <!-- ============ Skills ============ -->
+                <ScrollViewer x:Name="SkillsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="Skills">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type data:SkillRow}">
+                                <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="4,8" ToolTip="{Binding Description}">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Source}" Style="{StaticResource Dim}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}" Foreground="{StaticResource TextSoft}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- ============ MCP servers ============ -->
+                <ScrollViewer x:Name="ServersPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="Yours · user, project and local scopes" Style="{StaticResource Label}" Margin="0,0,0,8" />
+                        <Border x:Name="OwnEmpty" BorderBrush="{StaticResource ControlLine}" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,8">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Height="32" Content="Add server" Click="OnOpenAdd" />
+                                <TextBlock Text="No servers of your own yet. Everything below comes from plugins." Foreground="{StaticResource TextSoft}" FontSize="13" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                        <ItemsControl x:Name="OwnServers" ItemTemplate="{StaticResource ServerRow}" />
+
+                        <!-- Add server -->
+                        <Border x:Name="AddForm" Background="{StaticResource Panel}" BorderBrush="{StaticResource ControlLine}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,4,0,8" Visibility="Collapsed">
+                            <StackPanel>
+                                <DockPanel>
+                                    <StackPanel DockPanel.Dock="Right" Margin="12,0,0,0">
+                                        <TextBlock Text="Transport" Style="{StaticResource Dim}" Margin="0,0,0,4" />
+                                        <Border Background="{StaticResource Bg}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="2">
+                                            <StackPanel Orientation="Horizontal">
+                                                <RadioButton x:Name="TransportStdio" Style="{StaticResource Segment}" GroupName="Transport" Content="stdio" Tag="stdio" Checked="OnAddChanged" />
+                                                <RadioButton x:Name="TransportHttp" Style="{StaticResource Segment}" GroupName="Transport" Content="http" Tag="http" IsChecked="True" Checked="OnAddChanged" />
+                                                <RadioButton x:Name="TransportSse" Style="{StaticResource Segment}" GroupName="Transport" Content="sse" Tag="sse" Checked="OnAddChanged" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel>
+                                        <TextBlock Text="Name" Style="{StaticResource Dim}" Margin="0,0,0,4" />
+                                        <TextBox x:Name="AddName" TextChanged="OnAddChanged" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <TextBlock x:Name="AddTargetLabel" Style="{StaticResource Dim}" Margin="0,12,0,4" />
+                                <TextBox x:Name="AddTarget" Style="{StaticResource Field}" TextChanged="OnAddChanged" />
+                                <TextBlock x:Name="AddPairsLabel" Style="{StaticResource Dim}" Margin="0,12,0,4" />
+                                <TextBox x:Name="AddPairs" Style="{StaticResource Field}" AcceptsReturn="True" MinHeight="54" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" TextChanged="OnAddChanged" />
+                                <TextBlock Text="Save to" Style="{StaticResource Dim}" Margin="0,12,0,6" />
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="AddLocal" GroupName="AddScope" Content="Local · just me, this folder" Tag="local" IsChecked="True" Margin="0,0,18,0" Checked="OnAddChanged" />
+                                    <RadioButton x:Name="AddProject" GroupName="AddScope" Content="Project · shared in .mcp.json" Tag="project" Margin="0,0,18,0" Checked="OnAddChanged" />
+                                    <RadioButton x:Name="AddUser" GroupName="AddScope" Content="User · every folder" Tag="user" Checked="OnAddChanged" />
+                                </StackPanel>
+                                <Border Background="{StaticResource TerminalBg}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6" Padding="10,8" Margin="0,12,0,0">
+                                    <TextBlock x:Name="AddPreview" FontFamily="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource TextSoft}" TextWrapping="Wrap" />
+                                </Border>
+                                <DockPanel Margin="0,12,0,0">
+                                    <Button x:Name="AddConfirm" DockPanel.Dock="Right" Style="{StaticResource Primary}" Content="Add server" Margin="8,0,0,0" Click="OnConfirmAdd" />
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Height="32" Content="Cancel" Click="OnCloseAdd" />
+                                    <TextBlock x:Name="AddError" Foreground="{StaticResource Bad}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <DockPanel Margin="0,14,0,8">
+                            <TextBlock x:Name="PluginServersHeader" Text="From plugins" Style="{StaticResource Label}" VerticalAlignment="Center" Margin="0,0,12,0" />
+                            <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="2" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="StateAll" Style="{StaticResource Segment}" GroupName="State" IsChecked="True" Checked="OnServerFilter" />
+                                    <RadioButton x:Name="StateConnected" Style="{StaticResource Segment}" GroupName="State" Checked="OnServerFilter" />
+                                    <RadioButton x:Name="StateAuth" Style="{StaticResource Segment}" GroupName="State" Checked="OnServerFilter" />
+                                    <RadioButton x:Name="StateNotSetUp" Style="{StaticResource Segment}" GroupName="State" Checked="OnServerFilter" />
+                                    <RadioButton x:Name="StateFailed" Style="{StaticResource Segment}" GroupName="State" Checked="OnServerFilter" />
+                                </StackPanel>
+                            </Border>
+                        </DockPanel>
+                        <TextBlock x:Name="ServersStatus" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <ItemsControl x:Name="PluginServers" ItemTemplate="{StaticResource ServerRow}" />
+                        <TextBlock Text="Plugin servers come and go with their plugin. New servers reach a session when it starts." Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- ============ Connectors ============ -->
+                <DockPanel x:Name="ConnectorsPage" Visibility="Collapsed">
+                    <TextBlock DockPanel.Dock="Bottom" Text="Sign in opens your browser, as /mcp does. Open sessions use a new sign-in after /mcp reconnects or they restart."
+                               Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,10,0,0" />
+                    <TextBlock x:Name="ConnectorsStatus" DockPanel.Dock="Top" Style="{StaticResource Dim}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="Connectors">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:ServerRowView}">
+                                    <Border Style="{StaticResource Tile}" Width="300" Padding="12,8" Margin="0,0,8,8">
+                                        <DockPanel>
+                                            <Border Style="{StaticResource Monogram}" Width="30" Height="30" Margin="0,0,10,0">
+                                                <TextBlock Text="{Binding Mono}" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Button DockPanel.Dock="Right" Style="{StaticResource Small}" Content="{Binding Action}" Visibility="{Binding ActionVisibility}" Click="OnServerAction" />
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Display}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Endpoint}" />
+                                                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{Binding StatusBrush}" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>

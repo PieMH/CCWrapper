@@ -58,10 +58,10 @@
                     </ContextMenu>
                 </Button.ContextMenu>
             </Button>
-            <Button Style="{StaticResource Nav}" Click="OnCustomize">
+            <Button Style="{StaticResource Nav}" Click="OnExtensions" ToolTip="Plugins, marketplaces, skills, MCP servers and claude.ai connectors">
                 <DockPanel>
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE71D;" Width="16" Margin="0,0,10,0" />
-                    <TextBlock Text="Customize" VerticalAlignment="Center" />
+                    <TextBlock Text="Plugins &amp; connectors" VerticalAlignment="Center" />
                 </DockPanel>
             </Button>
         </StackPanel>
@@ -96,6 +96,31 @@
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsActive}" Value="True">
                                                 <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                            <!-- the session's /color -->
+                                            <DataTrigger Binding="{Binding Color}" Value="red">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionRed}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="blue">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionBlue}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="green">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionGreen}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="yellow">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionYellow}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="purple">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionPurple}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="orange">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionOrange}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="pink">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionPink}" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Color}" Value="cyan">
+                                                <Setter Property="Foreground" Value="{StaticResource SessionCyan}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

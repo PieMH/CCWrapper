@@ -17,6 +17,9 @@ public sealed record RunningSession(
 public sealed record SessionEntry(Account Account, string Id, string Path, string? Cwd, DateTimeOffset LastActivity, string Title)
 {
     public RunningSession? Running { get; init; }
+
+    /// <summary>The session's /color name (red, blue, green, yellow, purple, orange, pink, cyan); null when unset or reset.</summary>
+    public string? Color { get; init; }
 }
 
 /// <param name="LastUsed">DateTimeOffset.MinValue when unknown.</param>
@@ -26,7 +29,7 @@ public static class SessionCatalog
 {
     const int HeadBytes = 64 * 1024, TailBytes = 64 * 1024;
 
-    record Probe(long Size, long Ticks, string? Cwd, string? AiTitle, string? LastPrompt);
+    record Probe(long Size, long Ticks, string? Cwd, string? CustomTitle, string? AiTitle, string? LastPrompt, string? Color);
 
     // Process-wide so repeated List calls stay cheap; keyed by full path, valid while (size, mtime) match.
     static readonly ConcurrentDictionary<string, Probe> Probes = new(StringComparer.OrdinalIgnoreCase);
@@ -40,9 +43,11 @@ public static class SessionCatalog
         foreach (var file in TranscriptFiles(account))
         {
             var id = Path.GetFileNameWithoutExtension(file.Name);
-            var probe = ProbeOf(file);
-            var title = CustomTitle(file, id) ?? probe.AiTitle ?? probe.LastPrompt ?? history.Value.GetValueOrDefault(id) ?? id;
-            list.Add(new SessionEntry(account, id, file.FullName, probe.Cwd, file.LastWriteTimeUtc, Collapse(title)) { Running = running.GetValueOrDefault(id) });
+            var probe = ProbeOf(file, id);
+            var title = probe.CustomTitle ?? probe.AiTitle ?? probe.LastPrompt ?? history.Value.GetValueOrDefault(id) ?? id;
+            var live = running.GetValueOrDefault(id);
+            list.Add(new SessionEntry(account, id, file.FullName, probe.Cwd ?? live?.Cwd, file.LastWriteTimeUtc, Collapse(title))
+                { Running = live, Color = probe.Color });
         }
         return list.OrderByDescending(s => s.LastActivity).ToList();
     }
@@ -98,36 +103,52 @@ public static class SessionCatalog
         return root.Exists ? root.EnumerateDirectories().SelectMany(d => d.EnumerateFiles("*.jsonl")) : [];
     }
 
-    static Probe ProbeOf(FileInfo file)
+    // "custom-title" and "agent-color" records are written again after every turn, so the tail nearly always has the latest;
+    // the head has the first ones (a name given with -n, a fork's color). /rename also writes the custom-title.json sidecar.
+    static Probe ProbeOf(FileInfo file, string id)
     {
         var (size, ticks) = (file.Length, file.LastWriteTimeUtc.Ticks);
         if (Probes.TryGetValue(file.FullName, out var cached) && cached.Size == size && cached.Ticks == ticks) return cached;
 
-        string? cwd = null, ai = null, prompt = null;
+        string? cwd = null, ai = null, prompt = null, headTitle = null, headColor = null, tailTitle = null, tailColor = null;
+        Probe Result() => new(size, ticks, cwd, tailTitle ?? CustomTitle(file, id) ?? headTitle, ai, prompt,
+            (tailColor ?? headColor) is { } color && color != "default" ? color : null);
         try
         {
             foreach (var (line, next) in JsonlReader.ReadLines(file.FullName))
             {
+                if ((line.Contains("\"custom-title\"") || line.Contains("\"agent-color\"")) && JsonlReader.TryParse(line) is { } t)
+                {
+                    headTitle ??= Text(t, "customTitle");
+                    headColor ??= Text(t, "agentColor");
+                }
                 if (line.Contains("\"cwd\"") && JsonlReader.TryParse(line) is { } r && Text(r, "cwd") is { } c) { cwd = c; break; }
                 if (next > HeadBytes) break;
             }
+            // A continued or resumed transcript can open with title records and file-history snapshots bigger than the head
+            // (one had its first cwd at 83 KB): then the tail's records, nearly all of which carry it, give the cwd.
+            var headHadCwd = cwd is not null;
             // The first tail line is usually cut mid-record; it fails to parse and is skipped like any bad line.
             foreach (var (line, _) in JsonlReader.ReadLines(file.FullName, Math.Max(0, size - TailBytes)))
             {
-                if (!line.Contains("\"ai-title\"") && !line.Contains("\"last-prompt\"")) continue;
-                if (JsonlReader.TryParse(line) is not { } r) continue;
+                var wanted = line.Contains("\"ai-title\"") || line.Contains("\"last-prompt\"") || line.Contains("\"custom-title\"")
+                    || line.Contains("\"agent-color\"") || (!headHadCwd && line.Contains("\"cwd\""));
+                if (!wanted || JsonlReader.TryParse(line) is not { } r) continue;
+                if (!headHadCwd && Text(r, "cwd") is { } c) cwd = c;
                 switch (r.Prop("type").Str())
                 {
                     case "ai-title": ai = Text(r, "aiTitle") ?? ai; break;
                     case "last-prompt": prompt = Text(r, "lastPrompt") ?? prompt; break;
+                    case "custom-title": tailTitle = Text(r, "customTitle") ?? tailTitle; break;
+                    case "agent-color": tailColor = Text(r, "agentColor") ?? tailColor; break;
                 }
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new Probe(size, ticks, cwd, ai, prompt); // vanished or locked: show what we have, retry next time
+            return Result(); // vanished or locked: show what we have, retry next time
         }
-        return Probes[file.FullName] = new Probe(size, ticks, cwd, ai, prompt);
+        return Probes[file.FullName] = Result();
     }
 
     static string? CustomTitle(FileInfo transcript, string id)

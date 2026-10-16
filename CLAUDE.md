@@ -24,8 +24,8 @@ dotnet test
 | Folder | What |
 |---|---|
 | `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to |
-| `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) |
-| `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree` |
+| `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print |
+| `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
 | `src/CCWrapper/Theme.xaml` | Every color and custom style; `App.xaml` recolors Fluent's own brushes |
 | `src/CCWrapper.StatusRelay` | The silent statusLine relay |
@@ -34,8 +34,11 @@ dotnet test
 ## Rules, and why
 
 - **Read-only over Claude Code.** Read only files Claude Code already writes. Never read `.credentials.json`, never call
-  Anthropic APIs, never edit the user's settings. The app only launches the unmodified `claude.exe`, which keeps it
-  inside the usage policy.
+  Anthropic APIs, never edit the user's settings yourself. The app only launches the unmodified `claude.exe`, which keeps
+  it inside the usage policy.
+- **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden
+  (`ClaudeCli`), only after the user's click, with a confirm before anything is removed. These commands never call the
+  model. A change no CLI command covers, such as a `settings.json` key, is not offered yet.
 - **Undocumented formats change.** The session registry (`sessions\*.json`), transcript records, file history and
   `cachedUsageUtilization` are internal and change with Claude Code releases. Parse them only in `Data/`, treat every
   field as optional, and show "—" when one is missing.

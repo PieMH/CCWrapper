@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-220%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-245%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -42,10 +42,15 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 **Sidebar**
 - **Session search:** typing filters by title and project. Enter searches the full text of every transcript of the account.
 - **Session list:** every session of the account, including ones started outside the app, newest first, with a status label (*working*, *needs you*, *open*) and a blue marker on the one you are looking at.
+  - Titles follow Claude Code: the name given at start or with `/rename`, else its own title for the chat. A session's `/color` tints its title.
   - Click a session to open it: if it already has a tab, that tab comes forward; otherwise it is resumed in its original folder in a new tab. Nothing open is closed.
   - A session open in another terminal gets a read-only tab that says where it is open, e.g. "PowerShell (pid 51708, since 15:07)". **Resume here** offers to close it there (the conversation is saved) and turns the tab into a live one; **Continue here as a copy** forks it instead.
 - **Settings menu:** opens `settings.json`, your `CLAUDE.md` or the config folder, or runs `/config`, `/permissions`, `/hooks` or `/memory`.
-- **Customize page:** lists your plugins, skills, MCP servers and connectors in one place. Changes go through Claude Code's own `/plugin` and `/mcp`.
+- **Plugins & connectors:** a window of its own for everything `/plugin` and `/mcp` do, without touching your open sessions.
+  - **Plugins:** turn installed plugins on and off; see each one's skills, MCP servers, context cost and notes; update, configure or uninstall it. Plugins synced from your claude.ai account are listed too.
+  - **Discover and Marketplaces:** search the marketplaces' catalogs and install to the user, project or local scope; add, update and remove marketplaces.
+  - **MCP servers and connectors:** every server with its health (connected, needs sign-in, failed), your own and those of plugins; add or remove your own, and sign in to servers and claude.ai connectors.
+  - Every change runs Claude Code's own `claude plugin` or `claude mcp` command in the background, shown in the window's status strip. New sessions get the change; **Reload idle sessions** sends `/reload-plugins` to the open ones that are idle.
 - **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
 
 **Tabs**
@@ -67,8 +72,11 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 
 **Compose box** (optional, under the terminal)
 - A real multi-line editor with a round send button: Enter sends, Shift+Enter adds a line, and Up recalls earlier prompts.
+- When Claude Code suggests your next prompt, the empty box shows it greyed too, as the terminal does: Tab takes it to edit, Enter sends it, typing replaces it.
 - Pasted screenshots become image files.
 - It never types into a permission prompt or a dialog. Those you always answer in the terminal.
+
+Confirmations, warnings and errors use the app's dark theme too.
 
 **Right panel**
 - **Files:** a tree of every file Claude changed this session, with `+/−` lines in green and red, or the size change for binaries. Click a file to see all of it with the changes highlighted.
@@ -145,7 +153,8 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 
 - **It ends a `claude` process only when you confirm it:** Resume here's "Close it there and resume it here?" ends that terminal's `claude`, as closing the terminal would. Nothing else is ever stopped for you.
 - **It reads only files Claude Code already writes:** each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts, session status files, file-history backups, and plugin and skill lists.
-- **It never reads** `.credentials.json`, never calls Anthropic APIs, and never edits your settings.
+- **It never reads** `.credentials.json`, never calls Anthropic APIs, and never edits Claude Code's files itself: plugin and MCP changes you make in Plugins & connectors are done by Claude Code's own `claude plugin` and `claude mcp` commands.
+- **Check health** in Plugins & connectors runs `claude mcp list`, which connects to every MCP server (and starts the local ones) to see if it answers, as `/mcp` does.
 - **It writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
 - **It makes no network calls of its own.** The Browser panel loads only what you open in it.
@@ -182,7 +191,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 220 tests on synthetic fixtures.
+- xUnit, with 245 tests on synthetic fixtures.
 
 ## Development
 

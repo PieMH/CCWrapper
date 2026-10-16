@@ -206,7 +206,21 @@ host.addEventListener('message', e => {
   }
 });
 
-// Read back by the host: TerminalHost.ReadTextAsync (smoke test) and ReadTailAsync (bottom bar, TuiInput).
+// One buffer row with its dim runs as ESC[2m…ESC[22m and inverse runs as ESC[7m…ESC[27m.
+function styledRow(line) {
+  let s = '', dim = false, inverse = false, cell;
+  for (let x = 0; x < line.length; x++) {
+    cell = line.getCell(x, cell);
+    if (!cell.getWidth()) continue; // the right half of a wide character
+    const d = !!cell.isDim(), v = !!cell.isInverse();
+    if (d !== dim) s += (dim = d) ? '\x1b[2m' : '\x1b[22m';
+    if (v !== inverse) s += (inverse = v) ? '\x1b[7m' : '\x1b[27m';
+    s += cell.getChars() || ' ';
+  }
+  return s.replace(/\s+$/, '');
+}
+
+// Read back by the host: TerminalHost.ReadTextAsync (smoke test) and ReadTailAsync (bottom bar, TuiInput, compose box).
 window.ccw = {
   text(id) {
     const buf = tabs.get(id)?.term.buffer.active;
@@ -215,14 +229,15 @@ window.ccw = {
     for (let i = 0; i < buf.length; i++) lines.push(buf.getLine(i)?.translateToString(true) ?? '');
     return lines.join('\n');
   },
-  // The last n non-blank rows of the screen (the bottom page, wherever the user has scrolled), top to bottom.
-  tail(id, n) {
+  // The last n non-blank rows of the screen (the bottom page, wherever the user has scrolled), top to bottom. styled: dim and
+  // inverse runs are marked with SGR codes, so TuiInput can tell Claude Code's greyed placeholder from typed text.
+  tail(id, n, styled = false) {
     const term = tabs.get(id)?.term;
     if (!term) return null;
     const buf = term.buffer.active, lines = [];
     for (let i = buf.baseY + term.rows - 1; i >= buf.baseY && lines.length < n; i--) {
-      const line = buf.getLine(i)?.translateToString(true) ?? '';
-      if (line.trim()) lines.unshift(line);
+      const line = buf.getLine(i), text = line?.translateToString(true) ?? '';
+      if (text.trim()) lines.unshift(styled ? styledRow(line) : text);
     }
     return lines.join('\n');
   },

@@ -36,7 +36,9 @@ public partial class App : Application
         e.Handled = true;
         if (_showingError) return;
         _showingError = true;
-        try { MessageBox.Show($"{e.Exception.GetType().Name}: {e.Exception.Message}\n\n{(windowOpen ? "CCWrapper keeps running." : "CCWrapper will close.")}", "CCWrapper: unexpected error", MessageBoxButton.OK, MessageBoxImage.Error); }
+        var text = $"{e.Exception.GetType().Name}: {e.Exception.Message}\n\n{(windowOpen ? "CCWrapper keeps running." : "CCWrapper will close.")}";
+        try { Dialog.Show(null, text, "CCWrapper: unexpected error", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception) { MessageBox.Show(text, "CCWrapper: unexpected error", MessageBoxButton.OK, MessageBoxImage.Error); } // the themed window failed too
         finally { _showingError = false; }
         if (!windowOpen) Shutdown(1);
     }

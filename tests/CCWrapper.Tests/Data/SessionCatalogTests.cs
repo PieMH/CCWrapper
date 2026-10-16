@@ -45,6 +45,46 @@ public sealed class SessionCatalogTests : IDisposable
     }
 
     [Fact]
+    public void Cwd_comes_from_the_tail_when_the_head_is_all_snapshots()
+    {
+        var a = _home.AddAccount("a");
+        // A continued session: title records, then file-history snapshots far bigger than the head, and only then a cwd.
+        var snapshot = "{\"type\":\"file-history-snapshot\",\"snapshot\":\"" + new string('x', 40 * 1024) + "\"}\n";
+        var pad = string.Concat(Enumerable.Repeat("{\"type\":\"user\",\"cwd\":\"C:\\\\Work\\\\Alpha\",\"message\":{\"content\":\"padding padding\"}}\n", 2000));
+        var path = a.Paths.Transcript(Alpha, "continued");
+        FakeHome.WriteFile(path, "{\"type\":\"custom-title\",\"customTitle\":\"planv3\"}\n" + snapshot + snapshot + snapshot + pad);
+        Assert.True(new FileInfo(path).Length > 192 * 1024);
+
+        Assert.Equal(Alpha, Assert.Single(SessionCatalog.List(a)).Cwd);
+    }
+
+    [Fact]
+    public void Names_and_colors_come_from_the_transcript_records()
+    {
+        var a = _home.AddAccount("a");
+        var pad = string.Concat(Enumerable.Repeat("""{"type":"assistant","message":{"content":"padding padding padding padding padding"}}""" + "\n", 3000));
+        string Record(string type, string field, string value) => $"{{\"type\":\"{type}\",\"{field}\":\"{value}\"}}\n";
+        const string Cwd = "{\"type\":\"user\",\"cwd\":\"C:\\\\Work\\\\Alpha\"}\n";
+
+        // Started with -n: the name is in the head only, and no custom-title.json is written.
+        FakeHome.WriteFile(a.Paths.Transcript(Alpha, "named"),
+            Record("custom-title", "customTitle", "from -n") + Record("agent-color", "agentColor", "green") + Cwd + pad + Record("ai-title", "aiTitle", "AI title"));
+        // Renamed and recolored later, then the color reset: the tail's records win over the head's and the sidecar.
+        var renamed = a.Paths.Transcript(Alpha, "renamed");
+        FakeHome.WriteFile(renamed, Record("custom-title", "customTitle", "old name") + Cwd + Record("agent-color", "agentColor", "red") + pad
+            + Record("custom-title", "customTitle", "new name") + Record("agent-color", "agentColor", "cyan") + Record("agent-color", "agentColor", "default"));
+        FakeHome.WriteFile(Path.Combine(Path.GetDirectoryName(renamed)!, "renamed", "custom-title.json"), """{"customTitle":"sidecar name"}""");
+
+        var list = SessionCatalog.List(a);
+        var (named, recolored) = (list.Single(s => s.Id == "named"), list.Single(s => s.Id == "renamed"));
+
+        Assert.Equal("from -n", named.Title);
+        Assert.Equal("green", named.Color);
+        Assert.Equal("new name", recolored.Title);
+        Assert.Null(recolored.Color);
+    }
+
+    [Fact]
     public void Only_the_tail_is_read_for_titles()
     {
         var a = _home.AddAccount("a");
