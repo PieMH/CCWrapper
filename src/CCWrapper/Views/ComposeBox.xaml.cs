@@ -136,7 +136,7 @@ public static class TuiInput
     public const string ClearInputFirst = "Clear the terminal input first: the command would be added to the text there";
     public const string BashModeFirst = "Clear the terminal input first: it is in bash mode (!) and the text would run as a shell command";
     const string StatusUnreadable = "Could not read Claude Code's status — try again";
-    const int ScreenRows = 12;
+    const int ScreenRows = 200; // the whole screen (ccw.tail stops at its top): a tall multi-line input must keep its top rule in view
 
     static readonly HashSet<LiveSession> Switching = []; // UI thread only
 
@@ -183,6 +183,7 @@ public static class TuiInput
                     Thread.Sleep(50);
                 }
             });
+            ShellModel.Rebind([s], running, ProcessTree.Parents);
             if (s.Pid is { } pid && !running.Any(r => r.Pid == pid)) return StatusUnreadable; // fail closed
             return ShellModel.MapStatus([s], running).Select(m => m.Registry).FirstOrDefault() is { Status: SessionStatus.Waiting } r
                 ? WaitingText(r.WaitingFor) : null;

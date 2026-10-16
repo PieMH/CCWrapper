@@ -217,6 +217,7 @@ public partial class MainWindow : Window, IAppCommands
         try
         {
             var running = await Task.Run(() => SessionCatalog.Running(_state.Account)); // reads files
+            ShellModel.Rebind(_state.OpenSessions.ToList(), running, ProcessTree.Parents);
             foreach (var (session, registry) in ShellModel.MapStatus(_state.OpenSessions.ToList(), running))
             {
                 ShellModel.Adopt(session, registry); // /clear or /resume in the TUI: the pid stays, the session id changes

@@ -117,6 +117,41 @@ public sealed class ShellTests
     }
 
     [Fact]
+    public void Rebind_moves_a_launcher_tab_to_the_claude_process_it_started()
+    {
+        var shim = Live("s1", pid: 10);
+        ShellModel.Rebind([shim], [Reg("s1", SessionStatus.Idle, pid: 30)], () => new Dictionary<int, int> { [30] = 20, [20] = 10 });
+        Assert.Equal(30, shim.Pid); // grandchild through a second launcher
+    }
+
+    [Fact]
+    public void Rebind_leaves_tabs_alone_unless_exactly_one_started_entry_has_their_session_id()
+    {
+        var tree = new Dictionary<int, int> { [20] = 10, [21] = 10, [40] = 5 };
+        var unrelated = Live("s1", pid: 10);
+        ShellModel.Rebind([unrelated], [Reg("s1", SessionStatus.Idle, pid: 40)], () => tree);
+        var nested = Live("s1", pid: 10); // a claude run from the tab's own Bash tool has another session id
+        ShellModel.Rebind([nested], [Reg("other", SessionStatus.Idle, pid: 20)], () => tree);
+        var ambiguous = Live("s1", pid: 10);
+        ShellModel.Rebind([ambiguous], [Reg("s1", SessionStatus.Idle, pid: 20), Reg("s1", SessionStatus.Idle, pid: 21)], () => tree);
+        Assert.Equal((10, 10, 10), (unrelated.Pid, nested.Pid, ambiguous.Pid));
+
+        var registered = Live("s1", pid: 20); // its own entry is there: the process list is not even read
+        ShellModel.Rebind([registered, Live("s2", SessionStatus.Exited)], [Reg("s1", SessionStatus.Idle, pid: 20)], () => throw new InvalidOperationException());
+        Assert.Equal(20, registered.Pid);
+    }
+
+    [Fact]
+    public void IsDescendant_follows_a_few_parent_links_and_stops_on_loops()
+    {
+        var tree = new Dictionary<int, int> { [3] = 2, [2] = 1, [7] = 8, [8] = 7 };
+        Assert.True(ProcessTree.IsDescendant(tree, 3, 1));
+        Assert.False(ProcessTree.IsDescendant(tree, 1, 3));
+        Assert.False(ProcessTree.IsDescendant(tree, 7, 1)); // pid reuse made a loop
+        Assert.True(ProcessTree.IsDescendant(ProcessTree.Parents(), Environment.ProcessId, ProcessTree.Parents()[Environment.ProcessId]));
+    }
+
+    [Fact]
     public void A_cleared_session_keeps_its_row_instead_of_showing_running_elsewhere()
     {
         var tab = Live("old", SessionStatus.Idle, pid: 10); // the poll has not adopted the new id yet

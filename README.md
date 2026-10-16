@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-188%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-193%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -85,7 +85,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
   ```powershell
   irm https://claude.ai/install.ps1 | iex
   ```
-  The npm package (`claude.cmd`) and launcher shims (Scoop, Chocolatey) aren't supported yet.
+  The npm package (`claude.cmd`) isn't supported. Launcher shims (Scoop, Chocolatey) should work but are untested.
 
 ## Install
 
@@ -174,7 +174,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 188 tests on synthetic fixtures.
+- xUnit, with 193 tests on synthetic fixtures.
 
 ## Development
 
