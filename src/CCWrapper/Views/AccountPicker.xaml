@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:CCWrapper.Views"
         Title="CCWrapper" Width="900" Height="720" MinWidth="560" MinHeight="480"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen" Background="{StaticResource Bg}">
     <Grid Margin="24,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -12,7 +12,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="Heading" Text="Who's working?" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,16" />
+        <StackPanel HorizontalAlignment="Center" Margin="0,0,0,18">
+            <Image Source="/CCWrapper.ico" Width="48" Height="48" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,10" />
+            <TextBlock x:Name="Heading" Text="Who's working?" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" />
+        </StackPanel>
 
         <ItemsControl x:Name="Cards" Grid.Row="1" HorizontalAlignment="Center">
             <ItemsControl.ItemsPanel>
@@ -20,7 +23,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="{x:Type views:AccountCard}">
-                    <Button Width="250" Margin="6" Padding="16" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top"
+                    <Button Style="{StaticResource Card}" Width="250" Margin="6" Padding="16" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top"
                             Click="OnCardClick" ToolTip="{Binding Account.ConfigRoot}">
                         <StackPanel>
                             <Grid Margin="0,0,0,12">
@@ -28,30 +31,30 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="44" Height="44" CornerRadius="22" Background="{Binding Color}" VerticalAlignment="Center">
+                                <Border Width="44" Height="44" CornerRadius="10" Background="{Binding Color}" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Letter}" Foreground="#1E1E1E" FontWeight="Bold" FontSize="22"
                                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
                                 <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Title}" ToolTip="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Subtitle}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                             </Grid>
                             <DockPanel>
-                                <TextBlock Text="5-hour" Width="50" Opacity="0.7" DockPanel.Dock="Left" />
+                                <TextBlock Text="5-hour" Width="50" Foreground="{StaticResource Muted}" DockPanel.Dock="Left" />
                                 <TextBlock Text="{Binding FiveHourText}" Width="36" TextAlignment="Right" DockPanel.Dock="Right" />
                                 <ProgressBar Value="{Binding FiveHour, Mode=OneWay}" Maximum="100" Height="6" Margin="4,0,8,0"
                                              Foreground="{Binding Color}" VerticalAlignment="Center" />
                             </DockPanel>
                             <DockPanel Margin="0,6,0,0">
-                                <TextBlock Text="Weekly" Width="50" Opacity="0.7" DockPanel.Dock="Left" />
+                                <TextBlock Text="Weekly" Width="50" Foreground="{StaticResource Muted}" DockPanel.Dock="Left" />
                                 <TextBlock Text="{Binding WeekText}" Width="36" TextAlignment="Right" DockPanel.Dock="Right" />
                                 <ProgressBar Value="{Binding Week, Mode=OneWay}" Maximum="100" Height="6" Margin="4,0,8,0"
                                              Foreground="{Binding Color}" VerticalAlignment="Center" />
                             </DockPanel>
                             <DockPanel Margin="0,10,0,0">
-                                <TextBlock Text="{Binding Running}" DockPanel.Dock="Right" Opacity="0.7" />
-                                <TextBlock Text="{Binding AsOf}" Opacity="0.5" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Running}" DockPanel.Dock="Right" Foreground="{StaticResource Muted}" />
+                                <TextBlock Text="{Binding AsOf}" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" />
                             </DockPanel>
                         </StackPanel>
                     </Button>
@@ -59,13 +62,13 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <TextBlock x:Name="RecentHeading" Grid.Row="2" Text="Recent sessions" FontWeight="SemiBold" Margin="6,20,0,6" />
+        <TextBlock x:Name="RecentHeading" Grid.Row="2" Text="Recent sessions" Style="{StaticResource Label}" Margin="10,22,0,6" />
 
         <Grid Grid.Row="3">
-            <ListBox x:Name="Recent" BorderThickness="0" HorizontalContentAlignment="Stretch"
+            <ListBox x:Name="Recent" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel">
                 <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
                         <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
                         <EventSetter Event="MouseLeftButtonUp" Handler="OnSessionClick" />
                     </Style>
@@ -79,18 +82,18 @@
                                 <ColumnDefinition Width="160" />
                                 <ColumnDefinition Width="50" />
                             </Grid.ColumnDefinitions>
-                            <Border Width="22" Height="22" CornerRadius="11" Background="{Binding Color}" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <Border Width="22" Height="22" CornerRadius="6" Background="{Binding Color}" Margin="0,0,10,0" VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Letter}" Foreground="#1E1E1E" FontWeight="Bold" FontSize="12"
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{Binding Project}" Opacity="0.7" TextTrimming="CharacterEllipsis" Margin="8,0" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="3" Text="{Binding Age}" Opacity="0.6" TextAlignment="Right" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{Binding Project}" Foreground="#AEB7C2" TextTrimming="CharacterEllipsis" Margin="8,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="3" Text="{Binding Age}" Foreground="{StaticResource Muted}" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <TextBlock x:Name="Status" Text="Loading…" Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12" />
+            <TextBlock x:Name="Status" Text="Loading…" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,12" />
         </Grid>
     </Grid>
 </Window>

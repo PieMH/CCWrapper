@@ -3,10 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:CCWrapper.Views">
     <Grid>
-        <ListBox x:Name="List" BorderThickness="0" HorizontalContentAlignment="Stretch"
+        <ListBox x:Name="List" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel">
             <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
                     <EventSetter Event="MouseDoubleClick" Handler="OnDoubleClick" />
                 </Style>
             </ListBox.ItemContainerStyle>
@@ -17,10 +17,10 @@
                             <TextBlock Text="●" Margin="0,0,6,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#777" />
+                                        <Setter Property="Foreground" Value="#6E7884" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                <Setter Property="Foreground" Value="#6FCF97" />
+                                                <Setter Property="Foreground" Value="{StaticResource Good}" />
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -28,12 +28,12 @@
                             </TextBlock>
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         </DockPanel>
-                        <TextBlock Text="{Binding Detail}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Stats}" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Detail}" Foreground="#AEB7C2" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Stats}" Foreground="{StaticResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
-        <TextBlock x:Name="Empty" Margin="12" Opacity="0.6" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Top" />
+        <TextBlock x:Name="Empty" Margin="12" Foreground="{StaticResource Muted}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Top" />
     </Grid>
 </UserControl>

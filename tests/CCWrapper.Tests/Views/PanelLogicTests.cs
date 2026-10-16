@@ -43,6 +43,11 @@ public sealed class PanelLogicTests
         Assert.Equal("+1.5 KB", FileTree.Summary(new("a", "a", ChangeKind.Added, true, null, null, 0, 1536, null)));
         Assert.Equal("−2 B", FileTree.Summary(new("a", "a", ChangeKind.Modified, true, null, null, 10, 8, null)));
         Assert.Equal("?", FileTree.Summary(new("a", "a", ChangeKind.Modified, true, null, null, null, 8, null)));
+        var text = new FileNode("a", "a", Text("a", 12, 3));
+        Assert.Equal(("+12", "−3", ""), (text.Plus, text.Minus, text.Other)); // colored apart
+        var binary = new FileNode("a", "a", new("a", "a", ChangeKind.Added, true, null, null, 0, 1536, null));
+        Assert.Equal(("", "", "+1.5 KB"), (binary.Plus, binary.Minus, binary.Other));
+        Assert.Equal(("", "", ""), (new FileNode("dir", "dir").Plus, new FileNode("dir", "dir").Minus, new FileNode("dir", "dir").Other));
         Assert.Equal("A", new FileNode("a", "a", Text("a", kind: ChangeKind.Added)).Badge);
         Assert.Equal("", new FileNode("a", "a", Text("a")).Badge);
     }

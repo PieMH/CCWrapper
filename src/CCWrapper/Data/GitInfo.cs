@@ -5,7 +5,12 @@ using System.IO;
 namespace CCWrapper.Data;
 
 /// <param name="PushAccount">The GitHub account this repo pushes as; null when unknown.</param>
-public sealed record GitInfo(bool InRepo, string? PushAccount, string? UserName, string? UserEmail)
+/// <param name="Branch">The current branch, or the short commit id when HEAD is detached.</param>
+/// <param name="Upstream">The branch's upstream ("origin/main"); null when it has none.</param>
+/// <param name="Ahead">Commits to push / <paramref name="Behind"/> commits to pull, against the upstream as of the last fetch
+/// (no fetch is made: that needs the network and credentials); null without an upstream.</param>
+public sealed record GitInfo(bool InRepo, string? PushAccount, string? UserName, string? UserEmail,
+    string? Branch = null, string? Upstream = null, int? Ahead = null, int? Behind = null)
 {
     public static readonly GitInfo None = new(false, null, null, null);
     const int TimeoutMs = 5000;
@@ -23,9 +28,19 @@ public sealed record GitInfo(bool InRepo, string? PushAccount, string? UserName,
         var origin = Run("git", ["config", "--get", "remote.origin.url"], cwd, ct);
         var name = Run("git", ["config", "--get", "user.name"], cwd, ct);
         var email = Run("git", ["config", "--get", "user.email"], cwd, ct);
+        var branch = Run("git", ["branch", "--show-current"], cwd, ct);
+        var upstream = Run("git", ["rev-parse", "--abbrev-ref", "@{upstream}"], cwd, ct);
+        var counts = Run("git", ["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], cwd, ct);
         var account = await credential ?? UrlUser(await origin) ?? await Run("gh", ["config", "get", "-h", "github.com", "user"], cwd, ct);
-        return new GitInfo(true, account, await name, await email);
+        var (ahead, behind) = Counts(await counts);
+        return new GitInfo(true, account, await name, await email,
+            await branch ?? await Run("git", ["rev-parse", "--short", "HEAD"], cwd, ct), await upstream, ahead, behind);
     }, ct);
+
+    /// <summary>rev-list --left-right --count prints "ahead\tbehind".</summary>
+    internal static (int? Ahead, int? Behind) Counts(string? output) =>
+        output?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries) is [var a, var b] && int.TryParse(a, out var x) && int.TryParse(b, out var y)
+            ? (x, y) : (null, null);
 
     // Only the user part: https://user:token@github.com/... must never leak its token.
     static string? UrlUser(string? url) =>

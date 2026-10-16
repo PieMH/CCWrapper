@@ -61,6 +61,11 @@ public sealed class FileNode(string name, string key, FileChange? change = null)
     public List<FileNode> Children { get; } = [];
     public string Summary => Change is null ? "" : FileTree.Summary(Change);
     public string Badge => Change?.Kind == ChangeKind.Added ? "A" : "";
+    /// <summary>A text file's "+12" and "−3", shown in green and red; <see cref="Other"/> is the rest of <see cref="Summary"/>
+    /// (a binary file's size change, or "?").</summary>
+    public string Plus => Change is { IsBinary: false, Added: { } a, Removed: not null } ? $"+{a}" : "";
+    public string Minus => Change is { IsBinary: false, Added: not null, Removed: { } r } ? $"−{r}" : "";
+    public string Other => Plus.Length > 0 ? "" : Summary;
 }
 
 public static class FileTree

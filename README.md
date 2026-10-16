@@ -5,14 +5,14 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-197%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-209%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
 CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style app around it. The chat, permission prompts, slash commands and menus all stay Claude Code's own TUI, so every Claude Code update works the day it ships.
 
 ```
-┌ CCWrapper │ ● C · Personal Pro  ⇄ Switch │ GitHub: octocat ────────────────────────┐
+┌ CCWrapper │ ● C · Personal Pro  ⇄ Switch │ octocat · main ↑2 ──────────────────────┐
 ├────────────────────┬─────────────────────────────────────┬─────────────────────────┤
 │ Search sessions... │ [find in chat ____ 3/12 ↑↓] Ctrl+F │ Files │ Agents │ Browser │
 │ Settings ▾         │                                     │ ▾ src/                  │
@@ -38,6 +38,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 **One account per window**
 - Each window runs one account with that account's own settings. To run accounts side by side, open more windows.
 - **Switch** in the top bar restarts the window as another account. Its sessions stay resumable.
+- The top bar also shows the repo's git state: the GitHub account it pushes as, the branch, and the commits to push (↑) and pull (↓) as of the last fetch.
 - `CCWrapper.exe --account b` skips the picker, so you can make one shortcut per account.
 - The taskbar badge shows each window's account letter and color.
 
@@ -59,7 +60,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 | Drag & drop | Inserts the dropped files' paths |
 | Ctrl+C | Copies when text is selected, otherwise interrupts (Ctrl+Shift+C always copies) |
 | Right-click | Copies the selection, or pastes when nothing is selected |
-| Ctrl+F | Find in the chat, with highlights and a match count. "Search full transcript" covers the whole session. |
+| Ctrl+F | Find in the chat (also the search button in the terminal's top right corner), with highlights and a match count. "Search full transcript" covers the whole session. |
 | Links | `localhost` links open in the built-in browser, all others in your default browser |
 
 **Compose box** (optional, under the terminal)
@@ -74,7 +75,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 
 **Bottom bar**
 - Model, effort and permission-mode switches that drive Claude Code's own `/model`, `/effort` and Shift+Tab.
-- Meters for context window, session tokens and cost, and 5-hour and weekly plan usage. Usage shows even with no session open, is checked when the window opens and every 30 minutes, and a click checks it now.
+- Meters for context window, session tokens and cost, and 5-hour and weekly plan usage. Usage shows even with no session open, is checked when the window opens and every 30 minutes, and the ↻ button checks it now.
 
 ## Requirements
 
@@ -175,7 +176,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 197 tests on synthetic fixtures.
+- xUnit, with 209 tests on synthetic fixtures.
 
 ## Development
 

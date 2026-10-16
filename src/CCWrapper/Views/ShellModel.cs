@@ -38,6 +38,20 @@ public static class ShellModel
 
     public static string Percent(double? value) => value is { } v ? $"{v:0}%" : "—";
 
+    /// <summary>The top bar's git chip tooltip: who commits and pushes, and the branch against its upstream as of the last fetch.</summary>
+    public static string GitTip(GitInfo info)
+    {
+        if (!info.InRepo) return "Not in a git repository";
+        List<string> lines = [];
+        if (info.UserName is not null || info.UserEmail is not null) lines.Add($"Commits as {info.UserName} <{info.UserEmail}>");
+        lines.Add(info.PushAccount is { } account ? $"Pushes to GitHub as {account}" : "GitHub account unknown");
+        if (info.Branch is { } branch)
+            lines.Add(info.Upstream is { } upstream
+                ? $"{branch} → {upstream}: {info.Ahead ?? 0} to push, {info.Behind ?? 0} to pull (as of the last fetch)"
+                : $"{branch}: no upstream branch");
+        return string.Join("\n", lines);
+    }
+
     /// <summary>Last folder name of a cwd, "" when unknown.</summary>
     public static string ProjectOf(string? cwd) =>
         string.IsNullOrWhiteSpace(cwd) ? "" : Path.GetFileName(Path.TrimEndingDirectorySeparator(cwd)) is { Length: > 0 } name ? name : cwd;
@@ -131,6 +145,12 @@ public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Li
 
     /// <summary>A claude process that is not a tab of this window (another window, PowerShell, Desktop).</summary>
     public bool IsElsewhere => Live is null && Entry?.Running is not null;
+
+    /// <summary>The row's status label: "working", "needs you", "open", or "" when no claude process has it.</summary>
+    public string Badge => Dot switch { "●" => "working", "◉" => "needs you", "○" => "open", _ => "" };
+
+    /// <summary>"project · age", or just the age when the project is unknown.</summary>
+    public string Meta => Project.Length == 0 ? Age : $"{Project} · {Age}";
 
     /// <summary>Open sessions plus the account's transcripts, newest first. <paramref name="hits"/> (full-text search)
     /// restricts the list to the matching transcripts and adds their snippet; otherwise <paramref name="filter"/> is

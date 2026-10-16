@@ -1,24 +1,77 @@
 <UserControl x:Class="CCWrapper.Views.BottomBar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <WrapPanel Margin="8,4" VerticalAlignment="Center">
-        <WrapPanel.Resources>
-            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                <Setter Property="Padding" Value="8,2" />
-                <Setter Property="MinHeight" Value="0" />
-                <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-                <Setter Property="Margin" Value="0,2,6,2" />
-            </Style>
-            <Style TargetType="TextBlock">
-                <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Margin" Value="10,2,0,2" />
-            </Style>
-        </WrapPanel.Resources>
-        <Button x:Name="ModelButton" Click="OnModel" />
-        <Button x:Name="EffortButton" Click="OnEffort" />
-        <Button x:Name="ModeButton" Click="OnMode" />
-        <TextBlock x:Name="CtxText" ToolTip="Context window: tokens used / window size" />
-        <TextBlock x:Name="SpendText" ToolTip="Session tokens in / out, and cost" />
-        <TextBlock x:Name="UsageText" Cursor="Hand" />
-    </WrapPanel>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource Panel}" FontSize="12">
+    <UserControl.Resources>
+        <Style x:Key="Chip" TargetType="Button" BasedOn="{StaticResource Flat}">
+            <Setter Property="Height" Value="26" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Margin" Value="0,0,2,0" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="Dim" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+        </Style>
+        <Style x:Key="Sep" TargetType="Border">
+            <Setter Property="Width" Value="1" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Margin" Value="10,0" />
+            <Setter Property="Background" Value="{StaticResource Line}" />
+        </Style>
+        <Style x:Key="Bar" TargetType="Border">
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="CornerRadius" Value="2" />
+            <Setter Property="Width" Value="0" />
+            <Setter Property="Background" Value="{StaticResource Accent}" />
+        </Style>
+    </UserControl.Resources>
+    <DockPanel Height="36" Margin="6,0">
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <StackPanel Orientation="Horizontal" ToolTip="Context window: tokens used / window size">
+                <TextBlock Text="ctx" Style="{StaticResource Dim}" />
+                <Border Style="{StaticResource MeterTrack}"><Border x:Name="CtxBar" Style="{StaticResource Bar}" Background="{StaticResource Muted}" /></Border>
+                <TextBlock x:Name="CtxText" />
+            </StackPanel>
+            <Border Style="{StaticResource Sep}" />
+            <StackPanel x:Name="UsageGroup" Orientation="Horizontal">
+                <TextBlock Text="5h" Style="{StaticResource Dim}" />
+                <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
+                <TextBlock x:Name="FiveHourText" MinWidth="28" />
+                <TextBlock Text="wk" Style="{StaticResource Dim}" Margin="10,0,0,0" />
+                <Border Style="{StaticResource MeterTrack}"><Border x:Name="WeekBar" Style="{StaticResource Bar}" /></Border>
+                <TextBlock x:Name="WeekText" MinWidth="28" />
+            </StackPanel>
+            <Border Style="{StaticResource Sep}" />
+            <TextBlock x:Name="SpendText" Foreground="#AEB7C2" ToolTip="Session tokens in / out, and cost" />
+            <Button x:Name="RefreshButton" Style="{StaticResource Chip}" Width="28" Padding="0" Margin="6,0,0,0" Click="OnRefresh">
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="12" Foreground="#AEB7C2" />
+            </Button>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal">
+            <Button x:Name="ModelButton" Style="{StaticResource Chip}" Click="OnModel">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="model " Style="{StaticResource Dim}" />
+                    <TextBlock x:Name="ModelValue" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="8" Margin="6,1,0,0" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="EffortButton" Style="{StaticResource Chip}" Click="OnEffort">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="effort " Style="{StaticResource Dim}" />
+                    <TextBlock x:Name="EffortValue" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="8" Margin="6,1,0,0" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="ModeButton" Style="{StaticResource Chip}" Click="OnMode">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="mode " Style="{StaticResource Dim}" />
+                    <TextBlock x:Name="ModeValue" FontWeight="SemiBold" />
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="8" Margin="6,1,0,0" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </DockPanel>
 </UserControl>

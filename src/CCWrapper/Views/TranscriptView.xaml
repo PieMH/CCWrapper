@@ -25,10 +25,10 @@
                         <Border BorderThickness="3,0,0,0" Padding="8,2" Margin="0,4">
                             <Border.Style>
                                 <Style TargetType="Border">
-                                    <Setter Property="BorderBrush" Value="#5B9BD5" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Role}" Value="user">
-                                            <Setter Property="BorderBrush" Value="#E0A030" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource Warn}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CCWrapper.Core;
 using CCWrapper.Data;
@@ -30,7 +31,6 @@ public partial class BottomBar : UserControl
     {
         InitializeComponent();
         _usageTimer.Tick += async (_, _) => await CheckUsageAsync(force: false);
-        UsageText.MouseLeftButtonUp += async (_, _) => await CheckUsageAsync(force: true);
         Loaded += async (_, _) =>
         {
             UsageProbe.Refreshed += OnUsageRefreshed;
@@ -62,20 +62,37 @@ public partial class BottomBar : UserControl
         _effort = sl?.Effort ?? d?.Effort ?? d?.Account?.Effort;
         // The transcript's permission-mode record is written per turn, not when Shift+Tab changes the mode: the footer is the truth.
         _mode = (_screenMode.Session == s ? _screenMode.Mode : null) ?? d?.Mode;
-        ModelButton.Content = $"{_model ?? BarFormat.None} ▾";
-        EffortButton.Content = $"effort {_effort ?? BarFormat.None} ▾";
-        ModeButton.Content = $"mode {_mode ?? BarFormat.None} ▾";
+        ModelValue.Text = _model ?? BarFormat.None;
+        EffortValue.Text = _effort ?? BarFormat.None;
+        ModeValue.Text = _mode ?? BarFormat.None;
 
         var reason = TuiInput.BlockedReason(s);
         foreach (var b in new[] { ModelButton, EffortButton, ModeButton }) b.IsEnabled = reason is null;
         ModelButton.ToolTip = EffortButton.ToolTip = reason ?? SavedAsDefault;
         ModeButton.ToolTip = reason;
-        CtxText.Text = BarFormat.Ctx(sl, d?.ContextTokens);
+        var (ctx, ctxPercent) = BarFormat.CtxParts(sl, d?.ContextTokens);
+        CtxText.Text = ctx;
+        Meter(CtxBar, ctxPercent, warn: false);
         SpendText.Text = BarFormat.Spend(sl, d?.OutputTokens, d?.CostUsd);
-        var (usage, tip) = BarFormat.Usage(sl, BarFormat.Newer(_account, d?.Account)); // shown with no session open too
-        UsageText.Text = _checkingUsage ? usage + " ↻" : usage;
-        UsageText.ToolTip = $"{tip}\nClick to check now (runs /usage hidden)";
+        var usage = BarFormat.Usage(sl, BarFormat.Newer(_account, d?.Account)); // shown with no session open too
+        FiveHourText.Text = BarFormat.Percent(usage.FiveHour);
+        WeekText.Text = BarFormat.Percent(usage.Week);
+        Meter(FiveHourBar, usage.FiveHour, warn: true);
+        Meter(WeekBar, usage.Week, warn: true);
+        UsageGroup.ToolTip = usage.Tip;
+        RefreshButton.IsEnabled = !_checkingUsage;
+        RefreshButton.ToolTip = _checkingUsage ? "Checking plan usage…" : "Check plan usage now (runs /usage hidden)";
     }
+
+    /// <summary>Fills a meter's bar to <paramref name="percent"/> of its track; plan usage turns amber from 80%.</summary>
+    void Meter(Border bar, double? percent, bool warn)
+    {
+        var p = Math.Clamp(percent ?? 0, 0, 100);
+        bar.Width = ((FrameworkElement)bar.Parent).Width * p / 100;
+        if (warn) bar.Background = (Brush)FindResource(p >= 80 ? "Warn" : "Accent");
+    }
+
+    void OnRefresh(object sender, RoutedEventArgs e) => _ = CheckUsageAsync(force: true);
 
     /// <summary>Runs /usage hidden for the window's account (see <see cref="UsageProbe"/>); the Refreshed event re-reads it.</summary>
     async Task CheckUsageAsync(bool force)
@@ -230,13 +247,16 @@ public static class BarFormat
 
     /// <summary>"ctx 200k/1M 20%". Used tokens are window x percent when the status line has both (it stays right after a
     /// /compact), else the transcript's last turn; the percent is the status line's, else used / window.</summary>
-    public static string Ctx(StatusLineData? sl, long? lastTurnTokens)
+    public static string Ctx(StatusLineData? sl, long? lastTurnTokens) => "ctx " + CtxParts(sl, lastTurnTokens).Text;
+
+    /// <summary><see cref="Ctx"/> without its "ctx " label, and the percent for the meter bar.</summary>
+    public static (string Text, double? Percent) CtxParts(StatusLineData? sl, long? lastTurnTokens)
     {
         var size = sl?.ContextWindowSize;
         var pct = sl?.ContextUsedPercent;
         var used = size is { } w && pct is { } p ? (long)(w * p / 100) : lastTurnTokens;
         pct ??= used is { } u && size is > 0 ? u * 100.0 / size : null;
-        return used is null && size is null && pct is null ? "ctx " + None : $"ctx {Tokens(used)}/{Tokens(size)} {Percent(pct)}";
+        return (used is null && size is null && pct is null ? None : $"{Tokens(used)}/{Tokens(size)} {Percent(pct)}", pct);
     }
 
     static readonly Dictionary<string, string> FooterModes = new()
@@ -266,15 +286,16 @@ public static class BarFormat
         $"in {Tokens(sl?.TotalInputTokens)} out {Tokens(sl?.TotalOutputTokens ?? transcriptOutput)} {Cost(sl?.CostUsd ?? transcriptCost)}";
 
     /// <summary>"5h 58% · wk 12%", from whichever is newer: the status line's rate limits (Pro/Max, after the first reply) or
-    /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its time goes in the tooltip.</summary>
-    public static (string Text, string Tip) Usage(StatusLineData? sl, AccountInfo? account)
+    /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its time goes in the tooltip; the two
+    /// percents feed the meter bars.</summary>
+    public static (string Text, string Tip, double? FiveHour, double? Week) Usage(StatusLineData? sl, AccountInfo? account)
     {
         var saved = account?.UsageFetchedAt;
-        if ((sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null }) && (saved is null || sl.ReceivedAt > saved))
-            return ($"5h {Percent(sl.FiveHourUsedPercent)} · wk {Percent(sl.SevenDayUsedPercent)}",
-                $"Plan usage from Claude Code's status line, as of {sl.ReceivedAt.ToLocalTime():HH:mm}");
-        return ($"5h {Percent(account?.FiveHour?.Utilization)} · wk {Percent(account?.SevenDay?.Utilization)}",
-            saved is { } at ? $"Plan usage from Claude Code's /usage, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data");
+        var live = (sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null }) && (saved is null || sl.ReceivedAt > saved);
+        var (five, week) = live ? (sl!.FiveHourUsedPercent, sl.SevenDayUsedPercent) : (account?.FiveHour?.Utilization, account?.SevenDay?.Utilization);
+        var tip = live ? $"Plan usage from Claude Code's status line, as of {sl!.ReceivedAt.ToLocalTime():HH:mm}"
+            : saved is { } at ? $"Plan usage from Claude Code's /usage, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data";
+        return ($"5h {Percent(five)} · wk {Percent(week)}", tip, five, week);
     }
 
     /// <summary>The account read whose saved usage is newer (a null one loses).</summary>

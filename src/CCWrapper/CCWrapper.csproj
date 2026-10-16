@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <None Update="Terminal\wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="CCWrapper.ico" /> <!-- also the logo in the top bar and the empty state -->
     <InternalsVisibleTo Include="CCWrapper.Tests" />
   </ItemGroup>
 
