@@ -10,7 +10,7 @@ namespace CCWrapper.Terminal;
 public sealed record LaunchOptions(string Cwd, string? ResumeId = null, string? Model = null, string? Effort = null,
     string? PermissionMode = null, string? Name = null);
 
-/// <summary>Command line, environment and statusLine relay for claude.exe (docs/PLAN.md, "Launch command per session").</summary>
+/// <summary>Command line, environment and statusLine relay for claude.exe.</summary>
 public static class ClaudeLaunch
 {
     public static string AppDataDir =>

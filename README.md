@@ -158,7 +158,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 
 CCWrapper was built in about a day, almost entirely by Claude Code agents:
 
-1. **The idea.** It started from one long prompt, kept as-is in [`FirstPrompt.txt`](FirstPrompt.txt). Claude Code brainstormed it with me: wrapper or chat clone, which stack, which layout, how to respect each account's settings. That produced the plan in [`docs/PLAN.md`](docs/PLAN.md).
+1. **The idea.** It started from one long prompt describing the problem. Claude Code brainstormed it with me: wrapper or chat clone, which stack, which layout, how to respect each account's settings. That produced a detailed design and build plan.
 2. **The build.** An orchestrator agent (the agents-team plugin for Claude Code) split the plan into 7 tasks, each owning its own files.
    - Up to 3 worker agents ran in parallel, each in its own git worktree.
    - **Claude Opus** wrote the skeleton and the terminal core (ConPTY ↔ xterm.js bridge).
@@ -192,7 +192,6 @@ src/CCWrapper/             WPF app
   Views/                   picker, main window, sidebar, panels, bottom bar, compose box
 src/CCWrapper.StatusRelay/ silent statusLine relay → %LOCALAPPDATA%\CCWrapper\live
 tests/CCWrapper.Tests/     xUnit tests
-docs/PLAN.md               the original design and build plan
 ```
 
 Issues and pull requests are welcome.
