@@ -11,6 +11,7 @@ public sealed class PtySessionTests
     [InlineData("my task")]
     [InlineData("say \"hi\"")]
     [InlineData(@"C:\Users\John Doe\relay-settings.json")]
+    [InlineData("{\"statusLine\":{\"type\":\"command\",\"command\":\"C:/Apps/CCW/CCWrapper.StatusRelay.exe\"}}")] // the inline --settings
     [InlineData(@"ends in backslash\")]
     [InlineData(@"two\\")]
     [InlineData(@"a\""b")]

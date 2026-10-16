@@ -53,28 +53,20 @@ public static class ClaudeLaunch
         return env;
     }
 
-    /// <summary>The <c>--settings</c> file that installs the relay, or null when a statusLine is already configured.
-    /// --settings outranks user and project settings, so any of them having one means the relay must stay out.</summary>
-    public static string? RelaySettings(Account account, string cwd, string? relayExe = null, string? dir = null)
+    /// <summary>The <c>--settings</c> JSON that installs the relay, or null when a statusLine is already configured or the relay
+    /// exe is missing (e.g. quarantined): the session then starts without it. --settings outranks user and project settings,
+    /// so any of them having one means the relay must stay out. It is passed inline, not as a file: nothing to write that
+    /// could fail, go stale or be locked by an antivirus.</summary>
+    public static string? RelaySettings(Account account, string cwd, string? relayExe = null)
     {
         string[] own = [account.Paths.Settings, Path.Combine(cwd, ".claude", "settings.json"), Path.Combine(cwd, ".claude", "settings.local.json")];
         if (own.Any(HasStatusLine)) return null;
 
         relayExe ??= Path.Combine(AppContext.BaseDirectory, "CCWrapper.StatusRelay.exe");
+        if (!File.Exists(relayExe)) return null;
         // Unquoted with forward slashes so Git Bash and PowerShell both run it.
         // shortcut: breaks if the install path has spaces; switch to the 8.3 short path if that ever happens.
-        var json = JsonSerializer.Serialize(new { statusLine = new { type = "command", command = relayExe.Replace('\\', '/') } });
-        var path = Path.Combine(dir ?? AppDataDir, "relay-settings.json");
-        try
-        {
-            if (!File.Exists(path) || File.ReadAllText(path) != json)
-            {
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllText(path, json);
-            }
-        }
-        catch (IOException) { } // another window is writing the same content
-        return path;
+        return JsonSerializer.Serialize(new { statusLine = new { type = "command", command = relayExe.Replace('\\', '/') } });
     }
 
     // A raw match survives comments and half-written files; a false positive only skips the relay.
