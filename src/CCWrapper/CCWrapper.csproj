@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- Embedded in the exe: Explorer, Start, taskbar; WPF windows without an Icon take it from the exe too. -->
+    <ApplicationIcon>CCWrapper.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
