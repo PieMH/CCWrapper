@@ -110,6 +110,17 @@ public sealed class ClaudeLaunchTests : IDisposable
         Assert.False(File.Exists(Path.Combine(StatusLineFeed.LiveDir, @"..\..\evil.json")));
     }
 
+    [Fact]
+    public async Task UsageProbe_skips_without_starting_claude_while_the_saved_usage_is_fresh()
+    {
+        var account = AccountC();
+        Directory.CreateDirectory(account.ConfigDir!);
+        File.WriteAllText(account.GlobalConfigPath, $$"""{ "cachedUsageUtilization": { "fetchedAtMs": {{DateTimeOffset.Now.AddSeconds(-30).ToUnixTimeMilliseconds()}} } }""");
+        var sw = Stopwatch.StartNew();
+        Assert.False(await UsageProbe.RefreshAsync(account));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1.5)); // a real /usage run takes 2 s or more
+    }
+
     static int RunRelay(string tab, string stdin, out string stdout)
     {
         var psi = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "CCWrapper.StatusRelay.exe"))

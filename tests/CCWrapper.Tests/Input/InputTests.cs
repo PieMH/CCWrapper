@@ -323,19 +323,35 @@ public sealed class InputTests
     }
 
     [Fact]
-    public void Usage_uses_the_status_line_else_the_cached_value_with_its_age()
+    public void Usage_uses_the_newer_of_the_status_line_and_the_saved_value_with_its_time()
     {
-        var cached = new AccountInfo(null, null, null, null, null, new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero),
+        var savedAt = new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero);
+        var cached = new AccountInfo(null, null, null, null, null, savedAt,
             new UsageWindow(81, null), new UsageWindow(12.4, null), null, null, null);
 
-        var live = BarFormat.Usage(new() { FiveHourUsedPercent = 58, SevenDayUsedPercent = 9 }, cached);
+        var live = BarFormat.Usage(new() { FiveHourUsedPercent = 58, SevenDayUsedPercent = 9 }, cached); // read now: newer
         Assert.Equal("5h 58% · wk 9%", live.Text);
-        Assert.DoesNotContain("as of", live.Tip);
+        Assert.Contains("status line", live.Tip);
+
+        var older = BarFormat.Usage(new() { FiveHourUsedPercent = 58, ReceivedAt = savedAt.AddMinutes(-5) }, cached); // a /usage ran since
+        Assert.Equal("5h 81% · wk 12%", older.Text);
 
         var fallback = BarFormat.Usage(new(), cached);
         Assert.Equal("5h 81% · wk 12%", fallback.Text);
         Assert.Contains("as of 2026-10-09", fallback.Tip);
 
         Assert.Equal("5h — · wk —", BarFormat.Usage(null, null).Text);
+    }
+
+    [Fact]
+    public void Newer_picks_the_account_read_with_the_later_saved_usage()
+    {
+        AccountInfo At(int day) => new(null, null, null, null, null, new DateTimeOffset(2026, 10, day, 0, 0, 0, TimeSpan.Zero), null, null, null, null, null);
+        var (old, fresh) = (At(9), At(16));
+        Assert.Same(fresh, BarFormat.Newer(old, fresh));
+        Assert.Same(fresh, BarFormat.Newer(fresh, old));
+        Assert.Same(old, BarFormat.Newer(old, null));
+        Assert.Same(old, BarFormat.Newer(null, old));
+        Assert.Null(BarFormat.Newer(null, null));
     }
 }

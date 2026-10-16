@@ -32,7 +32,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 ## Features
 
 **Start screen**
-- A "Who's working?" picker shows one card per Claude Code account, with its email, plan, and 5-hour and weekly usage bars.
+- A "Who's working?" picker shows one card per Claude Code account, with its email, plan, and 5-hour and weekly usage bars, checked live when the screen opens.
 - Below the cards is a list of recent sessions from every account, each with its account badge. Click one to resume it.
 
 **One account per window**
@@ -74,7 +74,7 @@ CCWrapper keeps Claude Code exactly as it is and builds a Claude Desktop-style a
 
 **Bottom bar**
 - Model, effort and permission-mode switches that drive Claude Code's own `/model`, `/effort` and Shift+Tab.
-- Meters for context window, session tokens and cost, and 5-hour and weekly plan usage.
+- Meters for context window, session tokens and cost, and 5-hour and weekly plan usage. Usage shows even with no session open, is checked when the window opens and every 30 minutes, and a click checks it now.
 
 ## Requirements
 
@@ -144,13 +144,14 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **It writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
 - **It makes no network calls of its own.** The Browser panel loads only what you open in it.
+- **Plan usage is checked with Claude Code's own `/usage`:** a hidden `claude "/usage"` (MCP servers off) runs in the folder of the account's most recent session, and Claude Code saves the result in `.claude.json`. Each check takes a few seconds, adds `/usage` to that folder's prompt history (Up arrow), and runs your startup hooks like any `claude` start. A check that can't finish in 30 seconds (not logged in, a trust question) is stopped and the last numbers stay.
 - Every session is the unmodified `claude.exe`, run under your own login.
 
 ## Known limits
 
 - **Undocumented files.** Session status files, transcript records and file-history backups are internal to Claude Code and can change with any update. If they do, the affected field shows "—" instead of the app crashing.
 - **Files panel** only sees edits made with Claude's Edit and Write tools, not files changed by shell commands.
-- **Weekly usage on Team accounts** comes from Claude Code's cached value (shown with its age), because the live status line reports it for Pro and Max only.
+- **Plan usage between checks** is as fresh as the last hidden `/usage`. On Pro and Max the live status line also updates it after each reply in a session open in the app; Team accounts get no live updates.
 - **Memory:** each open session is a full `claude.exe` (about 200–300 MB), so close the ones you don't need.
 - **Antivirus:** the exe is unsigned. If your antivirus flags `CCWrapper.exe`, add an exception for that one file.
 

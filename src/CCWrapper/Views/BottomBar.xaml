@@ -19,6 +19,6 @@
         <Button x:Name="ModeButton" Click="OnMode" />
         <TextBlock x:Name="CtxText" ToolTip="Context window: tokens used / window size" />
         <TextBlock x:Name="SpendText" ToolTip="Session tokens in / out, and cost" />
-        <TextBlock x:Name="UsageText" />
+        <TextBlock x:Name="UsageText" Cursor="Hand" />
     </WrapPanel>
 </UserControl>

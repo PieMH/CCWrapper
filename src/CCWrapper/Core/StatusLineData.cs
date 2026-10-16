@@ -23,6 +23,8 @@ public sealed record StatusLineData
     public DateTimeOffset? FiveHourResetsAt { get; init; }
     public double? SevenDayUsedPercent { get; init; }
     public DateTimeOffset? SevenDayResetsAt { get; init; }
+    /// <summary>When the app read it: the status line refreshes as Claude replies, so this dates its rate limits.</summary>
+    public DateTimeOffset ReceivedAt { get; init; } = DateTimeOffset.Now;
 
     /// <summary>Null when the text is not a JSON object.</summary>
     public static StatusLineData? Parse(string json)

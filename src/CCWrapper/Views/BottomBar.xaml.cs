@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using CCWrapper.Core;
 using CCWrapper.Data;
 using CCWrapper.Terminal;
@@ -21,10 +22,27 @@ public partial class BottomBar : UserControl
     LiveSession? _session;
     (LiveSession Session, string? Mode) _screenMode;
     string? _model, _effort, _mode;
+    AccountInfo? _account; // the window's account, read at start and after each /usage check
+    bool _checkingUsage;
+    readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
 
     public BottomBar()
     {
         InitializeComponent();
+        _usageTimer.Tick += async (_, _) => await CheckUsageAsync(force: false);
+        UsageText.MouseLeftButtonUp += async (_, _) => await CheckUsageAsync(force: true);
+        Loaded += async (_, _) =>
+        {
+            UsageProbe.Refreshed += OnUsageRefreshed;
+            _usageTimer.Start();
+            await ReadAccountAsync();
+            await CheckUsageAsync(force: false); // skipped when the start screen just checked
+        };
+        Unloaded += (_, _) =>
+        {
+            UsageProbe.Refreshed -= OnUsageRefreshed;
+            _usageTimer.Stop();
+        };
         _ = new SessionFollower<BarSource, BarData>(this, s => new BarSource(s), r => r.Read(), async d =>
         {
             _data = d;
@@ -54,7 +72,36 @@ public partial class BottomBar : UserControl
         ModeButton.ToolTip = reason;
         CtxText.Text = BarFormat.Ctx(sl, d?.ContextTokens);
         SpendText.Text = BarFormat.Spend(sl, d?.OutputTokens, d?.CostUsd);
-        (UsageText.Text, UsageText.ToolTip) = BarFormat.Usage(sl, d?.Account);
+        var (usage, tip) = BarFormat.Usage(sl, BarFormat.Newer(_account, d?.Account)); // shown with no session open too
+        UsageText.Text = _checkingUsage ? usage + " ↻" : usage;
+        UsageText.ToolTip = $"{tip}\nClick to check now (runs /usage hidden)";
+    }
+
+    /// <summary>Runs /usage hidden for the window's account (see <see cref="UsageProbe"/>); the Refreshed event re-reads it.</summary>
+    async Task CheckUsageAsync(bool force)
+    {
+        if (AppState.Current?.Account is not { } account || _checkingUsage) return;
+        _checkingUsage = true;
+        Render();
+        try { await UsageProbe.RefreshAsync(account, force); }
+        finally
+        {
+            _checkingUsage = false;
+            Render();
+        }
+    }
+
+    // A pool thread; the start screen's checks of this account land here too.
+    void OnUsageRefreshed(Account account)
+    {
+        if (account.Letter == AppState.Current?.Account.Letter) Dispatcher.InvokeAsync(ReadAccountAsync);
+    }
+
+    async Task ReadAccountAsync()
+    {
+        if (AppState.Current?.Account is not { } account) return;
+        _account = await Task.Run(() => AccountReader.Read(account));
+        Render();
     }
 
     // A refusal (e.g. text already in the terminal input) shows in the compose box's notice.
@@ -218,13 +265,19 @@ public static class BarFormat
     public static string Spend(StatusLineData? sl, long? transcriptOutput, double? transcriptCost) =>
         $"in {Tokens(sl?.TotalInputTokens)} out {Tokens(sl?.TotalOutputTokens ?? transcriptOutput)} {Cost(sl?.CostUsd ?? transcriptCost)}";
 
-    /// <summary>"5h 58% · wk 12%" from the status line's rate limits (Pro/Max, after the first reply), else the usage
-    /// Claude Code cached in .claude.json, whose age goes in the tooltip.</summary>
+    /// <summary>"5h 58% · wk 12%", from whichever is newer: the status line's rate limits (Pro/Max, after the first reply) or
+    /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its time goes in the tooltip.</summary>
     public static (string Text, string Tip) Usage(StatusLineData? sl, AccountInfo? account)
     {
-        if (sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null })
-            return ($"5h {Percent(sl.FiveHourUsedPercent)} · wk {Percent(sl.SevenDayUsedPercent)}", "Plan usage from Claude Code's status line");
+        var saved = account?.UsageFetchedAt;
+        if ((sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null }) && (saved is null || sl.ReceivedAt > saved))
+            return ($"5h {Percent(sl.FiveHourUsedPercent)} · wk {Percent(sl.SevenDayUsedPercent)}",
+                $"Plan usage from Claude Code's status line, as of {sl.ReceivedAt.ToLocalTime():HH:mm}");
         return ($"5h {Percent(account?.FiveHour?.Utilization)} · wk {Percent(account?.SevenDay?.Utilization)}",
-            account?.UsageFetchedAt is { } at ? $"Cached by Claude Code, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data");
+            saved is { } at ? $"Plan usage from Claude Code's /usage, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data");
     }
+
+    /// <summary>The account read whose saved usage is newer (a null one loses).</summary>
+    public static AccountInfo? Newer(AccountInfo? a, AccountInfo? b) =>
+        (b?.UsageFetchedAt ?? DateTimeOffset.MinValue) > (a?.UsageFetchedAt ?? DateTimeOffset.MinValue) ? b : a ?? b;
 }

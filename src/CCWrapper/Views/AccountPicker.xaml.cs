@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -5,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using CCWrapper.Core;
 using CCWrapper.Data;
+using CCWrapper.Terminal;
 
 namespace CCWrapper.Views;
 
@@ -39,8 +41,10 @@ public partial class AccountPicker : Window
                 return (accounts.Select(a => AccountCard.From(a, AccountReader.Read(a), SessionCatalog.Running(a).Count, now)).ToList(),
                     SessionCatalog.Recent(accounts).Select(e => RecentRow.From(e, now)).ToList());
             });
-            Cards.ItemsSource = cards;
+            var shown = new ObservableCollection<AccountCard>(cards);
+            Cards.ItemsSource = shown;
             Recent.ItemsSource = recent;
+            for (var i = 0; i < shown.Count; i++) _ = CheckUsageAsync(shown, i); // all accounts in parallel
             Status.Text = cards.Count == 0 ? @"No Claude Code accounts found (~\.claude, ~\.claude-x)" : recent.Count == 0 ? "No sessions yet" : "";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -48,6 +52,16 @@ public partial class AccountPicker : Window
             Status.Text = ex.Message;
         }
         Status.Visibility = Status.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    /// <summary>Runs /usage hidden for the card's account (see <see cref="UsageProbe"/>) and shows the fresh numbers.</summary>
+    static async Task CheckUsageAsync(ObservableCollection<AccountCard> cards, int i)
+    {
+        var card = cards[i];
+        cards[i] = card with { AsOf = "checking usage…" };
+        var fresh = await UsageProbe.RefreshAsync(card.Account);
+        var info = fresh ? await Task.Run(() => AccountReader.Read(card.Account)) : null;
+        cards[i] = info is null ? card : AccountCard.From(card.Account, info, 0, DateTimeOffset.Now) with { Running = card.Running };
     }
 
     void OnCardClick(object sender, RoutedEventArgs e)
