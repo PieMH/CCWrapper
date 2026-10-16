@@ -22,7 +22,7 @@
                     </StackPanel>
                 </Border>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Image Source="/CCWrapper.ico" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Image Source="/logo.png" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="CCWrapper" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
                     <TextBlock Text="/" Foreground="#4A525D" Margin="10,0" VerticalAlignment="Center" />
                     <Border x:Name="Badge" Width="22" Height="22" CornerRadius="6" VerticalAlignment="Center">
@@ -65,7 +65,7 @@
                 <!-- No session open: the terminal is collapsed (WPF cannot draw over WebView2), this takes its cell. -->
                 <Border x:Name="EmptyState" Background="{StaticResource TerminalBg}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <Image Source="/CCWrapper.ico" Width="56" Height="56" Opacity="0.9" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,14" />
+                        <Image Source="/logo.png" Width="56" Height="56" Opacity="0.9" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,14" />
                         <TextBlock Text="No session open" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
                         <TextBlock Text="Start a new session, or pick one from the list to resume it." Foreground="{StaticResource Muted}" Margin="0,6,0,0" HorizontalAlignment="Center" />
                         <Button Style="{StaticResource Primary}" Margin="0,18,0,0" HorizontalAlignment="Center" Click="OnNewSession">

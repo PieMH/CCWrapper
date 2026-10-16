@@ -13,7 +13,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel HorizontalAlignment="Center" Margin="0,0,0,18">
-            <Image Source="/CCWrapper.ico" Width="48" Height="48" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,10" />
+            <Image Source="/logo.png" Width="48" Height="48" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,10" />
             <TextBlock x:Name="Heading" Text="Who's working?" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" />
         </StackPanel>
 
