@@ -18,6 +18,7 @@ public partial class MainWindow : Window, IAppCommands
     readonly AppState _state;
     readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
     readonly DispatcherTimer _gitTimer = new() { Interval = TimeSpan.FromMilliseconds(400) }; // debounce
+    readonly DispatcherTimer _gitRefresh = new() { Interval = TimeSpan.FromSeconds(10) }; // commits and branch switches in the session
     LiveSession? _watched; // the active session whose cwd the GitHub label follows
     SessionEntry? _elsewhere; // shown read-only in the center: open in another claude process
     string? _gitCwd;
@@ -31,7 +32,7 @@ public partial class MainWindow : Window, IAppCommands
         var letter = ShellModel.LetterOf(account.Letter);
         var color = (Color)ColorConverter.ConvertFromString(ShellModel.ColorOf(account.Letter));
         Title = $"CCWrapper · {letter} · {account.Label}";
-        AccountLabel.Text = $"{letter} · {account.Label}";
+        AccountLabel.Text = account.Label;
         BadgeText.Text = letter;
         Badge.Background = new SolidColorBrush(color);
         Taskbar.Overlay = BadgeImage(letter, color);
@@ -42,14 +43,19 @@ public partial class MainWindow : Window, IAppCommands
         _state.PropertyChanged += OnStateChanged;
         _statusTimer.Tick += async (_, _) => await PollStatusAsync();
         _gitTimer.Tick += async (_, _) => await ReadGitAsync();
-        Loaded += (_, _) =>
+        _gitRefresh.Tick += async (_, _) => { if (_gitCwd is not null) await ReadGitAsync(); };
+        Loaded += async (_, _) =>
         {
             _statusTimer.Start();
+            _gitRefresh.Start();
             _ = ResumeFromArgsAsync();
+            var info = await Task.Run(() => AccountReader.Read(account));
+            PlanLabel.Text = ShellModel.PlanOf(info.OrganizationType) ?? "";
         };
         Closed += (_, _) =>
         {
             _statusTimer.Stop();
+            _gitRefresh.Stop();
             _gitCts?.Cancel();
         };
     }
@@ -229,8 +235,12 @@ public partial class MainWindow : Window, IAppCommands
         GitInfo info;
         try { info = await GitInfo.ReadAsync(_gitCwd, cts.Token); }
         catch (OperationCanceledException) { return; } // a newer read is on its way
-        GitHubLabel.Text = "GitHub: " + info.Label;
-        GitHubLabel.ToolTip = info.UserName is null && info.UserEmail is null ? null : $"{info.UserName} <{info.UserEmail}>";
+        GitAccount.Text = info.InRepo ? info.Label : "git: none";
+        GitBranchSep.Visibility = info.Branch is null ? Visibility.Collapsed : Visibility.Visible;
+        GitBranch.Text = info.Branch ?? "";
+        GitAhead.Text = info.Ahead is > 0 ? $"↑{info.Ahead}" : "";
+        GitBehind.Text = info.Behind is > 0 ? $"↓{info.Behind}" : "";
+        GitChip.ToolTip = ShellModel.GitTip(info);
     }
 
     /// <summary>The letter on a color circle, the taskbar overlay that tells the windows of different accounts apart.</summary>

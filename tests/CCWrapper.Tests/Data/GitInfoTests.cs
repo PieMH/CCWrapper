@@ -47,7 +47,7 @@ public sealed class GitInfoTests : IDisposable
         Git("config", "--unset", "credential.https://github.com.username");
         var withUrl = await GitInfo.ReadAsync(_dir);
 
-        Assert.Equal(new GitInfo(true, "credUser", "Test User", "test@example.com"), withCredential);
+        Assert.Equal((true, "credUser", "Test User", "test@example.com"), (withCredential.InRepo, withCredential.PushAccount, withCredential.UserName, withCredential.UserEmail));
         Assert.Equal("urluser", withUrl.PushAccount); // the token part is never returned
         Assert.Equal("urluser", withUrl.Label);
     }
@@ -62,4 +62,37 @@ public sealed class GitInfoTests : IDisposable
 
         Assert.True(info.InRepo);
     }
+
+    [Fact]
+    public async Task Branch_upstream_and_commits_ahead_and_behind()
+    {
+        Git("init", "-q", "-b", "main");
+        Git("config", "user.name", "Test User");
+        Git("config", "user.email", "test@example.com");
+        Git("config", "commit.gpgsign", "false"); // a throwaway repo: a global signing setting must not need a key here
+        Git("init", "-q", "--bare", "remote.git");
+        Git("remote", "add", "origin", "remote.git");
+        Git("commit", "-q", "--allow-empty", "-m", "one");
+        var noUpstream = await GitInfo.ReadAsync(_dir);
+        Git("commit", "-q", "--allow-empty", "-m", "two");
+        Git("push", "-q", "-u", "origin", "main");
+        Git("reset", "-q", "--hard", "HEAD~1"); // one behind
+        Git("commit", "-q", "--allow-empty", "-m", "three"); // one ahead
+
+        var info = await GitInfo.ReadAsync(_dir);
+        Git("checkout", "-q", "--detach");
+        var detached = await GitInfo.ReadAsync(_dir);
+
+        Assert.Equal(("main", null, null, null), (noUpstream.Branch, noUpstream.Upstream, noUpstream.Ahead, noUpstream.Behind));
+        Assert.Equal(("main", "origin/main", 1, 1), (info.Branch, info.Upstream, info.Ahead, info.Behind));
+        Assert.Matches("^[0-9a-f]{7,}$", detached.Branch); // the short commit id
+    }
+
+    [Theory]
+    [InlineData("2\t1", 2, 1)]
+    [InlineData("0\t0\n", 0, 0)]
+    [InlineData(null, null, null)]
+    [InlineData("fatal", null, null)]
+    public void Counts_parses_ahead_and_behind(string? output, int? ahead, int? behind) =>
+        Assert.Equal((ahead, behind), GitInfo.Counts(output));
 }

@@ -27,7 +27,7 @@ function create(id) {
     scrollback: 10000,
     fontFamily: "'Cascadia Mono', Consolas, monospace",
     fontSize: 14,
-    theme: { background: '#1e1e1e' },
+    theme: { background: '#101215', foreground: '#d3d9e1', cursor: '#d3d9e1', selectionBackground: '#2b74c266' }, // Theme.xaml
     linkHandler: { activate: link }, // OSC 8 hyperlinks
   });
   const fit = new FitAddon.FitAddon();
@@ -132,6 +132,7 @@ new ResizeObserver(() => {
 function openFind() {
   if (!visible) return;
   $('find').hidden = false;
+  $('find-open').hidden = true;
   $('find-q').select();
   $('find-q').focus();
   if ($('find-q').value) find(true, true);
@@ -140,6 +141,7 @@ function openFind() {
 function closeFind() {
   if ($('find').hidden) return;
   $('find').hidden = true;
+  $('find-open').hidden = false;
   visible?.search.clearDecorations();
   visible?.term.focus();
 }
@@ -166,6 +168,7 @@ $('find-q').addEventListener('keydown', e => {
 $('find-next').onclick = () => find(true);
 $('find-prev').onclick = () => find(false);
 $('find-close').onclick = closeFind;
+$('find-open').onclick = openFind;
 $('find-full').onclick = () => visible && post({ t: 'transcript', id: visible.id, q: $('find-q').value });
 
 // Files dropped anywhere else must not navigate the page away.

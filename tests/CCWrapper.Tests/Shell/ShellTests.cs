@@ -39,6 +39,30 @@ public sealed class ShellTests
     [InlineData(null, null)]
     public void Plan_names(string? type, string? plan) => Assert.Equal(plan, ShellModel.PlanOf(type));
 
+    [Theory]
+    [InlineData("●", "working")]
+    [InlineData("◉", "needs you")]
+    [InlineData("○", "open")]
+    [InlineData("", "")]
+    public void Session_row_badge_follows_its_status_dot(string dot, string badge) =>
+        Assert.Equal(badge, new SessionRow("k", null, null, "t", "proj", "2m", dot, "#fff", false, null, "").Badge);
+
+    [Fact]
+    public void Session_row_meta_skips_an_unknown_project()
+    {
+        Assert.Equal("proj · 2m", new SessionRow("k", null, null, "t", "proj", "2m", "", "#fff", false, null, "").Meta);
+        Assert.Equal("2m", new SessionRow("k", null, null, "t", "", "2m", "", "#fff", false, null, "").Meta);
+    }
+
+    [Fact]
+    public void Git_tip_names_the_committer_the_push_account_and_the_branch_state()
+    {
+        Assert.Equal("Not in a git repository", ShellModel.GitTip(GitInfo.None));
+        Assert.Equal("Commits as Me <me@x.com>\nPushes to GitHub as octocat\nmain → origin/main: 2 to push, 0 to pull (as of the last fetch)",
+            ShellModel.GitTip(new GitInfo(true, "octocat", "Me", "me@x.com", "main", "origin/main", 2, 0)));
+        Assert.Equal("GitHub account unknown\nwip: no upstream branch", ShellModel.GitTip(new GitInfo(true, null, null, null, "wip")));
+    }
+
     [Fact]
     public void Age_is_now_under_a_minute_then_short_units()
     {

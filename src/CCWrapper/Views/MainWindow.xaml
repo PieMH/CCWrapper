@@ -3,81 +3,111 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="clr-namespace:CCWrapper.Views"
         xmlns:terminal="clr-namespace:CCWrapper.Terminal"
-        Title="CCWrapper" Width="1400" Height="900">
+        Title="CCWrapper" Width="1400" Height="900" Background="{StaticResource Bg}">
     <Window.TaskbarItemInfo>
         <TaskbarItemInfo x:Name="Taskbar" />
     </Window.TaskbarItemInfo>
     <DockPanel>
-        <!-- Top bar: app name, account + Switch, GitHub label -->
-        <Border DockPanel.Dock="Top" Padding="8,6" BorderThickness="0,0,0,1" BorderBrush="#33FFFFFF">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="CCWrapper" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <Border x:Name="Badge" Width="22" Height="22" CornerRadius="11" Margin="16,0,8,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="BadgeText" Foreground="#1E1E1E" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <!-- Top bar: logo, account + Switch, git -->
+        <Border DockPanel.Dock="Top" Height="42" Padding="12,0" Background="{StaticResource Panel}" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Line}">
+            <DockPanel>
+                <Border x:Name="GitChip" DockPanel.Dock="Right" Height="26" Padding="10,0" CornerRadius="6" Background="{StaticResource Raised}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource GitIcon}" Stroke="{StaticResource Muted}" StrokeThickness="1.6" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
+                        <TextBlock x:Name="GitAccount" Text="git: none" Foreground="#AEB7C2" Margin="7,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="GitBranchSep" Text="·" Foreground="#4A525D" Margin="6,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <TextBlock x:Name="GitBranch" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock x:Name="GitAhead" Foreground="{StaticResource Accent}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="GitBehind" Foreground="{StaticResource Warn}" Margin="4,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
                 </Border>
-                <TextBlock x:Name="AccountLabel" Margin="0,0,10,0" VerticalAlignment="Center" />
-                <Button x:Name="SwitchButton" Content="⇄ Switch" Padding="10,2" Click="OnSwitch" />
-                <TextBlock x:Name="GitHubLabel" Text="GitHub: none" Margin="16,0,0,0" VerticalAlignment="Center" />
-            </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="/CCWrapper.ico" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="CCWrapper" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <TextBlock Text="/" Foreground="#4A525D" Margin="10,0" VerticalAlignment="Center" />
+                    <Border x:Name="Badge" Width="22" Height="22" CornerRadius="6" VerticalAlignment="Center">
+                        <TextBlock x:Name="BadgeText" Foreground="#1E1E1E" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock x:Name="AccountLabel" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="PlanLabel" Foreground="{StaticResource Muted}" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    <Button x:Name="SwitchButton" Style="{StaticResource Outlined}" Margin="12,0,0,0" Click="OnSwitch"
+                            ToolTip="Restart this window as another account">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8AB;" FontSize="12" Margin="0,0,6,0" />
+                            <TextBlock Text="Switch account" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
         </Border>
 
-        <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="#33FFFFFF">
+        <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{StaticResource Line}">
             <views:BottomBar />
         </Border>
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" MinWidth="160" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="256" MinWidth="160" />
                 <ColumnDefinition Width="*" MinWidth="300" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="340" MinWidth="200" />
+                <ColumnDefinition Width="320" MinWidth="200" />
             </Grid.ColumnDefinitions>
 
-            <views:Sidebar Grid.Column="0" />
-            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" />
+            <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
+                <views:Sidebar />
+            </Border>
 
-            <Grid Grid.Column="2">
+            <Grid Grid.Column="1">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <terminal:TerminalHost x:Name="TerminalView" />
                 <!-- No session open: the terminal is collapsed (WPF cannot draw over WebView2), this takes its cell. -->
-                <Border x:Name="EmptyState" Background="#1E1E1E">
+                <Border x:Name="EmptyState" Background="{StaticResource TerminalBg}">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Image Source="/CCWrapper.ico" Width="56" Height="56" Opacity="0.9" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,0,14" />
                         <TextBlock Text="No session open" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                        <TextBlock Text="Start a new session, or pick one from the list to resume it." Opacity="0.6" Margin="0,6,0,0" HorizontalAlignment="Center" />
-                        <Button Content="＋ New session" Padding="18,6" Margin="0,16,0,0" HorizontalAlignment="Center" Click="OnNewSession" />
+                        <TextBlock Text="Start a new session, or pick one from the list to resume it." Foreground="{StaticResource Muted}" Margin="0,6,0,0" HorizontalAlignment="Center" />
+                        <Button Style="{StaticResource Primary}" Margin="0,18,0,0" HorizontalAlignment="Center" Click="OnNewSession">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" Margin="0,0,8,0" />
+                                <TextBlock Text="New session" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
                 <!-- A session open in another claude process: its live transcript, read-only, in the terminal's cell. -->
-                <DockPanel x:Name="ElsewhereState" Background="#1E1E1E" Visibility="Collapsed">
-                    <Border DockPanel.Dock="Top" Padding="10,8" Background="#2A2A2A" BorderThickness="0,0,0,1" BorderBrush="#33FFFFFF">
+                <DockPanel x:Name="ElsewhereState" Background="{StaticResource TerminalBg}" Visibility="Collapsed">
+                    <Border DockPanel.Dock="Top" Padding="12,8" Background="{StaticResource Panel}" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Line}">
                         <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Continue here as a copy" Padding="10,2" Margin="8,0,0,0" Click="OnContinueAsCopy"
+                            <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Continue here as a copy" Margin="8,0,0,0" Click="OnContinueAsCopy"
                                     ToolTip="Opens a copy of the conversation under a new id; the original stays as it is" />
-                            <Button DockPanel.Dock="Right" Content="Resume here" Padding="10,2" Click="OnResumeHere"
+                            <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Resume here" Click="OnResumeHere"
                                     ToolTip="Works once the session is closed in the other terminal" />
                             <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                 <Run x:Name="ElsewhereTitle" FontWeight="SemiBold" />
-                                <Run Text="  is open in another terminal: read-only, updates live." Foreground="#E0A030" />
+                                <Run Text="  is open in another terminal: read-only, updates live." Foreground="{StaticResource Warn}" />
                             </TextBlock>
                         </DockPanel>
                     </Border>
                     <ContentControl x:Name="ElsewhereView" />
                 </DockPanel>
-                <Border Grid.Row="1" BorderThickness="0,1,0,0" BorderBrush="#33FFFFFF">
+                <Border Grid.Row="1" Background="{StaticResource Panel}" BorderThickness="0,1,0,0" BorderBrush="{StaticResource Line}">
                     <views:ComposeBox />
                 </Border>
             </Grid>
 
-            <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" />
-            <TabControl x:Name="RightTabs" Grid.Column="4">
-                <TabItem Header="Files"><views:FilesPanel /></TabItem>
-                <TabItem Header="Agents"><views:AgentsPanel /></TabItem>
-                <TabItem x:Name="BrowserTab" Header="Browser"><views:BrowserPanel x:Name="Browser" /></TabItem>
-            </TabControl>
+            <Border Grid.Column="2" BorderBrush="{StaticResource Line}" BorderThickness="1,0,0,0">
+                <TabControl x:Name="RightTabs" Style="{StaticResource UnderlineTabs}">
+                    <TabItem Header="Files"><views:FilesPanel /></TabItem>
+                    <TabItem Header="Agents"><views:AgentsPanel /></TabItem>
+                    <TabItem x:Name="BrowserTab" Header="Browser"><views:BrowserPanel x:Name="Browser" /></TabItem>
+                </TabControl>
+            </Border>
+
+            <!-- Splitters sit on the panels' inner edges, never over the terminal (WebView2 would cover them) -->
+            <GridSplitter Grid.Column="0" Width="4" HorizontalAlignment="Right" Background="Transparent" ResizeBehavior="CurrentAndNext" />
+            <GridSplitter Grid.Column="2" Width="4" HorizontalAlignment="Left" Background="Transparent" ResizeBehavior="PreviousAndCurrent" />
         </Grid>
     </DockPanel>
 </Window>

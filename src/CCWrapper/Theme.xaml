@@ -1,0 +1,257 @@
+<!-- The app's look ("cool": slate grays, the logo's blue). Colors are here once; views use these keys. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="Bg" Color="#15171B" />
+    <SolidColorBrush x:Key="Panel" Color="#1B1E23" />
+    <SolidColorBrush x:Key="Raised" Color="#242830" />
+    <SolidColorBrush x:Key="Hover" Color="#2A2F37" />
+    <SolidColorBrush x:Key="Line" Color="#2A2F37" />
+    <SolidColorBrush x:Key="ControlLine" Color="#343A44" />
+    <SolidColorBrush x:Key="Text" Color="#E4E8EE" />
+    <SolidColorBrush x:Key="TextSoft" Color="#C9D0D9" />
+    <SolidColorBrush x:Key="Muted" Color="#8A94A1" />
+    <SolidColorBrush x:Key="TerminalBg" Color="#101215" />
+    <SolidColorBrush x:Key="Accent" Color="#4A9BE8" />
+    <SolidColorBrush x:Key="AccentFill" Color="#2B74C2" />
+    <SolidColorBrush x:Key="Good" Color="#7FD1A0" />
+    <SolidColorBrush x:Key="Warn" Color="#F2C46D" />
+    <SolidColorBrush x:Key="Bad" Color="#F08F86" />
+    <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
+    <!-- A git branch: three commits, a fork (the icon font has none) -->
+    <Geometry x:Key="GitIcon">M6,3.5 A2.5,2.5 0 1 1 6,8.5 A2.5,2.5 0 1 1 6,3.5 M6,15.5 A2.5,2.5 0 1 1 6,20.5 A2.5,2.5 0 1 1 6,15.5 M18,5.5 A2.5,2.5 0 1 1 18,10.5 A2.5,2.5 0 1 1 18,5.5 M6,8.5 L6,15.5 M18,10.5 C18,14.5 12,13.5 7.2,16.3</Geometry>
+
+    <!-- A Segoe Fluent Icons glyph (Windows' own icon font: crisp at any size, nothing to ship) -->
+    <Style x:Key="Icon" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Section label: "Sessions" -->
+    <Style x:Key="Label" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+    </Style>
+
+    <!-- Flat button: no fill until hovered. Icon buttons, sidebar rows, bottom-bar chips. -->
+    <Style x:Key="Flat" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Hover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#323843" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Sidebar row: icon + label, left aligned -->
+    <Style x:Key="Nav" TargetType="Button" BasedOn="{StaticResource Flat}">
+        <Setter Property="Foreground" Value="{StaticResource TextSoft}" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <!-- Bordered button on a panel: Switch account -->
+    <Style x:Key="Outlined" TargetType="Button" BasedOn="{StaticResource Flat}">
+        <Setter Property="Background" Value="{StaticResource Raised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Height" Value="26" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="10,0" />
+    </Style>
+
+    <!-- Main action: Start, Resume -->
+    <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource Flat}">
+        <Setter Property="Background" Value="{StaticResource AccentFill}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="MinHeight" Value="32" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="#3381D2" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- The compose box's round send button -->
+    <Style x:Key="Send" TargetType="Button">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="Background" Value="{StaticResource AccentFill}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="10">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#3381D2" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#2566AD" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A clickable card on the start screen -->
+    <Style x:Key="Card" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+        <Setter Property="Background" Value="{StaticResource Panel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Raised}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource ControlLine}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- List row: rounded hover and selection, no system highlight -->
+    <Style x:Key="Row" TargetType="ListBoxItem">
+        <Setter Property="Foreground" Value="{StaticResource Text}" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="Margin" Value="0,0,0,1" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid>
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <Border x:Name="Marker" Width="3" HorizontalAlignment="Left" Margin="0,9" CornerRadius="1.5"
+                                Background="{StaticResource Accent}" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#20242A" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#262B33" />
+                        </Trigger>
+                        <!-- Views set Tag="Active" on the row that is open in the center -->
+                        <Trigger Property="Tag" Value="Active">
+                            <Setter TargetName="Bd" Property="Background" Value="#262B33" />
+                            <Setter TargetName="Marker" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Right panel tabs: text with an accent underline -->
+    <Style x:Key="UnderlineTabs" TargetType="TabControl">
+        <Setter Property="Background" Value="{StaticResource Panel}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <DockPanel Background="{TemplateBinding Background}">
+                        <Border DockPanel.Dock="Top" Height="40" Padding="14,0" BorderThickness="0,0,0,1" BorderBrush="{StaticResource Line}">
+                            <StackPanel IsItemsHost="True" Orientation="Horizontal" />
+                        </Border>
+                        <ContentPresenter ContentSource="SelectedContent" Margin="4,6,4,0" />
+                    </DockPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="ItemContainerStyle">
+            <Setter.Value>
+                <Style TargetType="TabItem">
+                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="TabItem">
+                                <Border x:Name="Bd" Margin="0,0,18,0" Padding="2,0" Background="Transparent"
+                                        BorderThickness="0,0,0,2" BorderBrush="Transparent">
+                                    <ContentPresenter ContentSource="Header" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}" />
+                                        <Setter Property="Foreground" Value="{StaticResource Text}" />
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A small meter bar: the track; its child Border's Width is set in code -->
+    <Style x:Key="MeterTrack" TargetType="Border">
+        <Setter Property="Width" Value="44" />
+        <Setter Property="Height" Value="4" />
+        <Setter Property="CornerRadius" Value="2" />
+        <Setter Property="Background" Value="#2F343D" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="6,0" />
+    </Style>
+</ResourceDictionary>

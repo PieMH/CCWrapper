@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:CCWrapper.Views">
     <Grid>
-        <TreeView x:Name="Tree" BorderThickness="0" KeyDown="OnKeyDown" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+        <TreeView x:Name="Tree" BorderThickness="0" Background="Transparent" KeyDown="OnKeyDown" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <TreeView.ItemContainerStyle>
                 <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -13,13 +13,25 @@
             <TreeView.ItemTemplate>
                 <HierarchicalDataTemplate DataType="{x:Type local:FileNode}" ItemsSource="{Binding Children}">
                     <DockPanel ToolTip="{Binding Tip}">
-                        <TextBlock DockPanel.Dock="Right" Width="16" Text="{Binding Badge}" TextAlignment="Center" Foreground="#6FCF97" FontWeight="SemiBold" />
-                        <TextBlock DockPanel.Dock="Right" Text="{Binding Summary}" Margin="12,0,4,0" Opacity="0.7" />
-                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock DockPanel.Dock="Right" Width="16" Text="{Binding Badge}" TextAlignment="Center" Foreground="{StaticResource Good}" FontWeight="SemiBold" />
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Minus}" Foreground="{StaticResource Bad}" FontFamily="{StaticResource MonoFont}" FontSize="12" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Plus}" Foreground="{StaticResource Good}" FontFamily="{StaticResource MonoFont}" FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Other}" Foreground="{StaticResource Muted}" FontSize="12" Margin="12,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                            <Setter Property="Foreground" Value="#AEB7C2" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </DockPanel>
                 </HierarchicalDataTemplate>
             </TreeView.ItemTemplate>
         </TreeView>
-        <TextBlock x:Name="Empty" Margin="12" Opacity="0.6" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Top" />
+        <TextBlock x:Name="Empty" Margin="12" Foreground="{StaticResource Muted}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Top" />
     </Grid>
 </UserControl>
