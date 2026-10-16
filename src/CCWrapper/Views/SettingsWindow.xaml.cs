@@ -17,9 +17,9 @@ public enum FieldKind { Select, Combo, Segments, Text }
 
 /// <summary>One setting row. <paramref name="Values"/> are the JSON values the options write when that isn't the option's
 /// own text (a boolean); <paramref name="AnyTrueWins"/>: true in any file wins (disableClaudeAiConnectors), not the most
-/// specific file.</summary>
+/// specific file; <paramref name="SessionOnly"/>: one more segment, shown disabled, that Claude Code takes only per session.</summary>
 public sealed record FieldDef(string[] Path, string Label, string Description, FieldKind Kind, string[] Options,
-    JsonNode?[]? Values = null, string? Placeholder = null, bool AnyTrueWins = false)
+    JsonNode?[]? Values = null, string? Placeholder = null, bool AnyTrueWins = false, string? SessionOnly = null)
 {
     public string Key => string.Join('.', Path);
     public JsonNode ValueOf(int i) => Values?[i]?.DeepClone() ?? JsonValue.Create(Options[i])!;
@@ -224,9 +224,11 @@ public partial class SettingsWindow : Window
     {
         yield return new(["model"], "Model", "What new sessions start with. /model still changes one session.", FieldKind.Combo,
             ["default", "opus", "sonnet", "haiku", "opus[1m]", "sonnet[1m]"]);
-        yield return new(["effortLevel"], "Effort", "How hard the model thinks, for models without their own effort below.", FieldKind.Segments, Effort);
+        yield return new(["effortLevel"], "Effort", "How hard the model thinks, for models without their own effort below.", FieldKind.Segments, Effort,
+            SessionOnly: "max");
         foreach (var id in _files.Values.SelectMany(f => f.Pending["modelSettings"] is JsonObject m ? m.Select(p => p.Key) : []).Distinct().Order())
-            yield return new(["modelSettings", id, "effortLevel"], $"Effort · {id}", "This model's own effort: it wins over Effort.", FieldKind.Segments, Effort);
+            yield return new(["modelSettings", id, "effortLevel"], $"Effort · {id}", "This model's own effort: it wins over Effort.", FieldKind.Segments, Effort,
+                SessionOnly: "max");
         yield return new(["outputStyle"], "Output style", "How Claude writes its answers. Your own styles work too: type the name.", FieldKind.Combo,
             ["Default", "Explanatory", "Learning"]);
         yield return new(["language"], "Language", "The language Claude answers in. Empty is English.", FieldKind.Text, [], Placeholder: "e.g. italian");
@@ -337,6 +339,14 @@ public partial class SettingsWindow : Window
                     var choice = new RadioButton { Style = (Style)FindResource("Segment"), GroupName = group, Content = def.Options[i], IsChecked = i == index };
                     choice.Checked += (_, _) => { file?.Set(def.Path, def.ValueOf(option)); Changed(); };
                     panel.Children.Add(choice);
+                }
+                if (def.SessionOnly is { } only)
+                {
+                    // Claude Code drops it from settings.json without a word: offering it would save nothing.
+                    var off = new RadioButton { Style = (Style)FindResource("Segment"), Content = only, IsEnabled = false,
+                        ToolTip = $"Claude Code doesn't save {only} in settings. Use /effort {only} in a session." };
+                    ToolTipService.SetShowOnDisabled(off, true);
+                    panel.Children.Add(off);
                 }
                 return new Border { Background = B("Bg"), BorderBrush = B("Line"), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8), Padding = new Thickness(2), Child = panel };
             }
