@@ -83,10 +83,10 @@
                             <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Continue here as a copy" Margin="8,0,0,0" Click="OnContinueAsCopy"
                                     ToolTip="Opens a copy of the conversation under a new id; the original stays as it is" />
                             <Button DockPanel.Dock="Right" Style="{StaticResource Outlined}" Content="Resume here" Click="OnResumeHere"
-                                    ToolTip="Works once the session is closed in the other terminal" />
+                                    ToolTip="Resumes it here; if it is still open elsewhere, offers to close it there first" />
                             <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
                                 <Run x:Name="ElsewhereTitle" FontWeight="SemiBold" />
-                                <Run Text="  is open in another terminal: read-only, updates live." Foreground="{StaticResource Warn}" />
+                                <Run x:Name="ElsewhereWhere" Foreground="{StaticResource Warn}" />
                             </TextBlock>
                         </DockPanel>
                     </Border>

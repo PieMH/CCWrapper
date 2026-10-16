@@ -112,18 +112,43 @@ public partial class MainWindow : Window, IAppCommands
     {
         _elsewhere = entry;
         ElsewhereTitle.Text = entry?.Title ?? "";
+        ElsewhereWhere.Text = $"  is open in {(entry?.Running is { } r ? ProcessTree.Describe(r.Pid) : "another terminal")}: read-only, updates live.";
         ElsewhereView.Content = entry is null ? null : new TranscriptView(entry.Path, query); // the old view stops following when unloaded
         ShowTerminal(_state.OpenSessions.Count > 0);
     }
 
+    /// <summary>Resumes the session here. Still open elsewhere: says where and offers to close it there first (the claude
+    /// process is ended, as closing its terminal would; the conversation so far is saved).</summary>
     async void OnResumeHere(object sender, RoutedEventArgs e)
     {
         if (_elsewhere is not { } entry) return;
-        var running = await Task.Run(() => SessionCatalog.Running(_state.Account));
-        if (running.Any(r => r.SessionId == entry.Id))
-            MessageBox.Show(this, "It is still open in another terminal. Close it there first, or continue here as a copy.",
-                "Resume here", MessageBoxButton.OK, MessageBoxImage.Information);
-        else await OpenEntry(entry with { Running = null });
+        var holders = await HoldersAsync(entry.Id, TimeSpan.FromSeconds(3)); // a terminal closed just now may still be shutting down
+        if (holders.Count > 0)
+        {
+            var where = string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)));
+            var busy = holders.Any(h => h.Status is SessionStatus.Busy or SessionStatus.Waiting)
+                ? "\n\nClaude is working or waiting for an answer there: that stops." : "";
+            if (MessageBox.Show(this, $"“{entry.Title}” is still open in:\n{where}\n\nClose it there and resume it here? The conversation so far is saved.{busy}",
+                    "Resume here", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            foreach (var h in holders) ProcessTree.End(h.Pid);
+            if ((holders = await HoldersAsync(entry.Id, TimeSpan.FromSeconds(5))).Count > 0)
+            {
+                MessageBox.Show(this, $"It could not be closed:\n{string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)))}\n\nClose it there, then try again.",
+                    "Resume here", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        await OpenEntry(entry with { Running = null });
+    }
+
+    /// <summary>The live claude processes of this account that have the session open, waiting up to <paramref name="wait"/> for them to go.</summary>
+    async Task<List<RunningSession>> HoldersAsync(string sessionId, TimeSpan wait)
+    {
+        for (var until = DateTime.UtcNow + wait; ; await Task.Delay(300))
+        {
+            var holders = (await Task.Run(() => SessionCatalog.Running(_state.Account))).Where(r => r.SessionId == sessionId).ToList();
+            if (holders.Count == 0 || DateTime.UtcNow >= until) return holders;
+        }
     }
 
     async void OnContinueAsCopy(object sender, RoutedEventArgs e)
