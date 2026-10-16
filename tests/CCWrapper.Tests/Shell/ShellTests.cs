@@ -54,6 +54,24 @@ public sealed class ShellTests
         Assert.Equal("2m", new SessionRow("k", null, null, "t", "", "2m", "", "#fff", false, null, "").Meta);
     }
 
+    [Theory]
+    [InlineData("powershell", "PowerShell")]
+    [InlineData("pwsh", "PowerShell")]
+    [InlineData("CCWrapper", "a CCWrapper window")]
+    [InlineData("WindowsTerminal", "Windows Terminal")]
+    [InlineData("nu", "nu")]
+    [InlineData(null, "another terminal")]
+    public void Host_names_are_what_the_user_calls_the_program(string? process, string name) =>
+        Assert.Equal(name, ProcessTree.HostName(process));
+
+    [Fact]
+    public void Describe_names_a_live_process_by_its_parent_with_pid_and_start_time()
+    {
+        var text = ProcessTree.Describe(Environment.ProcessId); // the test host, started by dotnet or an IDE
+        Assert.Contains($"(pid {Environment.ProcessId}, since ", text);
+        Assert.Equal("another terminal (pid 3)", ProcessTree.Describe(3)); // no such process: Windows pids are multiples of 4
+    }
+
     [Fact]
     public void Git_tip_names_the_committer_the_push_account_and_the_branch_state()
     {

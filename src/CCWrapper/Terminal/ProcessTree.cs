@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace CCWrapper.Terminal;
@@ -19,6 +21,44 @@ public static class ProcessTree
         }
         finally { CloseHandle(snapshot); }
         return parents;
+    }
+
+    /// <summary>"PowerShell (pid 51708, since 15:07)": where a claude process runs, named by the program that started it.</summary>
+    public static string Describe(int pid)
+    {
+        string? parent = null;
+        DateTime? since = null;
+        try { using var p = Process.GetProcessById(pid); since = p.StartTime; }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception) { }
+        if (Parents().TryGetValue(pid, out var ppid))
+            try { using var pp = Process.GetProcessById(ppid); parent = pp.ProcessName; }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception) { } // its terminal is gone
+        return $"{HostName(parent)} (pid {pid}{(since is { } s ? $", since {s:HH:mm}" : "")})";
+    }
+
+    /// <summary>What the user calls the program that started a claude process.</summary>
+    public static string HostName(string? process) => process?.ToLowerInvariant() switch
+    {
+        "powershell" or "pwsh" => "PowerShell",
+        "cmd" => "Command Prompt",
+        "windowsterminal" => "Windows Terminal",
+        "ccwrapper" => "a CCWrapper window",
+        "code" => "VS Code",
+        "bash" or "mintty" => "Git Bash",
+        null or "" => "another terminal",
+        _ => process,
+    };
+
+    /// <summary>Ends a process and everything it started, as closing its terminal would. False when it cannot be ended.</summary>
+    public static bool End(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            p.Kill(entireProcessTree: true);
+            return true;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or Win32Exception or NotSupportedException) { return false; }
     }
 
     /// <summary>True when <paramref name="ancestor"/> started <paramref name="pid"/>, directly or through a few launchers.
