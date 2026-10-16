@@ -166,7 +166,7 @@ public partial class Sidebar : UserControl
         if (path is null) return;
         if (!File.Exists(path) && !Directory.Exists(path))
         {
-            MessageBox.Show(Main, $"{path}\n\ndoes not exist.", "Nothing to open", MessageBoxButton.OK, MessageBoxImage.Information);
+            Dialog.Show(Main, $"{path}\n\ndoes not exist.", "Nothing to open", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }

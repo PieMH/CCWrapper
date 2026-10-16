@@ -89,7 +89,7 @@ public partial class MainWindow : Window, IAppCommands
         }
         catch (Exception ex) // WebView2 cannot start; a failed claude.exe start is shown in the terminal instead
         {
-            MessageBox.Show(this, ex.Message, "Could not start the session", MessageBoxButton.OK, MessageBoxImage.Error);
+            Dialog.Show(this, ex.Message, "Could not start the session", MessageBoxButton.OK, MessageBoxImage.Error);
             CloseSession(session);
         }
     }
@@ -151,13 +151,13 @@ public partial class MainWindow : Window, IAppCommands
                 var where = string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)));
                 var busy = holders.Any(h => h.Status is SessionStatus.Busy or SessionStatus.Waiting)
                     ? "\n\nClaude is working or waiting for an answer there: that stops." : "";
-                if (MessageBox.Show(this, $"“{entry.Title}” is still open in:\n{where}\n\nClose it there and resume it here? The conversation so far is saved.{busy}",
+                if (Dialog.Show(this, $"“{entry.Title}” is still open in:\n{where}\n\nClose it there and resume it here? The conversation so far is saved.{busy}",
                         "Resume here", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
                 SetResumeBusy("Closing it there…");
                 foreach (var h in holders) ProcessTree.End(h.Pid);
                 if ((holders = await HoldersAsync(entry.Id, TimeSpan.FromSeconds(5))).Count > 0)
                 {
-                    MessageBox.Show(this, $"It could not be closed:\n{string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)))}\n\nClose it there, then try again.",
+                    Dialog.Show(this, $"It could not be closed:\n{string.Join("\n", holders.Select(h => "    " + ProcessTree.Describe(h.Pid)))}\n\nClose it there, then try again.",
                         "Resume here", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -206,7 +206,7 @@ public partial class MainWindow : Window, IAppCommands
     }
 
     void FolderGone(SessionEntry entry) =>
-        MessageBox.Show(this, $"The session's folder does not exist any more:\n{entry.Cwd ?? "(unknown)"}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Dialog.Show(this, $"The session's folder does not exist any more:\n{entry.Cwd ?? "(unknown)"}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
 
     /// <summary>Brings an open session's card forward.</summary>
     internal void Activate(LiveSession session)
@@ -252,7 +252,7 @@ public partial class MainWindow : Window, IAppCommands
     internal bool ConfirmEnd(string what, IEnumerable<LiveSession> sessions)
     {
         var n = sessions.Count(s => s.Status is SessionStatus.Busy or SessionStatus.Waiting);
-        return n == 0 || MessageBox.Show(this, $"{what} ends {n} busy or waiting session(s); they stay resumable.\n\nContinue?",
+        return n == 0 || Dialog.Show(this, $"{what} ends {n} busy or waiting session(s); they stay resumable.\n\nContinue?",
             "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
     }
 

@@ -16,6 +16,15 @@
     <SolidColorBrush x:Key="Good" Color="#7FD1A0" />
     <SolidColorBrush x:Key="Warn" Color="#F2C46D" />
     <SolidColorBrush x:Key="Bad" Color="#F08F86" />
+    <!-- A session's /color on its sidebar title: Claude Code's dark-theme colors, red, purple, pink and cyan lightened to stay readable here -->
+    <SolidColorBrush x:Key="SessionRed" Color="#F06A6A" />
+    <SolidColorBrush x:Key="SessionBlue" Color="#6A9BCC" />
+    <SolidColorBrush x:Key="SessionGreen" Color="#16A34A" />
+    <SolidColorBrush x:Key="SessionYellow" Color="#CA8A04" />
+    <SolidColorBrush x:Key="SessionPurple" Color="#9590CF" />
+    <SolidColorBrush x:Key="SessionOrange" Color="#D97757" />
+    <SolidColorBrush x:Key="SessionPink" Color="#D57A99" />
+    <SolidColorBrush x:Key="SessionCyan" Color="#22A6C6" />
     <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
     <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas</FontFamily>
     <!-- A git branch: three commits, a fork (the icon font has none) -->

@@ -144,11 +144,14 @@ public sealed record SessionRow(string Key, SessionEntry? Entry, LiveSession? Li
     // comparing it would rebuild the ListBoxItem (selection, tooltip, in-flight click). What the row shows is compared.
     public bool Equals(SessionRow? other) => other is not null && Key == other.Key && Live == other.Live && Title == other.Title
         && Project == other.Project && Age == other.Age && Dot == other.Dot && DotColor == other.DotColor && IsActive == other.IsActive
-        && Snippet == other.Snippet && Tip == other.Tip;
+        && Snippet == other.Snippet && Tip == other.Tip && Color == other.Color;
 
     public override int GetHashCode() => Key.GetHashCode();
 
     public bool IsOpen => Live is not null;
+
+    /// <summary>The session's /color name, which tints its title; null for none.</summary>
+    public string? Color => Entry?.Color;
 
     /// <summary>A claude process that is not a tab of this window (another window, PowerShell, Desktop).</summary>
     public bool IsElsewhere => Live is null && Entry?.Running is not null;

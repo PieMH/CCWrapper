@@ -23,6 +23,7 @@ public sealed class ThemeLoadTests
                 _ = new NewSessionDialog();
                 _ = new CustomizePage();
                 _ = new TranscriptView(@"C:\none\t.jsonl");
+                _ = new Dialog("message", "title", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
                 Assert.NotNull(main.FindResource("Accent"));
             }
             catch (Exception ex) { error = ex; }

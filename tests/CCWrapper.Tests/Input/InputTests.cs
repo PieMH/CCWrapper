@@ -13,8 +13,8 @@ public sealed class InputTests
         public List<string> Sent { get; } = [];
         public void SendText(string text) { Sent.Add("text:" + text); onText?.Invoke(); }
         public void SendKeys(string keys) => Sent.Add("keys:" + keys);
-        // Like ccw.tail: only the last <rows> non-blank rows.
-        public Task<string?> ReadTailAsync(int rows) =>
+        // Like ccw.tail: only the last <rows> non-blank rows; styled or not, as given.
+        public Task<string?> ReadTailAsync(int rows, bool styled = false) =>
             Task.FromResult(screen is null ? null : string.Join('\n', screen.Split('\n').Where(l => l.Trim().Length > 0).TakeLast(rows)));
     }
 
@@ -173,6 +173,22 @@ public sealed class InputTests
     [InlineData("!", false)]
     public void Prompt_row_text_is_found_under_the_rule(string row, bool typed) =>
         Assert.Equal(typed, TuiInput.HasPromptText($"> old prompt\n  ⎿ answer\n{Rule}\n{row}\n{Rule}\n  ? for shortcuts\n> statusline\n\n\n"));
+
+    // Styled rows as ccw.tail(styled) gives them: dim in ESC[2m…ESC[22m, inverse (Claude Code's cursor) in ESC[7m…ESC[27m.
+    [Theory]
+    [InlineData("❯ \x1b[7mr\x1b[27m\x1b[2mun the tests\x1b[22m", "run the tests", false)] // focused: the first character is the cursor
+    [InlineData("❯ \x1b[2mrun the tests\x1b[22m", "run the tests", false)]                // unfocused
+    [InlineData("❯ \x1b[7mT\x1b[27m\x1b[2mry \"fix lint errors\"\x1b[22m", null, false)]    // the default hint is not a suggestion
+    [InlineData("❯ run the tests\x1b[7m \x1b[27m", null, true)]
+    [InlineData("❯ \x1b[7mr\x1b[27mun", null, true)]                                      // the cursor moved to the start
+    [InlineData("❯ \x1b[7m \x1b[27m", null, false)]                                       // empty
+    public void Suggestion_is_the_greyed_text_of_the_empty_input(string row, string? suggestion, bool typed)
+    {
+        var screen = $"\x1b[2m> old prompt\x1b[22m\n{Rule}\n{row}\n{Rule}\n  ? for shortcuts";
+        Assert.Equal(suggestion, TuiInput.SuggestionOf(screen));
+        Assert.Equal(typed, TuiInput.HasPromptText(screen)); // a greyed suggestion is no typed text: a slash command may still go in
+        Assert.Null(TuiInput.SuggestionOf(screen.Replace("\x1b[2m", "").Replace("\x1b[22m", ""))); // a plain screen shows none
+    }
 
     [Fact]
     public void Prompt_row_needs_a_rule_above_it()

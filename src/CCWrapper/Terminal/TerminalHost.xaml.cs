@@ -106,9 +106,11 @@ public partial class TerminalHost : UserControl
     internal async Task<string?> ReadTextAsync(LiveSession session) =>
         JsonSerializer.Deserialize<string?>(await Web.CoreWebView2.ExecuteScriptAsync($"ccw.text('{session.TabId}')"));
 
-    /// <summary>The last <paramref name="rows"/> non-blank rows of the terminal's screen (not the scrollback), one line per row.</summary>
-    internal async Task<string?> ReadTailAsync(LiveSession session, int rows) =>
-        JsonSerializer.Deserialize<string?>(await Web.CoreWebView2.ExecuteScriptAsync($"ccw.tail('{session.TabId}', {rows})"));
+    /// <summary>The last <paramref name="rows"/> non-blank rows of the terminal's screen (not the scrollback), one line per row.
+    /// <paramref name="styled"/>: dim and inverse runs are marked with SGR 2/22 and 7/27.</summary>
+    internal async Task<string?> ReadTailAsync(LiveSession session, int rows, bool styled = false) =>
+        JsonSerializer.Deserialize<string?>(await Web.CoreWebView2.ExecuteScriptAsync(
+            $"ccw.tail('{session.TabId}', {rows}, {(styled ? "true" : "false")})"));
 
     Tab GetOrAdd(LiveSession session)
     {
@@ -221,7 +223,7 @@ public partial class TerminalHost : UserControl
         }
         if (!browser) { Web.CoreWebView2.Reload(); return; }
         _browserGone = true;
-        MessageBox.Show("The terminal's browser process ended, so the running sessions ended with it. Close this window and open it again; Resume restores them from the session list.",
+        Views.Dialog.Show(Window.GetWindow(this), "The terminal's browser process ended, so the running sessions ended with it. Close this window and open it again; Resume restores them from the session list.",
             "CCWrapper: terminal stopped", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
@@ -324,9 +326,9 @@ public partial class TerminalHost : UserControl
 
         public void SendKeys(string keys) => Pty?.Write(keys);
 
-        public async Task<string?> ReadTailAsync(int rows)
+        public async Task<string?> ReadTailAsync(int rows, bool styled = false)
         {
-            try { return await host.ReadTailAsync(Session, rows); }
+            try { return await host.ReadTailAsync(Session, rows, styled); }
             catch (Exception) { return null; } // WebView2 not up yet, reloading or gone: callers run from async void handlers
         }
     }
@@ -335,6 +337,7 @@ public partial class TerminalHost : UserControl
 /// <summary>A terminal whose screen can be read back. Must be called on the UI thread.</summary>
 public interface IScreenChannel : ITerminalChannel
 {
-    /// <summary>The last <paramref name="rows"/> non-blank rows of the screen, one line per row; null when it cannot be read.</summary>
-    Task<string?> ReadTailAsync(int rows);
+    /// <summary>The last <paramref name="rows"/> non-blank rows of the screen, one line per row; null when it cannot be read.
+    /// <paramref name="styled"/>: dim runs are wrapped in ESC[2m…ESC[22m and inverse ones in ESC[7m…ESC[27m.</summary>
+    Task<string?> ReadTailAsync(int rows, bool styled = false);
 }
