@@ -39,24 +39,11 @@
                     <TextBlock Text="New session" Foreground="{StaticResource Text}" VerticalAlignment="Center" />
                 </DockPanel>
             </Button>
-            <Button x:Name="SettingsButton" Style="{StaticResource Nav}" Click="OnSettings">
+            <Button Style="{StaticResource Nav}" Click="OnSettings" ToolTip="settings.json of the account and the project folder, hooks, environment, CLAUDE.md">
                 <DockPanel>
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE713;" Width="16" Margin="0,0,10,0" />
-                    <TextBlock DockPanel.Dock="Right" Style="{StaticResource Icon}" Text="&#xE76C;" FontSize="10" Foreground="{StaticResource Muted}" />
                     <TextBlock Text="Settings" VerticalAlignment="Center" />
                 </DockPanel>
-                <Button.ContextMenu>
-                    <ContextMenu x:Name="SettingsMenu" Placement="Right" Opened="OnSettingsOpened">
-                        <MenuItem Header="Open settings.json" Tag="Settings" Click="OnOpenFile" />
-                        <MenuItem Header="Open user CLAUDE.md" Tag="ClaudeMd" Click="OnOpenFile" />
-                        <MenuItem Header="Open config folder" Tag="Root" Click="OnOpenFile" />
-                        <Separator />
-                        <MenuItem Header="Run /config" Tag="/config" Click="OnSlash" />
-                        <MenuItem Header="Run /permissions" Tag="/permissions" Click="OnSlash" />
-                        <MenuItem Header="Run /hooks" Tag="/hooks" Click="OnSlash" />
-                        <MenuItem Header="Run /memory" Tag="/memory" Click="OnSlash" />
-                    </ContextMenu>
-                </Button.ContextMenu>
             </Button>
             <Button Style="{StaticResource Nav}" Click="OnExtensions" ToolTip="Plugins, marketplaces, skills, MCP servers and claude.ai connectors">
                 <DockPanel>

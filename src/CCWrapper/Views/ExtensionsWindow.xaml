@@ -6,47 +6,9 @@
         Title="Plugins &amp; connectors" Width="1120" Height="760" MinWidth="860" MinHeight="560"
         WindowStartupLocation="CenterOwner" Background="{StaticResource Bg}" Foreground="{StaticResource Text}">
     <Window.Resources>
-        <Style x:Key="SmallLabel" TargetType="TextBlock" BasedOn="{StaticResource Label}">
-            <Setter Property="Margin" Value="4,14,0,6" />
-        </Style>
-        <Style x:Key="Dim" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Foreground" Value="{StaticResource Muted}" />
-            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-        </Style>
-        <Style x:Key="Mono" TargetType="TextBlock" BasedOn="{StaticResource Dim}">
-            <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
-        </Style>
-        <Style x:Key="Monogram" TargetType="Border">
-            <Setter Property="Width" Value="32" />
-            <Setter Property="Height" Value="32" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="{StaticResource Raised}" />
-            <Setter Property="BorderBrush" Value="{StaticResource ControlLine}" />
-            <Setter Property="BorderThickness" Value="1" />
-        </Style>
-        <Style x:Key="Tile" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource Panel}" />
-            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="10" />
-        </Style>
-        <Style x:Key="Small" TargetType="Button" BasedOn="{StaticResource Outlined}">
-            <Setter Property="Height" Value="30" />
-        </Style>
-        <Style x:Key="SmallDanger" TargetType="Button" BasedOn="{StaticResource Danger}">
-            <Setter Property="Height" Value="30" />
-        </Style>
         <Style x:Key="Field" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
             <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
             <Setter Property="FontSize" Value="13" />
-        </Style>
-        <!-- Placeholder over an empty TextBox (WPF has none); each use adds the DataTrigger on its TextBox -->
-        <Style x:Key="Hint" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource Muted}" />
-            <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Visibility" Value="Collapsed" />
         </Style>
         <!-- An MCP server: status dot, name and origin, endpoint, status, Sign in / Retry, Remove… -->
         <DataTemplate x:Key="ServerRow" DataType="{x:Type local:ServerRowView}">

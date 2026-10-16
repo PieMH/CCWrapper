@@ -22,7 +22,7 @@ public partial class Sidebar : UserControl
     string? _query;
     CancellationTokenSource? _search;
     bool _refreshing;
-    Window? _extensions;
+    Window? _extensions, _settings;
 
     static AppState State => AppState.Current;
     MainWindow Main => (MainWindow)Window.GetWindow(this);
@@ -148,35 +148,9 @@ public partial class Sidebar : UserControl
 
     void OnSettings(object sender, RoutedEventArgs e)
     {
-        SettingsMenu.PlacementTarget = SettingsButton;
-        SettingsMenu.IsOpen = true;
-    }
-
-    // The slash commands need a terminal that takes input: not while a prompt or dialog is open (the Enter would answer it).
-    void OnSettingsOpened(object sender, RoutedEventArgs e)
-    {
-        foreach (var item in SettingsMenu.Items.OfType<MenuItem>().Where(m => m.Tag is string t && t.StartsWith('/')))
-            item.IsEnabled = TuiInput.BlockedReason(State.ActiveSession) is null;
-    }
-
-    void OnOpenFile(object sender, RoutedEventArgs e)
-    {
-        var paths = State.Account.Paths;
-        var path = (sender as MenuItem)?.Tag switch { "Settings" => paths.Settings, "ClaudeMd" => paths.ClaudeMd, "Root" => paths.Root, _ => null };
-        if (path is null) return;
-        if (!File.Exists(path) && !Directory.Exists(path))
-        {
-            Dialog.Show(Main, $"{path}\n\ndoes not exist.", "Nothing to open", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-        catch (Win32Exception) when (File.Exists(path)) { Process.Start("notepad.exe", $"\"{path}\""); } // no program registered for the type
-    }
-
-    async void OnSlash(object sender, RoutedEventArgs e)
-    {
-        // SubmitAsync checks BlockedReason again: a prompt may have opened since the menu did.
-        if (State.ActiveSession is { } session && sender is MenuItem { Tag: string command }) await TuiInput.SubmitAsync(session, command);
+        if (_settings is { IsLoaded: true }) { _settings.Activate(); return; }
+        _settings = new SettingsWindow(State.Account, State.ActiveSession?.Cwd) { Owner = Main };
+        _settings.Show();
     }
 
     void OnExtensions(object sender, RoutedEventArgs e)

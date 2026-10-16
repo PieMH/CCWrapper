@@ -19,6 +19,8 @@
     <SolidColorBrush x:Key="BadLine" Color="#5A3A38" />
     <SolidColorBrush x:Key="Selected" Color="#262B33" />
     <SolidColorBrush x:Key="SwitchOff" Color="#4A515C" />
+    <!-- A settings row with an unsaved change -->
+    <SolidColorBrush x:Key="ChangedFill" Color="#1A2330" />
     <!-- A plugin's note: a muted amber box -->
     <SolidColorBrush x:Key="NoteFill" Color="#221E17" />
     <SolidColorBrush x:Key="NoteLine" Color="#5A4A2A" />
@@ -368,6 +370,101 @@
         <Setter Property="Foreground" Value="{StaticResource Bad}" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="{StaticResource BadLine}" />
+    </Style>
+
+    <!-- Tool windows (Plugins & connectors, Settings): small text, tiles, compact buttons -->
+    <Style x:Key="SmallLabel" TargetType="TextBlock" BasedOn="{StaticResource Label}">
+        <Setter Property="Margin" Value="4,14,0,6" />
+    </Style>
+    <Style x:Key="Dim" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style x:Key="Mono" TargetType="TextBlock" BasedOn="{StaticResource Dim}">
+        <Setter Property="FontFamily" Value="{StaticResource MonoFont}" />
+    </Style>
+    <Style x:Key="Monogram" TargetType="Border">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{StaticResource Raised}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style x:Key="Tile" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Panel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+    </Style>
+    <Style x:Key="Small" TargetType="Button" BasedOn="{StaticResource Outlined}">
+        <Setter Property="Height" Value="30" />
+    </Style>
+    <Style x:Key="SmallDanger" TargetType="Button" BasedOn="{StaticResource Danger}">
+        <Setter Property="Height" Value="30" />
+    </Style>
+    <!-- Placeholder over an empty TextBox (WPF has none); each use adds the DataTrigger on its TextBox -->
+    <Style x:Key="Hint" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+        <Setter Property="IsHitTestVisible" Value="False" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Visibility" Value="Collapsed" />
+    </Style>
+    <!-- A text-only button: "View as JSON", "Remove from this file" -->
+    <Style x:Key="Link" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource Accent}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent">
+                        <TextBlock x:Name="Text" Text="{TemplateBinding Content}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Text" Property="TextDecorations" Value="Underline" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Text" Property="TextDecorations" Value="Underline" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <!-- One of a tool window's file choices (User / Project / Local): two lines, accent border when picked -->
+    <Style x:Key="ScopeCard" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{StaticResource TextSoft}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Hover}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource Selected}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter Property="Foreground" Value="{StaticResource Text}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- A small meter bar: the track; its child Border's Width is set in code -->
