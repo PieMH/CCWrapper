@@ -24,7 +24,7 @@ dotnet test
 | Folder | What |
 |---|---|
 | `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to |
-| `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print |
+| `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md` |
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
 | `src/CCWrapper/Theme.xaml` | Every color and custom style; `App.xaml` recolors Fluent's own brushes |
@@ -33,12 +33,16 @@ dotnet test
 
 ## Rules, and why
 
-- **Read-only over Claude Code.** Read only files Claude Code already writes. Never read `.credentials.json`, never call
-  Anthropic APIs, never edit the user's settings yourself. The app only launches the unmodified `claude.exe`, which keeps
-  it inside the usage policy.
+- **Read-only over Claude Code, but for two windows.** Read only files Claude Code already writes. Never read
+  `.credentials.json`, never call Anthropic APIs. The app only launches the unmodified `claude.exe`, which keeps it
+  inside the usage policy.
 - **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden
   (`ClaudeCli`), only after the user's click, with a confirm before anything is removed. These commands never call the
-  model. A change no CLI command covers, such as a `settings.json` key, is not offered yet.
+  model.
+- **The Settings window is the only writer of Claude Code's files:** `settings.json` (user, project, local) and the
+  `CLAUDE.md` files, only on Save, through `SettingsFile`/`TextFile` (`Data/SettingsData`). A save writes the whole
+  object back so unknown keys survive, refuses a file that changed on disk since it was read, and backs up the old one.
+  `.claude.json` is not written: every running `claude` rewrites it.
 - **Undocumented formats change.** The session registry (`sessions\*.json`), transcript records, file history and
   `cachedUsageUtilization` are internal and change with Claude Code releases. Parse them only in `Data/`, treat every
   field as optional, and show "—" when one is missing.

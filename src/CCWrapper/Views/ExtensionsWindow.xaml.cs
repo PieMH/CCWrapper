@@ -54,16 +54,8 @@ public partial class ExtensionsWindow : Window
 
     async Task LoadAsync()
     {
-        var projects = await Task.Run(() =>
-        {
-            try { return SessionCatalog.RecentProjects(_account).Select(p => p.Path).ToList(); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
-        });
-        if (_cwd is not null && !projects.Contains(_cwd, StringComparer.OrdinalIgnoreCase)) projects.Insert(0, _cwd);
         _filling = true;
-        ProjectBox.ItemsSource = projects.Select(p => new ProjectChoice(p)).ToList();
-        ProjectBox.SelectedIndex = _cwd is null ? (projects.Count > 0 ? 0 : -1) : projects.FindIndex(p => p.Equals(_cwd, StringComparison.OrdinalIgnoreCase));
-        _cwd = (ProjectBox.SelectedItem as ProjectChoice)?.Path;
+        _cwd = await ProjectChoice.FillAsync(ProjectBox, _account, _cwd);
         _filling = false;
         await Task.WhenAll(RefreshInstalledAsync(), RefreshMarketsAsync());
     }
@@ -667,6 +659,21 @@ public partial class ExtensionsWindow : Window
 public sealed record ProjectChoice(string Path)
 {
     public override string ToString() => System.IO.Path.GetFileName(Path.TrimEnd('\\')) is { Length: > 0 } name ? name : Path;
+
+    /// <summary>Fills a project picker with the account's recent folders, <paramref name="cwd"/> first when it is not among
+    /// them, and selects it (else the newest). Returns the selected folder. The caller ignores the SelectionChanged it raises.</summary>
+    public static async Task<string?> FillAsync(ComboBox box, Account account, string? cwd)
+    {
+        var projects = await Task.Run(() =>
+        {
+            try { return SessionCatalog.RecentProjects(account).Select(p => p.Path).ToList(); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return []; }
+        });
+        if (cwd is not null && !projects.Contains(cwd, StringComparer.OrdinalIgnoreCase)) projects.Insert(0, cwd);
+        box.ItemsSource = projects.Select(p => new ProjectChoice(p)).ToList();
+        box.SelectedIndex = cwd is null ? (projects.Count > 0 ? 0 : -1) : projects.FindIndex(p => p.Equals(cwd, StringComparison.OrdinalIgnoreCase));
+        return (box.SelectedItem as ProjectChoice)?.Path;
+    }
 }
 
 public sealed class PluginRowView(PluginInfo info, Brush tint)
