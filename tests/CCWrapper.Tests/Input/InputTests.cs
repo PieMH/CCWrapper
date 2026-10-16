@@ -13,7 +13,9 @@ public sealed class InputTests
         public List<string> Sent { get; } = [];
         public void SendText(string text) { Sent.Add("text:" + text); onText?.Invoke(); }
         public void SendKeys(string keys) => Sent.Add("keys:" + keys);
-        public Task<string?> ReadTailAsync(int rows) => Task.FromResult(screen);
+        // Like ccw.tail: only the last <rows> non-blank rows.
+        public Task<string?> ReadTailAsync(int rows) =>
+            Task.FromResult(screen is null ? null : string.Join('\n', screen.Split('\n').Where(l => l.Trim().Length > 0).TakeLast(rows)));
     }
 
     static LiveSession Session(SessionStatus status, string? waitingFor = null, bool channel = true, Account? account = null) =>
@@ -113,6 +115,18 @@ public sealed class InputTests
     }
 
     [Fact]
+    public async Task Fresh_read_follows_a_launcher_to_the_claude_process_it_started()
+    {
+        using var registry = new WaitingRegistry();
+        registry.WriteRaw($$"""{ "pid": {{Environment.ProcessId}}, "sessionId": "s1", "status": "idle" }""");
+        var s = Session(SessionStatus.Idle, account: registry.Account);
+        s.SessionId = "s1";
+        s.Pid = ProcessTree.Parents()[Environment.ProcessId]; // the tab spawned a shim; this process plays the claude.exe it started
+        Assert.Null(await TuiInput.FreshBlockedReasonAsync(s));
+        Assert.Equal(Environment.ProcessId, s.Pid);
+    }
+
+    [Fact]
     public async Task Submit_reads_the_registry_fresh_before_the_paste()
     {
         using var registry = new WaitingRegistry();
@@ -187,6 +201,15 @@ public sealed class InputTests
     {
         Assert.Equal(bash, TuiInput.InBashMode($"{Rule}\n{row}\n{Rule}\n  ? for shortcuts"));
         Assert.False(TuiInput.InBashMode($"! echoed\n  ⎿ out\n{Rule}\n> \n{Rule}")); // a "!" row in the transcript
+    }
+
+    [Fact]
+    public async Task Submit_is_refused_above_a_tall_multi_line_bash_input()
+    {
+        var s = Session(SessionStatus.Idle, channel: false);
+        s.Channel = new FakeChannel($"{Rule}\n! for f in *; do\n{string.Concat(Enumerable.Repeat("    echo line\n", 15))}  done\n{Rule}\n  ? for shortcuts");
+        Assert.Equal(TuiInput.BashModeFirst, await TuiInput.SubmitAsync(s, "hello"));
+        Assert.Empty(Sent(s));
     }
 
     [Theory]

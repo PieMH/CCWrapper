@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using CCWrapper.Core;
 using CCWrapper.Data;
+using CCWrapper.Terminal;
 
 namespace CCWrapper.Views;
 
@@ -54,6 +55,21 @@ public static class ShellModel
     /// change the session id but not the pid), then by session id. Exited sessions have no pid and match by id only.</summary>
     public static LiveSession? Match(IEnumerable<LiveSession> open, int? pid, string id) =>
         open.FirstOrDefault(s => pid is { } p && s.Pid == p) ?? open.FirstOrDefault(s => s.SessionId == id);
+
+    /// <summary>A tab started through a launcher (a Scoop or Chocolatey shim) holds the launcher's pid, but Claude Code registers
+    /// under its own. A running tab with no entry of its pid takes the one entry of its session id whose process its own
+    /// process started, so pid matching and the fail-closed submit check work for it. <paramref name="parents"/> is read
+    /// at most once, and only when a tab needs it.</summary>
+    public static void Rebind(IEnumerable<LiveSession> open, IReadOnlyList<RunningSession> running, Func<IReadOnlyDictionary<int, int>> parents)
+    {
+        IReadOnlyDictionary<int, int>? tree = null;
+        foreach (var s in open)
+        {
+            if (s.Status == SessionStatus.Exited || s.Pid is not { } pid || running.Any(r => r.Pid == pid)) continue;
+            var started = running.Where(r => r.SessionId == s.SessionId).Where(r => ProcessTree.IsDescendant(tree ??= parents(), r.Pid, pid)).Take(2).ToList();
+            if (started.Count == 1) s.Pid = started[0].Pid;
+        }
+    }
 
     /// <summary>The registry entry of every open session that has a live claude process; exited sessions are left alone.
     /// Per session its own pid's entry wins, else the newest entry of its session id.</summary>
