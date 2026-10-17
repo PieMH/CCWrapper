@@ -99,6 +99,12 @@
                             <TextBlock Text="JSON" />
                         </DockPanel>
                     </RadioButton>
+                    <RadioButton x:Name="NavApp" Style="{StaticResource NavItem}" GroupName="Nav" Checked="OnNav">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE713;" Width="16" Margin="0,0,10,0" />
+                            <TextBlock Text="CCWrapper" />
+                        </DockPanel>
+                    </RadioButton>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -384,6 +390,26 @@
                     </StackPanel>
                     <TextBox x:Name="MemoryBox" Style="{StaticResource Editor}" TextChanged="OnMemoryTyped" AutomationProperties.Name="CLAUDE.md text" />
                 </DockPanel>
+
+                <!-- ============ CCWrapper: app.json, not settings.json ============ -->
+                <ScrollViewer x:Name="AppPage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                    <Border Style="{StaticResource Tile}" Padding="16,14" VerticalAlignment="Top">
+                        <StackPanel>
+                            <CheckBox x:Name="CompactOn" Content="Show compact hint" Checked="OnAppEdited" Unchecked="OnAppEdited" />
+                            <TextBlock Style="{StaticResource Dim}" TextWrapping="Wrap" TextTrimming="None" Margin="0,2,0,12"
+                                       Text="The bottom bar offers a Compact button, left of the context meter, once the context passes the threshold. The button only fills the message box; you send it." />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                <TextBlock Text="Threshold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                <TextBox x:Name="CompactThreshold" Style="{StaticResource Field}" Width="60" TextChanged="OnAppEdited" AutomationProperties.Name="Context threshold in percent" />
+                                <TextBlock Text="% of the context window (1 to 99)" Style="{StaticResource Dim}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="Prompt after /compact" Margin="0,0,0,4" />
+                            <TextBox x:Name="CompactPrompt" Style="{StaticResource Field}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90"
+                                     VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" TextChanged="OnAppEdited" AutomationProperties.Name="Compact prompt" />
+                            <TextBlock Style="{StaticResource Dim}" Margin="0,8,0,0" Text="Saved in %LOCALAPPDATA%\CCWrapper\app.json. Line breaks become spaces." />
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
 
                 <!-- ============ JSON ============ -->
                 <DockPanel x:Name="JsonPage" Visibility="Collapsed">

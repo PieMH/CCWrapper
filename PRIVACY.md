@@ -77,7 +77,7 @@ If the runtime is missing on your PC, the installer (`Setup.exe`) downloads it f
 | `%LOCALAPPDATA%\CCWrapper\WebView2` | Browser profiles of the terminal and of the Browser panel, one per account: cookies, cache, site data. |
 | `%LOCALAPPDATA%\CCWrapper\backups` | Earlier versions of files you saved from the app. |
 | `%LOCALAPPDATA%\CCWrapper\live` | Live status data (model, context, cost, usage) from the status-line relay, one small file per tab. |
-| `%LOCALAPPDATA%\CCWrapper\app.json` | The app's own settings, for example `updateCheck`. |
+| `%LOCALAPPDATA%\CCWrapper\app.json` | The app's own settings: `updateCheck` and the bottom bar's `compact` hint (on/off, threshold, prompt). |
 
 These files stay on your computer. The publisher cannot see them.
 
@@ -87,7 +87,8 @@ These files stay on your computer. The publisher cannot see them.
 - The app **writes** to Claude Code's files only when you act:
   - **Save** in the Settings window writes the `settings.json` and `CLAUDE.md` files you changed.
   - A server's folder switch in Plugins & connectors changes the list of turned-off servers for that folder in `.claude.json`.
-- Before each write, the app keeps the old version in `%LOCALAPPDATA%\CCWrapper\backups`. It does not overwrite a file that changed on disk since it read it.
+  - **Delete** on a session's right-click menu, after you confirm, removes that session's transcript (`<id>.jsonl`) and its `<id>` folder for good. There is no backup, and a session open anywhere is refused.
+- Before each Save or switch write, the app keeps the old version in `%LOCALAPPDATA%\CCWrapper\backups`. It does not overwrite a file that changed on disk since it read it.
 
 ## Delete your data
 

@@ -93,6 +93,18 @@ public partial class Sidebar : UserControl
         if (sender is ListBoxItem { DataContext: SessionRow row }) await OpenAsync(row);
     }
 
+    void OnRowMenu(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not ListBoxItem { DataContext: SessionRow row } item) return;
+        e.Handled = true;
+        SessionMenu.Open(item, row.Live, row.Entry, row.Title, row.Color ?? "default", () =>
+        {
+            if (row.Entry is { } gone) _catalog = _catalog.Where(c => c.Id != gone.Id).ToList(); // gone now, not at the next refresh
+            Rebuild();
+            _ = RefreshAsync();
+        });
+    }
+
     async void OnListKey(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && List.SelectedItem is SessionRow row) await OpenAsync(row);

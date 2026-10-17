@@ -24,7 +24,7 @@ dotnet test
 | Folder | What |
 |---|---|
 | `src/CCWrapper` (root) | `Program.cs`: the Velopack hook runs before WPF starts |
-| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `AppUpdate` (auto-update), `AppPrefs` (`app.json`) |
+| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `AppUpdate` (auto-update), `AppPrefs` and `CompactPrefs` (`app.json`: each rewrites only its own key) |
 | `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md`; `ClaudeJson`, locked updates of `.claude.json` |
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
@@ -46,9 +46,11 @@ dotnet test
 
 ## Rules, and why
 
-- **Read-only over Claude Code, but for two windows.** Read only files Claude Code already writes. Never read
+- **Read-only over Claude Code, but for two windows and one delete.** Read only files Claude Code already writes. Never read
   `.credentials.json`, never call Anthropic APIs. The app only launches the unmodified `claude.exe`, which keeps it
-  inside the usage policy.
+  inside the usage policy. One deletion besides: the right-click Delete of a session removes its transcript
+  `<id>.jsonl` and its `<id>\` folder (`SessionCatalog.Delete`), only after a confirm and never while a claude process
+  or tab has the session; it refuses any path outside the account's `projects\<dir>\<id>.jsonl`.
 - **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden
   (`ClaudeCli`), only after the user's click, with a confirm before anything is removed. These commands never call the
   model.

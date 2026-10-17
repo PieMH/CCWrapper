@@ -23,6 +23,9 @@ public partial class ComposeBox : UserControl
     string? _refusal; // why the last submit to this session (from any view) did not go in; cleared by one that does
     string? _suggestion; // the prompt Claude Code suggests in the session's empty input, mirrored while this box is empty
     bool _sending, _polling;
+    readonly Dictionary<(string, string?), List<SlashCommand>> _commands = []; // per (account, folder), refreshed each time the list is about to open
+    bool _forced, _quiet, _fresh, _loading; // _forced: opened from the + menu over text; _quiet: a change made here must not open the list
+    string? _query;
 
     public ComposeBox()
     {
@@ -32,7 +35,7 @@ public partial class ComposeBox : UserControl
         _blink.Tick += (_, _) => HintCaret.Foreground = HintCaret.Foreground == Brushes.Transparent ? (Brush)FindResource("Text") : Brushes.Transparent;
         Loaded += (_, _) => { TuiInput.Changed -= OnTuiInput; TuiInput.Changed += OnTuiInput; _poll.Start(); UpdateHint(); };
         Unloaded += (_, _) => { TuiInput.Changed -= OnTuiInput; _poll.Stop(); _blink.Stop(); };
-        IsVisibleChanged += (_, _) => UpdateHint();
+        IsVisibleChanged += (_, _) => { UpdateHint(); CloseSlash(); };
     }
 
     // Reads the terminal's screen only while the box is empty and shown; a stale read for another session is dropped.
@@ -53,6 +56,138 @@ public partial class ComposeBox : UserControl
     }
 
     void OnHintChanged(object sender, RoutedEventArgs e) => UpdateHint();
+
+    void OnTextChanged(object sender, RoutedEventArgs e)
+    {
+        _forced = false;
+        UpdateHint();
+        UpdateSlash();
+    }
+
+    void OnCaretMoved(object sender, RoutedEventArgs e) => UpdateSlash();
+
+    void OnLostFocus(object sender, RoutedEventArgs e)
+    {
+        UpdateHint();
+        CloseSlash();
+    }
+
+    // ---- the "/" list ----
+
+    (string, string?)? CommandsKey => _session is { } s ? (s.Account.Letter, s.Cwd) : null;
+
+    // Open while the text starts with "/" and the caret is in that first word (or forced from the + menu): filtered by what follows the "/".
+    void UpdateSlash()
+    {
+        if (_quiet) return;
+        if (CommandsKey is not { } key) { CloseSlash(); return; }
+        var text = Input.Text;
+        string? query = null;
+        if (_forced) query = "";
+        else if (text.StartsWith('/') && Input.IsKeyboardFocused)
+        {
+            var end = WordEnd(text);
+            if (Input.CaretIndex >= 1 && Input.CaretIndex <= end) query = text[1..end];
+        }
+        if (query is null) { CloseSlash(); return; }
+        if (!_fresh && !_loading) _ = LoadCommandsAsync(key, _session!);
+        var rows = SlashCommands.Filter(_commands.GetValueOrDefault(key) ?? [], query);
+        if (rows.Count == 0) { SlashPopup.IsOpen = false; _query = null; return; } // keeps _fresh: no reload per key typed
+        if (SlashPopup.IsOpen && query == _query) return;
+        _query = query;
+        SlashList.ItemsSource = rows;
+        SlashList.SelectedIndex = 0;
+        SlashPopup.IsOpen = true;
+    }
+
+    async Task LoadCommandsAsync((string, string?) key, LiveSession session)
+    {
+        _loading = true;
+        try
+        {
+            _commands[key] = await Task.Run(() => SlashCommands.List(session.Account, session.Cwd));
+            _fresh = key == CommandsKey; // the active session may have changed meanwhile
+        }
+        finally { _loading = false; }
+        _query = null; // the list may have grown under the same query
+        UpdateSlash();
+    }
+
+    static int WordEnd(string text) => text.AsSpan().IndexOfAny(" \t\r\n") is >= 0 and var at ? at : text.Length;
+
+    void CloseSlash()
+    {
+        SlashPopup.IsOpen = false;
+        _fresh = _forced = false;
+        _query = null;
+    }
+
+    void MoveSlash(int by)
+    {
+        SlashList.SelectedIndex = Math.Clamp(SlashList.SelectedIndex + by, 0, SlashList.Items.Count - 1);
+        SlashList.ScrollIntoView(SlashList.SelectedItem);
+    }
+
+    // Completes to "/name " (the rest of the box stays); never sends.
+    void CompleteSlash(SlashCommand command)
+    {
+        var insert = $"/{command.Name} ";
+        _quiet = true;
+        if (_forced) Insert(insert);
+        else
+        {
+            var text = Input.Text;
+            var end = WordEnd(text);
+            SetText(insert + text[end..].TrimStart(' ', '\t'), insert.Length);
+        }
+        _quiet = false;
+        CloseSlash();
+        Input.Focus();
+    }
+
+    void OnSlashClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(SlashList, (DependencyObject)e.OriginalSource) is ListBoxItem { DataContext: SlashCommand c })
+        {
+            e.Handled = true;
+            CompleteSlash(c);
+        }
+    }
+
+    // ---- the + menu ----
+
+    void OnPlus(object sender, RoutedEventArgs e)
+    {
+        PlusButton.ContextMenu.PlacementTarget = PlusButton;
+        PlusButton.ContextMenu.IsOpen = true;
+    }
+
+    void OnAddFiles(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Add files", Multiselect = true };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true) InsertPaths(dialog.FileNames);
+    }
+
+    void OnAddFolder(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Add folders", Multiselect = true };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true) InsertPaths(dialog.FolderNames);
+    }
+
+    // Inserted as a drop of those files would be.
+    void InsertPaths(string[] paths)
+    {
+        if (PasteHandler.ForCompose(new DataObject(DataFormats.FileDrop, paths)) is { } text) Insert(text);
+        Input.Focus();
+    }
+
+    // After the menu has closed and given the focus back: an empty box gets the "/", a box with text only gets the full list.
+    void OnSlashMenu(object sender, RoutedEventArgs e) => Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+    {
+        Input.Focus();
+        if (Input.Text.Length == 0) { Input.Text = "/"; Input.CaretIndex = 1; } else _forced = true;
+        UpdateSlash();
+    });
 
     // The caret stands where typing would go, as in an editor: shown when the box is empty, unfocused and has no suggestion.
     void UpdateHint()
@@ -78,6 +213,7 @@ public partial class ComposeBox : UserControl
             _refusal = null;
             _suggestion = null;
             UpdateHint();
+            CloseSlash();
         }
         _session = session;
         var blocked = TuiInput.BlockedReason(session);
@@ -117,7 +253,14 @@ public partial class ComposeBox : UserControl
     void OnKeyDown(object sender, KeyEventArgs e)
     {
         var mods = Keyboard.Modifiers;
-        if (e.Key == Key.Enter && (mods & ModifierKeys.Shift) == 0)
+        if (SlashPopup.IsOpen && mods == ModifierKeys.None && e.Key is Key.Up or Key.Down or Key.Enter or Key.Tab or Key.Escape)
+        {
+            e.Handled = true; // before the prompt history and sending
+            if (e.Key == Key.Escape) CloseSlash();
+            else if (e.Key is Key.Up or Key.Down) MoveSlash(e.Key == Key.Up ? -1 : 1);
+            else if (SlashList.SelectedItem is SlashCommand c) CompleteSlash(c);
+        }
+        else if (e.Key == Key.Enter && (mods & ModifierKeys.Shift) == 0)
         {
             e.Handled = true;
             if (SendButton.IsEnabled) _ = SendAsync();
@@ -147,10 +290,24 @@ public partial class ComposeBox : UserControl
         }
     }
 
-    void Recall(string text)
+    /// <summary>Puts <paramref name="text"/> in an empty box and focuses it. A box with text keeps it: the text is never replaced
+    /// or added to, only focused. Not sent.</summary>
+    public void Prefill(string text)
     {
+        if (Input.Text.Length == 0) Recall(text);
+        Input.Focus();
+    }
+
+    void Recall(string text) => SetText(text, text.Length);
+
+    // _quiet: recalled text starting with "/" must not open the list (Up/Down would then move in it instead of the history).
+    void SetText(string text, int caret)
+    {
+        var was = _quiet;
+        _quiet = true;
         Input.Text = text;
-        Input.CaretIndex = text.Length;
+        Input.CaretIndex = caret;
+        _quiet = was;
     }
 
     void Insert(string text)
