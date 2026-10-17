@@ -62,6 +62,7 @@
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
                     <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
                     <EventSetter Event="MouseLeftButtonUp" Handler="OnRowClick" />
+                    <EventSetter Event="ContextMenuOpening" Handler="OnRowMenu" />
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding IsActive}" Value="True">
                             <Setter Property="Tag" Value="Active" />

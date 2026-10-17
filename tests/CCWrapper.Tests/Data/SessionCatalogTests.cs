@@ -175,4 +175,64 @@ public sealed class SessionCatalogTests : IDisposable
 
         Assert.Equal([("x", "x-new"), ("a", "a-mid")], recent.Select(s => (s.Account.Letter, s.Id)));
     }
+
+    [Fact]
+    public void Delete_removes_the_transcript_and_its_folder_and_leaves_the_rest()
+    {
+        var a = _home.AddAccount("a");
+        _home.AddTranscript(a, Alpha, "gone1", "bare.jsonl");
+        _home.AddTranscript(a, Alpha, "keep1", "bare.jsonl");
+        var sidecar = Path.Combine(a.Paths.ProjectDir(Alpha), "gone1");
+        FakeHome.WriteFile(Path.Combine(sidecar, "subagents", "agent-1.jsonl"), "{}");
+        FakeHome.WriteFile(Path.Combine(sidecar, "custom-title.json"), """{"customTitle":"x"}""");
+
+        Assert.Null(SessionCatalog.Delete(SessionCatalog.List(a).Single(s => s.Id == "gone1")));
+
+        Assert.False(File.Exists(a.Paths.Transcript(Alpha, "gone1")));
+        Assert.False(Directory.Exists(sidecar));
+        Assert.Equal(["keep1"], SessionCatalog.List(a).Select(s => s.Id));
+    }
+
+    [Fact]
+    public void Delete_without_a_folder_is_fine()
+    {
+        var a = _home.AddAccount("a");
+        _home.AddTranscript(a, Alpha, "bare1", "bare.jsonl");
+
+        Assert.Null(SessionCatalog.Delete(SessionCatalog.List(a).Single()));
+        Assert.Empty(SessionCatalog.List(a));
+    }
+
+    [Fact]
+    public void Delete_refuses_a_path_outside_the_projects_folder_or_an_id_that_does_not_match()
+    {
+        var a = _home.AddAccount("a");
+        var real = _home.AddTranscript(a, Alpha, "real1", "bare.jsonl");
+        var outside = Path.Combine(_home.Home, "outside.jsonl");
+        File.WriteAllText(outside, "{}");
+        var nested = Path.Combine(a.Paths.ProjectDir(Alpha), "real1", "subagents", "agent-1.jsonl");
+        FakeHome.WriteFile(nested, "{}");
+        var entry = SessionCatalog.List(a).Single();
+
+        Assert.NotNull(SessionCatalog.Delete(entry with { Path = outside, Id = "outside" }));
+        Assert.NotNull(SessionCatalog.Delete(entry with { Path = nested, Id = "agent-1" })); // one level too deep
+        Assert.NotNull(SessionCatalog.Delete(entry with { Id = "other1" }));                // file name is not the id
+        Assert.NotNull(SessionCatalog.Delete(entry with { Id = @"..eal1" }));
+        Assert.NotNull(SessionCatalog.Delete(entry with { Id = "" }));
+        Assert.NotNull(SessionCatalog.Delete(entry with { Account = _home.AddAccount("x") })); // another account's projects folder
+        Assert.True(File.Exists(outside));
+        Assert.True(File.Exists(real));
+        Assert.True(File.Exists(nested));
+    }
+
+    [Fact]
+    public void Delete_refuses_a_session_a_claude_process_has_open()
+    {
+        var a = _home.AddAccount("a");
+        var path = _home.AddTranscript(a, Alpha, "busy1", "bare.jsonl");
+        FakeHome.AddRegistry(a, Self, "busy1");
+
+        Assert.NotNull(SessionCatalog.Delete(SessionCatalog.List(a).Single()));
+        Assert.True(File.Exists(path));
+    }
 }

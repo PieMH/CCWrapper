@@ -35,7 +35,9 @@ dotnet test
 
 - **Read-only over Claude Code, but for two windows.** Read only files Claude Code already writes. Never read
   `.credentials.json`, never call Anthropic APIs. The app only launches the unmodified `claude.exe`, which keeps it
-  inside the usage policy.
+  inside the usage policy. One deletion besides: the right-click Delete of a session removes its transcript
+  `<id>.jsonl` and its `<id>\` folder (`SessionCatalog.Delete`), only after a confirm and never while a claude process
+  or tab has the session; it refuses any path outside the account's `projects\<dir>\<id>.jsonl`.
 - **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden
   (`ClaudeCli`), only after the user's click, with a confirm before anything is removed. These commands never call the
   model.

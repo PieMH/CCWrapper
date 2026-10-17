@@ -59,6 +59,17 @@ public static class ShellModel
         return string.Join("\n", lines);
     }
 
+    /// <summary>The /color names Claude Code takes, and "default" to reset.</summary>
+    public static readonly string[] SessionColors = ["red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan", "default"];
+
+    /// <summary>The slash command that renames a session: the typed name trimmed, newlines made spaces; null for an empty one.</summary>
+    public static string? RenameCommand(string? typed) =>
+        typed is null ? null : System.Text.RegularExpressions.Regex.Replace(typed, @"\s+", " ").Trim() is { Length: > 0 } name ? "/rename " + name : null;
+
+    /// <summary>Why a session cannot be deleted: a tab has it, or a claude process does. Null when it can.</summary>
+    public static string? DeleteBlock(LiveSession? live, SessionEntry? entry) =>
+        live is not null || entry?.Running is not null ? "Close the session first" : entry is null ? "It has no transcript yet" : null;
+
     /// <summary>Last folder name of a cwd, "" when unknown.</summary>
     public static string ProjectOf(string? cwd) =>
         string.IsNullOrWhiteSpace(cwd) ? "" : Path.GetFileName(Path.TrimEndingDirectorySeparator(cwd)) is { Length: > 0 } name ? name : cwd;

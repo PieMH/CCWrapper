@@ -295,4 +295,30 @@ public sealed class ShellTests
         Assert.Equal(new[] { "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CONFIG_DIR", "CCW_TAB", "COLORTERM", "Path" }.Order(StringComparer.OrdinalIgnoreCase),
             env.Keys.Order(StringComparer.OrdinalIgnoreCase));
     }
+
+    [Theory]
+    [InlineData("  my plan  ", "/rename my plan")]
+    [InlineData("a\r\nb\n\nc", "/rename a b c")]
+    [InlineData("   ", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void Rename_command_is_trimmed_on_one_line_and_empty_means_cancel(string? typed, string? command) =>
+        Assert.Equal(command, ShellModel.RenameCommand(typed));
+
+    [Fact]
+    public void Delete_is_blocked_while_a_tab_or_a_process_has_the_session()
+    {
+        var closed = Entry("s1", "t", @"C:\p", TimeSpan.Zero);
+        Assert.Null(ShellModel.DeleteBlock(null, closed));
+        Assert.NotNull(ShellModel.DeleteBlock(Live("s1"), closed));
+        Assert.NotNull(ShellModel.DeleteBlock(null, closed with { Running = Reg("s1", SessionStatus.Idle) }));
+        Assert.NotNull(ShellModel.DeleteBlock(Live("s1"), null)); // a tab that has no transcript yet
+        Assert.NotNull(ShellModel.DeleteBlock(null, null));
+    }
+
+    [Fact]
+    public void Color_menu_has_every_claude_code_color_and_a_reset()
+    {
+        Assert.Equal(["red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan", "default"], ShellModel.SessionColors);
+    }
 }

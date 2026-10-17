@@ -65,6 +65,14 @@ public partial class SessionTabs : UserControl
         if (sender is FrameworkElement { DataContext: LiveSession s } && Main.ConfirmEnd("Closing this session", [s])) Main.CloseSession(s);
     }
 
+    // Delete is always refused here (the tab has the session open); the sidebar row offers it once the tab is closed.
+    void OnCardMenu(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not ListBoxItem { DataContext: LiveSession s } card) return;
+        e.Handled = true;
+        SessionMenu.Open(card, s, null, s.Title ?? "New session", null, () => { });
+    }
+
     void OnReadOnlyClick(object sender, MouseButtonEventArgs e) => Main.ShowReadOnlyCard();
     void OnCloseReadOnly(object sender, RoutedEventArgs e) => Main.CloseElsewhere();
     async void OnNew(object sender, RoutedEventArgs e) => await Main.NewSessionAsync();

@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-281%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-292%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -44,6 +44,7 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 - **Session list:** every session of the account, including ones started outside the app, newest first, with a status label (*working*, *needs you*, *open*) and a blue marker on the one you are looking at.
   - Titles follow Claude Code: the name given at start or with `/rename`, else its own title for the chat. A session's `/color` tints its title.
   - Click a session to open it: if it already has a tab, that tab comes forward; otherwise it is resumed in its original folder in a new tab. Nothing open is closed.
+  - Right-click a session, here or on its tab, for **Name…** (sends `/rename`), **Color** (sends `/color`) and **Delete…**. Name and Color need the session open in this window. Delete asks first, then removes the session's transcript and its folder for good, so it cannot be resumed; it is refused while any claude process has the session open.
   - A session open in another terminal gets a read-only tab that says where it is open, e.g. "PowerShell (pid 51708, since 15:07)". **Resume here** offers to close it there (the conversation is saved) and turns the tab into a live one; **Continue here as a copy** forks it instead.
 - **Settings:** a window for the account's `settings.json` and the project folder's shared and local ones, without opening the files.
   - **General:** model, effort (also per model), output style, language, theme, time format, update channel, commit trailer and claude.ai connectors.
