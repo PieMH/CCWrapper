@@ -34,6 +34,7 @@ Third-party components keep their own licences. See [THIRD-PARTY-NOTICES.txt](TH
 - It changes Claude Code's files only when you act, and keeps a backup of the old version first:
   - **Save** in the Settings window writes the `settings.json` and `CLAUDE.md` files you changed.
   - A server's folder switch in Plugins & connectors changes `.claude.json` for that folder.
+  - **Delete** on a session's right-click menu removes that session's transcript and folder for good, after you confirm. It keeps no backup.
   - Plugin and MCP changes are made by Claude Code's own `claude plugin` and `claude mcp` commands, after your click.
 - It ends a running `claude` process only after you confirm ("Resume here").
 - It writes its own files in `%LOCALAPPDATA%\CCWrapper`. See the [privacy policy](PRIVACY.md).
