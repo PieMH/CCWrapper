@@ -6,3 +6,7 @@ artifacts/
 .agents-team/
 docs/PLAN.md
 .claude/settings.local.json
+.idea/
+.vscode/
+.fleet/
+*.suo
