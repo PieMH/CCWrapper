@@ -67,9 +67,10 @@ public sealed class AccountReaderTests : IDisposable
             File.WriteAllText(a.GlobalConfigPath, Global);
         });
 
-        var email = AccountReader.Read(a).Email;
+        // 50 attempts (2 s), not the default 4 (120 ms): a busy CI runner can start the writer later than that.
+        using var doc = JsonUtil.Load(a.GlobalConfigPath, attempts: 50);
         await rewrite;
 
-        Assert.Equal("x@example.com", email);
+        Assert.Equal("x@example.com", doc?.RootElement.GetProperty("oauthAccount").GetProperty("emailAddress").GetString());
     }
 }

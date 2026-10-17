@@ -12,7 +12,7 @@ Please report privately. Do **not** open a public issue for a security problem.
 2. Choose **Report a vulnerability** (GitHub's private vulnerability reporting).
 3. Fill in the form.
 
-If you cannot use GitHub, write to [CONTACT EMAIL] with the subject "CCWrapper security".
+If you cannot use GitHub, write to pdondiw@gmail.com with the subject "CCWrapper security".
 
 ### What to include
 

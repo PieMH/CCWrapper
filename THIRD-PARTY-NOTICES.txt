@@ -1,6 +1,6 @@
 THIRD-PARTY NOTICES
 
-CCWrapper is Copyright (C) 2026 [LEGAL NAME] and licensed under the GNU General Public License,
+CCWrapper is Copyright (C) 2026 Pietro Dondi and licensed under the GNU General Public License,
 version 3 (see LICENSE). Its source code is at https://github.com/PieMH/CCWrapper.
 It includes or ships with the third-party components listed below. Each keeps its own
 licence. The licence texts follow the list.

@@ -3,12 +3,12 @@
 **CCWrapper** ("the app") is a Windows GUI around Anthropic's Claude Code.
 These terms are effective from 17 October 2026 and apply when you install or use the app. The app is free of charge.
 
-Publisher: [LEGAL NAME], an individual developer resident in Spain (GitHub: [PieMH](https://github.com/PieMH)).
-Contact: [CONTACT EMAIL]
+Publisher: Pietro Dondi, an individual developer resident in Spain (GitHub: [PieMH](https://github.com/PieMH)).
+Contact: pdondiw@gmail.com
 
 ## 1. The licence is the GPL
 
-The app is free software under the **GNU General Public License, version 3** (GPLv3). Copyright (C) 2026 [LEGAL NAME]. The full text is in [LICENSE](LICENSE). You may run, study, change and share the app under that licence. The source code of each release is the tag of the same name at <https://github.com/PieMH/CCWrapper>.
+The app is free software under the **GNU General Public License, version 3** (GPLv3). Copyright (C) 2026 Pietro Dondi. The full text is in [LICENSE](LICENSE). You may run, study, change and share the app under that licence. The source code of each release is the tag of the same name at <https://github.com/PieMH/CCWrapper>.
 
 These terms do not restrict any right the GPLv3 gives you. If these terms and the GPLv3 conflict, the GPLv3 wins. These terms only cover what the GPLv3 leaves open: how the app relates to other services, what it does on your computer, and what the publisher is and is not responsible for.
 
@@ -79,6 +79,6 @@ The publisher may change these terms, for example when the law, Anthropic's rule
 
 ## 10. Contact
 
-[LEGAL NAME] - [CONTACT EMAIL] - GitHub: [PieMH](https://github.com/PieMH)
+Pietro Dondi - pdondiw@gmail.com - GitHub: [PieMH](https://github.com/PieMH)
 
 See also: [PRIVACY.md](PRIVACY.md), [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md), [SECURITY.md](SECURITY.md).
