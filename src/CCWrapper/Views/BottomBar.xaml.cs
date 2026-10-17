@@ -34,6 +34,8 @@ public partial class BottomBar : UserControl
         Loaded += async (_, _) =>
         {
             UsageProbe.Refreshed += OnUsageRefreshed;
+            AppUpdate.Changed += ShowUpdate;
+            ShowUpdate();
             _usageTimer.Start();
             await ReadAccountAsync();
             await CheckUsageAsync(force: false); // skipped when the start screen just checked
@@ -41,6 +43,7 @@ public partial class BottomBar : UserControl
         Unloaded += (_, _) =>
         {
             UsageProbe.Refreshed -= OnUsageRefreshed;
+            AppUpdate.Changed -= ShowUpdate;
             _usageTimer.Stop();
         };
         _ = new SessionFollower<BarSource, BarData>(this, s => new BarSource(s), r => r.Read(), async d =>
@@ -90,6 +93,25 @@ public partial class BottomBar : UserControl
         var p = Math.Clamp(percent ?? 0, 0, 100);
         bar.Width = ((FrameworkElement)bar.Parent).Width * p / 100;
         if (warn) bar.Background = (Brush)FindResource(p >= 80 ? "Warn" : "Accent");
+    }
+
+    void ShowUpdate()
+    {
+        var v = AppUpdate.ReadyVersion;
+        UpdateButton.Visibility = v is null ? Visibility.Collapsed : Visibility.Visible;
+        UpdateText.Text = $"Update {v} ready";
+    }
+
+    /// <summary>The updater stops every process of the install folder, so other windows close too.</summary>
+    void OnUpdate(object sender, RoutedEventArgs e)
+    {
+        var busy = AppState.Current.OpenSessions.Count(s => s.Status is SessionStatus.Busy or SessionStatus.Waiting);
+        var others = AppUpdate.OtherInstances();
+        var text = $"Restart now to install {AppUpdate.ReadyVersion}?";
+        if (busy > 0) text += $"\n\nThis ends {busy} busy or waiting session(s); they stay resumable.";
+        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.";
+        if (Dialog.Show(Window.GetWindow(this), text, "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            AppUpdate.RestartNow(AppState.Current?.Account.Letter);
     }
 
     void OnRefresh(object sender, RoutedEventArgs e) => _ = CheckUsageAsync(force: true);

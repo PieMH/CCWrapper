@@ -23,13 +23,26 @@ dotnet test
 
 | Folder | What |
 |---|---|
-| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to |
+| `src/CCWrapper` (root) | `Program.cs`: the Velopack hook runs before WPF starts |
+| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `AppUpdate` (auto-update), `AppPrefs` (`app.json`) |
 | `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md`; `ClaudeJson`, locked updates of `.claude.json` |
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
 | `src/CCWrapper/Theme.xaml` | Every color and custom style; `App.xaml` recolors Fluent's own brushes |
-| `src/CCWrapper.StatusRelay` | The silent statusLine relay |
+| `src/CCWrapper.StatusRelay` | The silent statusLine relay (native AOT in releases; launched by 8.3 short path, so install paths with spaces work) |
+| `scripts/`, `.github/workflows` | `pack.ps1` builds the Velopack release; `ci.yml` tests, `release.yml` publishes |
+| Root `*.md`, `THIRD-PARTY-NOTICES.txt` | PRIVACY, TERMS, CODE_SIGNING_POLICY, SECURITY: the policies the About window and SignPath point to |
 | `tests/CCWrapper.Tests` | xUnit, synthetic fixtures only (never real transcripts) |
+
+## Release
+
+- **Tag `vX.Y.Z` → `release.yml` → a draft GitHub release; a human publishes it.** Setup.exe, Portable.zip, nupkg, `releases.win.json`,
+  `SHA256SUMS.txt` and a build attestation. SignPath steps run only once the `SIGNPATH_API_TOKEN` secret exists.
+- **`scripts\pack.ps1 -Version X` locally needs the MSVC build tools** (`vcvars64` and `vswhere` on `PATH`) for the AOT relay.
+- **Velopack's apply force-stops every process in the install folder,** so `AppUpdate` hands off on exit only when it is the
+  last CCWrapper of that install. Each account window is its own process.
+- **No request before the first-run yes.** `AppUpdate` checks only in an installed copy and only when `AppPrefs` says so;
+  a dev build and "no" make no network call (PRIVACY.md says so too, keep them in step).
 
 ## Rules, and why
 
@@ -67,4 +80,4 @@ dotnet test
 
 - `main` is protected: work on a branch and open a pull request. Never push to `main` or force-push.
 - Commit messages: no `Co-Authored-By` or other AI attribution trailers.
-- Keep README's feature list and test badge in step with behavior changes.
+- Keep README's feature list and test badge in step with behavior changes, and the policy files in step with what the app sends.

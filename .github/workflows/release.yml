@@ -1,0 +1,115 @@
+name: Release
+
+# A pushed v* tag builds the Velopack installer and leaves a DRAFT GitHub release; a human publishes it.
+# Signing (SignPath Foundation) runs only while the SIGNPATH_API_TOKEN secret exists; without it the files ship unsigned.
+# Secrets stay out of job env: SIGNING is only a flag, and each secret is passed to the one step that needs it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  actions: read
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      SIGNING: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test -c Release
+
+      - name: Version from tag
+        run: |
+          $v = $env:TAG -replace '^v', ''
+          if ($v -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw "Tag '$env:TAG' is not vMAJOR.MINOR.PATCH[-prerelease]" }
+          "VERSION=$v" >> $env:GITHUB_ENV
+          "PRERELEASE=$($v.Contains('-'))" >> $env:GITHUB_ENV
+
+      - run: ./scripts/pack.ps1 -Version $env:VERSION -Stage publish
+
+      - name: Upload app for signing
+        id: upload-app
+        if: env.SIGNING == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-unsigned
+          path: artifacts/publish
+          if-no-files-found: error
+      - name: Sign app (SignPath)
+        if: env.SIGNING == 'true'
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: CCWrapper
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: app
+          github-artifact-id: ${{ steps.upload-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/publish
+
+      # Previous release gives vpk the full package to build delta packages from; the first release has none.
+      - name: Download previous release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pre = @(if ($env:PRERELEASE -eq 'True') { '--pre' })
+          dotnet tool restore
+          dotnet vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token $env:GH_TOKEN -o artifacts/releases @pre
+          if ($LASTEXITCODE) { Write-Warning "No previous release to download (exit $LASTEXITCODE): shipping full packages only"; $global:LASTEXITCODE = 0 }
+
+      - run: ./scripts/pack.ps1 -Version $env:VERSION -Stage pack
+
+      - name: Upload Setup.exe for signing
+        id: upload-setup
+        if: env.SIGNING == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: setup-unsigned
+          path: artifacts/releases/PieMH.CCWrapper-win-Setup.exe
+          if-no-files-found: error
+      - name: Sign Setup.exe (SignPath)
+        if: env.SIGNING == 'true'
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: CCWrapper
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: setup
+          github-artifact-id: ${{ steps.upload-setup.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/releases
+
+      # Only this version's files: the downloaded previous full package is already on its own release.
+      - name: Collect release files
+        run: |
+          $files = Get-ChildItem artifacts/releases -File | Where-Object {
+            $_.Name -like "*-$env:VERSION-*.nupkg" -or $_.Name -like '*-Setup.exe' -or $_.Name -like '*-Portable.zip' -or $_.Name -eq 'releases.win.json' }
+          if ($files.Count -lt 4) { throw "Expected at least Setup.exe, Portable.zip, full .nupkg and releases.win.json, found: $($files.Name -join ', ')" }
+          $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content artifacts/SHA256SUMS.txt
+          Get-Content artifacts/SHA256SUMS.txt
+          "SUBJECTS<<EOF`n$(($files.Name | ForEach-Object { "artifacts/releases/$_" }) -join "`n")`nEOF" >> $env:GITHUB_ENV
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ env.SUBJECTS }}
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pre = @(if ($env:PRERELEASE -eq 'True') { '--pre' })
+          dotnet vpk upload github --repoUrl "https://github.com/${{ github.repository }}" --token $env:GH_TOKEN -o artifacts/releases --tag $env:TAG --releaseName "CCWrapper $env:VERSION" --targetCommitish ${{ github.sha }} @pre
+          if ($LASTEXITCODE) { throw "vpk upload failed ($LASTEXITCODE)" }
+          gh release upload $env:TAG artifacts/SHA256SUMS.txt
+          if ($LASTEXITCODE) { throw "gh release upload failed ($LASTEXITCODE)" }

@@ -24,6 +24,19 @@ public partial class App : Application
         var account = i >= 0 && i + 1 < e.Args.Length ? AccountStore.Find(e.Args[i + 1]) : null;
         if (account is null) new AccountPicker().Show();
         else new MainWindow(account).Show();
+        await AppUpdate.StartAsync(AskUpdateCheck);
+    }
+
+    /// <summary>Asked once in an installed copy, before the first request to GitHub.</summary>
+    bool AskUpdateCheck() => Dialog.Show(Windows.OfType<Window>().FirstOrDefault(),
+        "CCWrapper can check GitHub for new versions. Your IP address and the app version reach GitHub when it does; nothing else is sent.\n\n" +
+        $"Details: {AppUpdate.Repo}/blob/main/PRIVACY.md\nYou can change this later under About.\n\nCheck for updates?",
+        "CCWrapper: updates", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        AppUpdate.ApplyOnExit();
+        base.OnExit(e);
     }
 
     bool _showingError;

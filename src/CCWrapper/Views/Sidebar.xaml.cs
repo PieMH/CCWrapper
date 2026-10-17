@@ -22,7 +22,7 @@ public partial class Sidebar : UserControl
     string? _query;
     CancellationTokenSource? _search;
     bool _refreshing;
-    Window? _extensions, _settings;
+    Window? _extensions, _settings, _about;
 
     static AppState State => AppState.Current;
     MainWindow Main => (MainWindow)Window.GetWindow(this);
@@ -158,6 +158,13 @@ public partial class Sidebar : UserControl
         if (_extensions is { IsLoaded: true }) { _extensions.Activate(); return; }
         _extensions = new ExtensionsWindow(State.Account, State.ActiveSession?.Cwd) { Owner = Main };
         _extensions.Show();
+    }
+
+    void OnAbout(object sender, RoutedEventArgs e)
+    {
+        if (_about is { IsLoaded: true }) { _about.Activate(); return; }
+        _about = new AboutWindow { Owner = Main };
+        _about.Show();
     }
 
     async void OnNewSession(object sender, RoutedEventArgs e) => await Main.NewSessionAsync();
