@@ -58,19 +58,22 @@ public sealed class AccountReaderTests : IDisposable
     }
 
     [Fact]
-    public async Task Tolerates_a_file_rewritten_mid_read()
+    public void Tolerates_a_file_rewritten_mid_read()
     {
         var a = _home.AddAccount("x", """{"oauthAccount":{"emailAdd""");
-        var rewrite = Task.Run(async () =>
+        string? email = null;
+        // A thread of its own, not the thread pool: on a busy CI runner a pool task can start seconds late, and one missed even a 2 s
+        // window. 50 attempts (2 s), not the default 4 (120 ms), for the same reason.
+        var reader = new Thread(() =>
         {
-            await Task.Delay(20);
-            File.WriteAllText(a.GlobalConfigPath, Global);
+            using var doc = JsonUtil.Load(a.GlobalConfigPath, attempts: 50);
+            email = doc?.RootElement.GetProperty("oauthAccount").GetProperty("emailAddress").GetString();
         });
+        reader.Start();
+        Thread.Sleep(20);
+        File.WriteAllText(a.GlobalConfigPath, Global);
+        reader.Join();
 
-        // 50 attempts (2 s), not the default 4 (120 ms): a busy CI runner can start the writer later than that.
-        using var doc = JsonUtil.Load(a.GlobalConfigPath, attempts: 50);
-        await rewrite;
-
-        Assert.Equal("x@example.com", doc?.RootElement.GetProperty("oauthAccount").GetProperty("emailAddress").GetString());
+        Assert.Equal("x@example.com", email);
     }
 }
