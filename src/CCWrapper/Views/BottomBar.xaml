@@ -30,6 +30,11 @@
     </UserControl.Resources>
     <DockPanel Height="36" Margin="6,0">
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+            <StackPanel x:Name="CompactHint" Orientation="Horizontal" Visibility="Collapsed">
+                <TextBlock x:Name="CompactText" Foreground="{StaticResource Warn}" />
+                <Button x:Name="CompactButton" Style="{StaticResource Chip}" Content="Compact" Margin="6,0,0,0" Click="OnCompact" />
+                <Border Style="{StaticResource Sep}" />
+            </StackPanel>
             <StackPanel Orientation="Horizontal" ToolTip="Context window: tokens used / window size">
                 <TextBlock Text="ctx" Style="{StaticResource Dim}" />
                 <Border Style="{StaticResource MeterTrack}"><Border x:Name="CtxBar" Style="{StaticResource Bar}" Background="{StaticResource Muted}" /></Border>

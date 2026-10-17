@@ -42,7 +42,7 @@
         </Border>
 
         <Border DockPanel.Dock="Bottom" BorderThickness="0,1,0,0" BorderBrush="{StaticResource Line}">
-            <views:BottomBar />
+            <views:BottomBar x:Name="Bar" />
         </Border>
 
         <Grid>
@@ -112,7 +112,7 @@
                     <ContentControl x:Name="ElsewhereView" />
                 </DockPanel>
                 <Border Grid.Row="2" Background="{StaticResource Panel}" BorderThickness="0,1,0,0" BorderBrush="{StaticResource Line}">
-                    <views:ComposeBox />
+                    <views:ComposeBox x:Name="Compose" />
                 </Border>
             </Grid>
 

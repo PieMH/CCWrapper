@@ -25,7 +25,11 @@ public partial class BottomBar : UserControl
     string? _model, _effort, _mode;
     AccountInfo? _account; // the window's account, read at start and after each /usage check
     bool _checkingUsage;
+    CompactPrefs _compact = CompactPrefs.Load();
     readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
+
+    /// <summary>The Compact hint's button: the command for the message box, which MainWindow routes there. Never sent.</summary>
+    public event Action<string>? CompactRequested;
 
     public BottomBar()
     {
@@ -34,6 +38,8 @@ public partial class BottomBar : UserControl
         Loaded += async (_, _) =>
         {
             UsageProbe.Refreshed += OnUsageRefreshed;
+            CompactPrefs.Saved += OnCompactPrefs;
+            OnCompactPrefs();
             _usageTimer.Start();
             await ReadAccountAsync();
             await CheckUsageAsync(force: false); // skipped when the start screen just checked
@@ -41,6 +47,7 @@ public partial class BottomBar : UserControl
         Unloaded += (_, _) =>
         {
             UsageProbe.Refreshed -= OnUsageRefreshed;
+            CompactPrefs.Saved -= OnCompactPrefs;
             _usageTimer.Stop();
         };
         _ = new SessionFollower<BarSource, BarData>(this, s => new BarSource(s), r => r.Read(), async d =>
@@ -73,6 +80,10 @@ public partial class BottomBar : UserControl
         var (ctx, ctxPercent) = BarFormat.CtxParts(sl, d?.ContextTokens);
         CtxText.Text = ctx;
         Meter(CtxBar, ctxPercent, warn: false);
+        var hint = _compact.Enabled && s is not null && ctxPercent >= _compact.Threshold;
+        CompactHint.Visibility = hint ? Visibility.Visible : Visibility.Collapsed;
+        CompactText.Text = $"Context {BarFormat.Percent(ctxPercent)}";
+        CompactButton.ToolTip = "Put " + _compact.Command + " in the message box (not sent)";
         SpendText.Text = BarFormat.Spend(sl, d?.OutputTokens, d?.CostUsd);
         var usage = BarFormat.Usage(sl, BarFormat.Newer(_account, d?.Account)); // shown with no session open too
         FiveHourText.Text = BarFormat.Percent(usage.FiveHour);
@@ -91,6 +102,15 @@ public partial class BottomBar : UserControl
         bar.Width = ((FrameworkElement)bar.Parent).Width * p / 100;
         if (warn) bar.Background = (Brush)FindResource(p >= 80 ? "Warn" : "Accent");
     }
+
+    // The prefs are read here and when Settings saves them, not on each render.
+    void OnCompactPrefs()
+    {
+        _compact = CompactPrefs.Load();
+        Render();
+    }
+
+    void OnCompact(object sender, RoutedEventArgs e) => CompactRequested?.Invoke(_compact.Command);
 
     void OnRefresh(object sender, RoutedEventArgs e) => _ = CheckUsageAsync(force: true);
 
@@ -286,16 +306,32 @@ public static class BarFormat
         $"in {Tokens(sl?.TotalInputTokens)} out {Tokens(sl?.TotalOutputTokens ?? transcriptOutput)} {Cost(sl?.CostUsd ?? transcriptCost)}";
 
     /// <summary>"5h 58% · wk 12%", from whichever is newer: the status line's rate limits (Pro/Max, after the first reply) or
-    /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its time goes in the tooltip; the two
-    /// percents feed the meter bars.</summary>
-    public static (string Text, string Tip, double? FiveHour, double? Week) Usage(StatusLineData? sl, AccountInfo? account)
+    /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its source and time, and when each
+    /// window resets, go in the tooltip (relative to <paramref name="now"/>); the two percents feed the meter bars.</summary>
+    public static (string Text, string Tip, double? FiveHour, double? Week) Usage(StatusLineData? sl, AccountInfo? account, DateTimeOffset? now = null)
     {
         var saved = account?.UsageFetchedAt;
         var live = (sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null }) && (saved is null || sl.ReceivedAt > saved);
         var (five, week) = live ? (sl!.FiveHourUsedPercent, sl.SevenDayUsedPercent) : (account?.FiveHour?.Utilization, account?.SevenDay?.Utilization);
+        var (fiveReset, weekReset) = live ? (sl!.FiveHourResetsAt, sl.SevenDayResetsAt) : (account?.FiveHour?.ResetsAt, account?.SevenDay?.ResetsAt);
         var tip = live ? $"Plan usage from Claude Code's status line, as of {sl!.ReceivedAt.ToLocalTime():HH:mm}"
             : saved is { } at ? $"Plan usage from Claude Code's /usage, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data";
+        var t = now ?? DateTimeOffset.Now;
+        tip += Reset("5h window", fiveReset, t, alwaysDay: false) + Reset("Weekly window", weekReset, t, alwaysDay: true);
         return ($"5h {Percent(five)} · wk {Percent(week)}", tip, five, week);
+    }
+
+    /// <summary>"5h window resets 14:30 (in 2h 10m)", with the weekday when it is not today (always for <paramref name="alwaysDay"/>);
+    /// empty when the time is unknown.</summary>
+    static string Reset(string what, DateTimeOffset? at, DateTimeOffset now, bool alwaysDay)
+    {
+        if (at is not { } r) return "";
+        var local = r.ToLocalTime();
+        var when = local.ToString(alwaysDay || local.Date != now.ToLocalTime().Date ? "ddd HH:mm" : "HH:mm", Inv);
+        var left = r - now;
+        if (left <= TimeSpan.Zero) return $"\n{what} reset was due {when}";
+        var span = left.TotalDays >= 1 ? $"{(int)left.TotalDays}d {left.Hours}h" : left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes}m" : $"{Math.Max(1, left.Minutes)}m";
+        return $"\n{what} resets {when} (in {span})";
     }
 
     /// <summary>The account read whose saved usage is newer (a null one loses).</summary>

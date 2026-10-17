@@ -147,6 +147,14 @@ public partial class ComposeBox : UserControl
         }
     }
 
+    /// <summary>Puts <paramref name="text"/> in an empty box and focuses it. A box with text keeps it: the text is never replaced
+    /// or added to, only focused. Not sent.</summary>
+    public void Prefill(string text)
+    {
+        if (Input.Text.Length == 0) Recall(text);
+        Input.Focus();
+    }
+
     void Recall(string text)
     {
         Input.Text = text;

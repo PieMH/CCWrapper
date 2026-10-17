@@ -39,6 +39,7 @@ public partial class MainWindow : Window, IAppCommands
         Taskbar.Overlay = BadgeImage(letter, color);
 
         UpdateCenter();
+        Bar.CompactRequested += Compose.Prefill;
         TerminalView.CloseRequested += (_, session) => CloseSession(session);
         _state.OpenSessions.CollectionChanged += (_, _) => UpdateCenter();
         _state.PropertyChanged += OnStateChanged;

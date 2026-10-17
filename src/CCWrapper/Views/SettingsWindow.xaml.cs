@@ -46,7 +46,8 @@ public partial class SettingsWindow : Window
     string? _cwd;
     DateTime _loadedAt;
     bool _filling, _quiet, _saved;
-    string? _jsonError, _envError; // typed text that does not parse: Save waits until it does
+    string? _jsonError, _envError, _appError; // typed text that does not parse: Save waits until it does
+    CompactPrefs _app = CompactPrefs.Load(), _appSaved = CompactPrefs.Load(); // the CCWrapper page: app.json, not a settings file
 
     public SettingsWindow(Account account, string? cwd)
     {
@@ -115,7 +116,7 @@ public partial class SettingsWindow : Window
     string Page => SearchBox.Text.Trim().Length > 0 ? "search"
         : NavPermissions.IsChecked == true ? "permissions" : NavInterface.IsChecked == true ? "interface"
         : NavHooks.IsChecked == true ? "hooks" : NavEnv.IsChecked == true ? "env"
-        : NavMemory.IsChecked == true ? "memory" : NavJson.IsChecked == true ? "json" : "general";
+        : NavMemory.IsChecked == true ? "memory" : NavJson.IsChecked == true ? "json" : NavApp.IsChecked == true ? "app" : "general";
 
     Brush B(string key) => (Brush)FindResource(key);
 
@@ -153,7 +154,8 @@ public partial class SettingsWindow : Window
         EnvPage.Visibility = V(page == "env");
         MemoryPage.Visibility = V(page == "memory");
         JsonPage.Visibility = V(page == "json");
-        ScopeArea.Visibility = V(page != "memory");
+        AppPage.Visibility = V(page == "app");
+        ScopeArea.Visibility = V(page is not ("memory" or "app"));
         MemoryNote.Visibility = V(page == "memory");
         ViewJsonLink.Visibility = V(page != "json");
         var letter = ShellModel.LetterOf(_account.Letter);
@@ -165,11 +167,12 @@ public partial class SettingsWindow : Window
             "env" => ("Environment", "Variables every session starts with."),
             "memory" => ("CLAUDE.md", "Instructions Claude reads at the start of every session."),
             "json" => ("JSON", "The whole file, for anything the pages above do not cover."),
+            "app" => ("CCWrapper", "Settings of this app, not of Claude Code."),
             "search" => ($"Settings matching \"{SearchBox.Text.Trim()}\"", "From General, Permissions and Interface."),
             _ => ("General", $"Model, look and updates for Claude Code sessions of account {letter}."),
         };
         if (_files.Count == 0) return; // still loading
-        _jsonError = _envError = null;
+        _jsonError = _envError = _appError = null;
         ShowScope();
         switch (page)
         {
@@ -177,6 +180,7 @@ public partial class SettingsWindow : Window
             case "env": ShowEnv(); break;
             case "memory": ShowMemory(); break;
             case "json": ShowJson(); break;
+            case "app": ShowApp(); break;
             default:
                 BuildRows();
                 if (page == "permissions") ShowRules();
@@ -575,6 +579,25 @@ public partial class SettingsWindow : Window
         UpdateSaveBar();
     }
 
+    // ---- CCWrapper ----
+
+    void ShowApp()
+    {
+        _quiet = true;
+        (CompactOn.IsChecked, CompactThreshold.Text, CompactPrompt.Text) = (_app.Enabled, _app.Threshold.ToString(), _app.Prompt);
+        _quiet = false;
+    }
+
+    void OnAppEdited(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || _quiet) return;
+        _appError = !int.TryParse(CompactThreshold.Text, out var threshold) || !CompactPrefs.ValidThreshold(threshold) ? "The threshold must be a whole number from 1 to 99."
+            : CompactPrompt.Text.Trim().Length == 0 ? "The prompt can't be empty." : null;
+        if (_appError is null) _app = new(CompactOn.IsChecked == true, threshold, CompactPrompt.Text.Trim());
+        _saved = false;
+        UpdateSaveBar();
+    }
+
     // ---- JSON ----
 
     void ShowJson()
@@ -609,12 +632,13 @@ public partial class SettingsWindow : Window
     List<string> DirtyNames() =>
         _files.Values.Where(f => f.Dirty).Select(f => $"{f.Scope} settings")
             .Concat(_memory.Where(m => m.Value.Dirty).Select(m => m.Key == SettingsScope.Local ? "CLAUDE.local.md" : $"{m.Key} CLAUDE.md"))
+            .Concat(_app != _appSaved ? new[] { "CCWrapper settings" } : [])
             .ToList();
 
     void UpdateSaveBar()
     {
         var dirty = DirtyNames();
-        var invalid = _jsonError ?? _envError;
+        var invalid = _jsonError ?? _envError ?? _appError;
         SaveButton.IsEnabled = dirty.Count > 0 && invalid is null;
         RevertButton.IsEnabled = dirty.Count > 0 || invalid is not null;
         (SaveText.Text, SaveDot.Fill) = invalid is not null ? (invalid + " Fix it to save.", B("Bad"))
@@ -629,6 +653,7 @@ public partial class SettingsWindow : Window
     {
         var failed = _files.Values.Select(f => (f.Path, Error: f.Save(BackupDir)))
             .Concat(_memory.Values.Select(m => (m.Path, Error: m.Save(BackupDir))))
+            .Concat(SaveApp())
             .Where(r => r.Error is not null).ToList();
         _saved = failed.Count == 0;
         ShowPage();
@@ -637,8 +662,17 @@ public partial class SettingsWindow : Window
         return failed.Count == 0;
     }
 
+    IEnumerable<(string Path, string? Error)> SaveApp()
+    {
+        if (_app == _appSaved) yield break;
+        var error = _app.Save();
+        if (error is null) _appSaved = _app;
+        yield return (CompactPrefs.DefaultPath, error);
+    }
+
     void OnRevert(object sender, RoutedEventArgs e)
     {
+        _app = _appSaved;
         foreach (var f in _files.Values) f.Revert();
         foreach (var m in _memory.Values) m.Revert();
         _saved = false;
@@ -663,7 +697,7 @@ public partial class SettingsWindow : Window
 
     void OnClosing(object? sender, CancelEventArgs e)
     {
-        if ((_jsonError ?? _envError) is not null)
+        if ((_jsonError ?? _envError ?? _appError) is not null)
         {
             e.Cancel = Dialog.Show(this, "Some changes are not valid and can't be saved. Close and lose all unsaved changes?", "Settings",
                 MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK;
