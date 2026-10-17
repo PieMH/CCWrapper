@@ -78,6 +78,35 @@ public static class SessionCatalog
         return result;
     }
 
+    /// <summary>Deletes the session's transcript and its sidecar folder (subagents, custom-title.json) for good. Null when done,
+    /// else why not. Trust boundary: only <c>projects\&lt;dir&gt;\&lt;id&gt;.jsonl</c> of the entry's own account, named by its id, is
+    /// touched; a session a claude process has open is refused. A missing folder is fine.</summary>
+    public static string? Delete(SessionEntry entry)
+    {
+        try
+        {
+            var projects = Path.TrimEndingDirectorySeparator(Path.GetFullPath(entry.Account.Paths.Projects));
+            var file = Path.GetFullPath(entry.Path);
+            var dir = Path.GetDirectoryName(file);
+            // An all-dots id would make the folder "." or ".."; a trailing dot or space is dropped by Windows and aliases another id.
+            if (entry.Id.Length == 0 || entry.Id.All(c => c == '.') || entry.Id[^1] is '.' or ' '
+                || entry.Id != Path.GetFileName(entry.Id) || Path.GetFileName(file) != entry.Id + ".jsonl"
+                || dir is null || !string.Equals(Path.GetDirectoryName(dir), projects, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Path.GetFullPath(Path.Combine(dir, entry.Id)), Path.Combine(dir, entry.Id), StringComparison.OrdinalIgnoreCase))
+                return "The transcript is not in this account's projects folder: nothing was deleted.";
+            if (Running(entry.Account).Any(r => r.SessionId == entry.Id)) return "A claude process has this session open: close it first.";
+            File.Delete(file);
+            var sidecar = Path.Combine(dir, entry.Id);
+            if (Directory.Exists(sidecar)) Directory.Delete(sidecar, recursive: true);
+            Probes.TryRemove(file, out _);
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return ex.Message;
+        }
+    }
+
     /// <summary>Folders for the New-session dialog: .claude.json "projects" plus transcript cwds, most recent first. Folders that no longer exist are dropped.</summary>
     public static IReadOnlyList<RecentProject> RecentProjects(Account account)
     {

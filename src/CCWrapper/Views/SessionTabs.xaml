@@ -13,6 +13,8 @@
             <Setter Property="Width" Value="{Binding CardWidth, RelativeSource={RelativeSource AncestorType=views:SessionTabs}}" />
             <Setter Property="AutomationProperties.Name" Value="{Binding Title, TargetNullValue='New session'}" />
             <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnCardDown" />
+            <EventSetter Event="PreviewMouseRightButtonDown" Handler="OnCardRightDown" />
+            <EventSetter Event="ContextMenuOpening" Handler="OnCardMenu" />
             <EventSetter Event="PreviewMouseMove" Handler="OnCardMove" />
             <EventSetter Event="DragOver" Handler="OnCardDragOver" />
             <EventSetter Event="Drop" Handler="OnCardDrop" />
