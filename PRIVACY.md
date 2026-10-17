@@ -3,8 +3,8 @@
 **CCWrapper** ("the app") is an unofficial Windows GUI around Anthropic's Claude Code.
 This policy is effective from 17 October 2026.
 
-Publisher: [LEGAL NAME], an individual developer resident in Spain (GitHub: [PieMH](https://github.com/PieMH)).
-Contact: [CONTACT EMAIL]
+Publisher: Pietro Dondi, an individual developer resident in Spain (GitHub: [PieMH](https://github.com/PieMH)).
+Contact: pdondiw@gmail.com
 
 ## In short
 
@@ -101,7 +101,7 @@ The app is not directed at children.
 
 ## Your rights and complaints
 
-Because the publisher holds no personal data from the app, there is normally nothing to access, correct or delete. If you think the publisher holds data about you, write to [CONTACT EMAIL]. You have the rights of arts. 15 to 22 GDPR (access, correction, erasure, restriction, portability, objection), and the publisher will answer within one month.
+Because the publisher holds no personal data from the app, there is normally nothing to access, correct or delete. If you think the publisher holds data about you, write to pdondiw@gmail.com. You have the rights of arts. 15 to 22 GDPR (access, correction, erasure, restriction, portability, objection), and the publisher will answer within one month.
 
 You may complain to the Spanish data protection authority, the Agencia Española de Protección de Datos (AEPD): <https://www.aepd.es>. You may also complain to the authority of your own EU country.
 
@@ -111,6 +111,6 @@ If the app starts to send other data, this policy changes first, and the release
 
 ## Contact
 
-[LEGAL NAME] - [CONTACT EMAIL] - GitHub: [PieMH](https://github.com/PieMH)
+Pietro Dondi - pdondiw@gmail.com - GitHub: [PieMH](https://github.com/PieMH)
 
 See also: [TERMS.md](TERMS.md), [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md), [SECURITY.md](SECURITY.md).
