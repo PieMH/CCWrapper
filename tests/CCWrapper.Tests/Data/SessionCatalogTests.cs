@@ -225,6 +225,29 @@ public sealed class SessionCatalogTests : IDisposable
         Assert.True(File.Exists(nested));
     }
 
+    [Theory]
+    [InlineData("..")]  // file "...jsonl": the sidecar would be the projects folder
+    [InlineData(".")]   // file "..jsonl": the sidecar would be the project folder
+    [InlineData("abc.")] // Windows drops the dot: the sidecar would be "abc"
+    [InlineData("abc ")]
+    public void Delete_refuses_ids_whose_folder_is_not_their_own(string id)
+    {
+        var a = _home.AddAccount("a");
+        var real = _home.AddTranscript(a, Alpha, "real1", "bare.jsonl");
+        var dir = a.Paths.ProjectDir(Alpha);
+        var file = Path.Combine(dir, id + ".jsonl");
+        File.WriteAllText(file, "{}");
+        var alias = Path.Combine(dir, "abc", "keep.txt");
+        FakeHome.WriteFile(alias, "{}");
+        var entry = SessionCatalog.List(a).Single(s => s.Id == "real1") with { Path = file, Id = id };
+
+        Assert.NotNull(SessionCatalog.Delete(entry));
+
+        Assert.True(File.Exists(file));
+        Assert.True(File.Exists(real));
+        Assert.True(File.Exists(alias));
+    }
+
     [Fact]
     public void Delete_refuses_a_session_a_claude_process_has_open()
     {

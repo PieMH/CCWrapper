@@ -65,6 +65,10 @@ public partial class SessionTabs : UserControl
         if (sender is FrameworkElement { DataContext: LiveSession s } && Main.ConfirmEnd("Closing this session", [s])) Main.CloseSession(s);
     }
 
+    // A right-click must not select (activate) the card: ListBoxItem selects on the button going down. The menu still opens,
+    // as ContextMenuOpening is raised when the button comes up.
+    void OnCardRightDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
     // Delete is always refused here (the tab has the session open); the sidebar row offers it once the tab is closed.
     void OnCardMenu(object sender, ContextMenuEventArgs e)
     {

@@ -79,7 +79,8 @@ public partial class ComposeBox : UserControl
     // Open while the text starts with "/" and the caret is in that first word (or forced from the + menu): filtered by what follows the "/".
     void UpdateSlash()
     {
-        if (_quiet || CommandsKey is not { } key) return;
+        if (_quiet) return;
+        if (CommandsKey is not { } key) { CloseSlash(); return; }
         var text = Input.Text;
         string? query = null;
         if (_forced) query = "";
@@ -105,7 +106,7 @@ public partial class ComposeBox : UserControl
         try
         {
             _commands[key] = await Task.Run(() => SlashCommands.List(session.Account, session.Cwd));
-            _fresh = true;
+            _fresh = key == CommandsKey; // the active session may have changed meanwhile
         }
         finally { _loading = false; }
         _query = null; // the list may have grown under the same query
@@ -117,7 +118,7 @@ public partial class ComposeBox : UserControl
     void CloseSlash()
     {
         SlashPopup.IsOpen = false;
-        _fresh = false;
+        _fresh = _forced = false;
         _query = null;
     }
 
@@ -212,6 +213,7 @@ public partial class ComposeBox : UserControl
             _refusal = null;
             _suggestion = null;
             UpdateHint();
+            CloseSlash();
         }
         _session = session;
         var blocked = TuiInput.BlockedReason(session);

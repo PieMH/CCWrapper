@@ -25,6 +25,7 @@ public partial class BottomBar : UserControl
     string? _model, _effort, _mode;
     AccountInfo? _account; // the window's account, read at start and after each /usage check
     bool _checkingUsage;
+    Func<string> _usageTip = () => "";
     CompactPrefs _compact = CompactPrefs.Load();
     readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
 
@@ -85,15 +86,20 @@ public partial class BottomBar : UserControl
         CompactText.Text = $"Context {BarFormat.Percent(ctxPercent)}";
         CompactButton.ToolTip = "Put " + _compact.Command + " in the message box (not sent)";
         SpendText.Text = BarFormat.Spend(sl, d?.OutputTokens, d?.CostUsd);
-        var usage = BarFormat.Usage(sl, BarFormat.Newer(_account, d?.Account)); // shown with no session open too
+        var account = BarFormat.Newer(_account, d?.Account);
+        var usage = BarFormat.Usage(sl, account); // shown with no session open too
         FiveHourText.Text = BarFormat.Percent(usage.FiveHour);
         WeekText.Text = BarFormat.Percent(usage.Week);
         Meter(FiveHourBar, usage.FiveHour, warn: true);
         Meter(WeekBar, usage.Week, warn: true);
-        UsageGroup.ToolTip = usage.Tip;
+        _usageTip = () => BarFormat.Usage(sl, account).Tip;
+        UsageGroup.ToolTip ??= usage.Tip; // non-null so ToolTipOpening fires; OnUsageTip makes the real text
         RefreshButton.IsEnabled = !_checkingUsage;
         RefreshButton.ToolTip = _checkingUsage ? "Checking plan usage…" : "Check plan usage now (runs /usage hidden)";
     }
+
+    // Built when it opens: the "in 2h 10m" of the reset times is relative to now, not to the last render.
+    void OnUsageTip(object sender, ToolTipEventArgs e) => UsageGroup.ToolTip = _usageTip();
 
     /// <summary>Fills a meter's bar to <paramref name="percent"/> of its track; plan usage turns amber from 80%.</summary>
     void Meter(Border bar, double? percent, bool warn)

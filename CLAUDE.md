@@ -33,7 +33,7 @@ dotnet test
 
 ## Rules, and why
 
-- **Read-only over Claude Code, but for two windows.** Read only files Claude Code already writes. Never read
+- **Read-only over Claude Code, but for two windows and one delete.** Read only files Claude Code already writes. Never read
   `.credentials.json`, never call Anthropic APIs. The app only launches the unmodified `claude.exe`, which keeps it
   inside the usage policy. One deletion besides: the right-click Delete of a session removes its transcript
   `<id>.jsonl` and its `<id>\` folder (`SessionCatalog.Delete`), only after a confirm and never while a claude process

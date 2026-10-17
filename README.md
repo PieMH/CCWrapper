@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-295%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-299%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -165,6 +165,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **It reads only files Claude Code already writes:** each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts, session status files, file-history backups, and plugin and skill lists.
 - **It never reads** `.credentials.json` and never calls Anthropic APIs. Plugin and MCP changes you make in Plugins & connectors are done by Claude Code's own `claude plugin` and `claude mcp` commands.
 - **It edits Claude Code's files only from the Settings window, when you click Save:** the `settings.json` and `CLAUDE.md` files you changed there. A file that changed on disk since the window read it is not overwritten, and the previous version of each saved file is kept in `%LOCALAPPDATA%\CCWrapper\backups`.
+- **It deletes a session's files only when you pick Delete on its right-click menu and confirm:** the transcript `projects\<folder>\<id>.jsonl` and its `<id>\` folder, for good. A session that is open anywhere is refused, and nothing outside those two paths is touched.
 - **It edits `.claude.json` only when you flip a server's folder switch** in Plugins & connectors, the one change there that no `claude` command makes. Like Claude Code itself, it takes the file's lock, reads the file as it is at that moment, changes that folder's list of servers turned off and writes it back; the previous version goes to the same backups folder.
 - **Check health** in Plugins & connectors runs `claude mcp list`, which connects to every MCP server (and starts the local ones) to see if it answers, as `/mcp` does.
 - **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, settings backups, `app.json` (CCWrapper's own settings), and the live status data described next.

@@ -88,8 +88,11 @@ public static class SessionCatalog
             var projects = Path.TrimEndingDirectorySeparator(Path.GetFullPath(entry.Account.Paths.Projects));
             var file = Path.GetFullPath(entry.Path);
             var dir = Path.GetDirectoryName(file);
-            if (entry.Id.Length == 0 || entry.Id != Path.GetFileName(entry.Id) || Path.GetFileName(file) != entry.Id + ".jsonl"
-                || dir is null || !string.Equals(Path.GetDirectoryName(dir), projects, StringComparison.OrdinalIgnoreCase))
+            // An all-dots id would make the folder "." or ".."; a trailing dot or space is dropped by Windows and aliases another id.
+            if (entry.Id.Length == 0 || entry.Id.All(c => c == '.') || entry.Id[^1] is '.' or ' '
+                || entry.Id != Path.GetFileName(entry.Id) || Path.GetFileName(file) != entry.Id + ".jsonl"
+                || dir is null || !string.Equals(Path.GetDirectoryName(dir), projects, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Path.GetFullPath(Path.Combine(dir, entry.Id)), Path.Combine(dir, entry.Id), StringComparison.OrdinalIgnoreCase))
                 return "The transcript is not in this account's projects folder: nothing was deleted.";
             if (Running(entry.Account).Any(r => r.SessionId == entry.Id)) return "A claude process has this session open: close it first.";
             File.Delete(file);

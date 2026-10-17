@@ -41,7 +41,7 @@
                 <TextBlock x:Name="CtxText" />
             </StackPanel>
             <Border Style="{StaticResource Sep}" />
-            <StackPanel x:Name="UsageGroup" Orientation="Horizontal">
+            <StackPanel x:Name="UsageGroup" Orientation="Horizontal" ToolTipOpening="OnUsageTip">
                 <TextBlock Text="5h" Style="{StaticResource Dim}" />
                 <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
                 <TextBlock x:Name="FiveHourText" MinWidth="28" />
