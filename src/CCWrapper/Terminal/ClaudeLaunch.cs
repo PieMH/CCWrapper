@@ -65,10 +65,30 @@ public static class ClaudeLaunch
 
         relayExe ??= Path.Combine(AppContext.BaseDirectory, "CCWrapper.StatusRelay.exe");
         if (!File.Exists(relayExe)) return null;
-        // Unquoted with forward slashes so Git Bash and PowerShell both run it.
-        // shortcut: breaks if the install path has spaces; switch to the 8.3 short path if that ever happens.
+        // Unquoted with forward slashes so Git Bash and PowerShell both run it. Any character outside the safe set (a space,
+        // ' & ( ) ; $ ` or a non-ASCII letter) would split or rewrite the command, so use the 8.3 short path; with 8.3 names
+        // off for that volume, or a short name that still has such a character, the session starts without the relay.
+        if (!IsShellSafe(relayExe))
+        {
+            relayExe = ShortPath(relayExe);
+            if (relayExe is null) return null;
+        }
         return JsonSerializer.Serialize(new { statusLine = new { type = "command", command = relayExe.Replace('\\', '/') } });
     }
+
+    internal static bool IsShellSafe(string path) =>
+        path.All(c => c is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or ':' or '\\' or '/' or '.' or '_' or '~' or '-');
+
+    static string? ShortPath(string path)
+    {
+        var buffer = new char[32768];
+        var n = GetShortPathNameW(path, buffer, buffer.Length);
+        var short83 = n > 0 && n < buffer.Length ? new string(buffer, 0, (int)n) : null;
+        return short83 is not null && IsShellSafe(short83) ? short83 : null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern uint GetShortPathNameW(string path, char[] buffer, int size);
 
     // A raw match survives comments and half-written files; a false positive only skips the relay.
     static bool HasStatusLine(string settingsPath)

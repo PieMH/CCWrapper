@@ -23,6 +23,7 @@ public sealed class ThemeLoadTests
                 _ = new NewSessionDialog();
                 _ = new ExtensionsWindow(new Account("c", @"C:\none\.claude-c", @"C:\none\.claude-c\.claude.json", "t@example.com"), null);
                 _ = new SettingsWindow(new Account("c", @"C:\none\.claude-c", @"C:\none\.claude-c\.claude.json", "t@example.com"), null);
+                _ = new AboutWindow();
                 _ = new HookDialog(["PreToolUse"], "PreToolUse", "Bash", "echo hi", 5);
                 _ = new PluginOptionsDialog("p",
                 [

@@ -75,6 +75,33 @@ public sealed class ClaudeLaunchTests : IDisposable
         Assert.Equal([exe], Directory.GetFiles(_dir, "*", SearchOption.AllDirectories));
     }
 
+    [Theory]
+    [InlineData(@"C:\Users\jane\AppData\Local\PieMH.CCWrapper\current\a-b_c~1.exe", true)]
+    [InlineData(@"C:\Users\John Smith\r.exe", false)]
+    [InlineData(@"C:\Users\O'Brien\r.exe", false)]
+    [InlineData(@"C:\Users\A&B\r.exe", false)]
+    [InlineData(@"C:\Users\a(1)\r.exe", false)]
+    [InlineData(@"C:\Users\a;b$c`d\r.exe", false)]
+    [InlineData("C:\\Users\\Jos\u00e9\\r.exe", false)]
+    public void IsShellSafe_allows_only_plain_path_characters(string path, bool expected) =>
+        Assert.Equal(expected, ClaudeLaunch.IsShellSafe(path));
+
+    [Fact]
+    public void RelaySettings_with_a_space_in_the_path_uses_the_short_path_or_skips_the_relay()
+    {
+        var exe = Path.Combine(_dir, "John Smith", "CCWrapper.StatusRelay.exe");
+        Directory.CreateDirectory(Path.GetDirectoryName(exe)!);
+        File.WriteAllText(exe, "same file");
+
+        var json = ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), exe);
+
+        if (json is null) return; // 8.3 names are off on this volume
+        using var doc = JsonDocument.Parse(json);
+        var command = doc.RootElement.GetProperty("statusLine").GetProperty("command").GetString()!;
+        Assert.DoesNotContain(' ', command);
+        Assert.Equal("same file", File.ReadAllText(command));
+    }
+
     [Fact]
     public void RelaySettings_skipped_when_the_relay_exe_is_missing() =>
         Assert.Null(ClaudeLaunch.RelaySettings(AccountC(), Path.Combine(_dir, "proj"), Path.Combine(_dir, "gone.exe")));

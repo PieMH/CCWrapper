@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <Version>0.1.0</Version>
+    <!-- Program.Main starts Velopack first; the Main that App.xaml generates stays unused. -->
+    <StartupObject>CCWrapper.Program</StartupObject>
     <!-- Embedded in the exe: Explorer, Start, taskbar; WPF windows without an Icon take it from the exe too. -->
     <ApplicationIcon>CCWrapper.ico</ApplicationIcon>
   </PropertyGroup>
@@ -14,10 +17,12 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
     <PackageReference Include="Porta.Pty" Version="2.2.3" />
     <PackageReference Include="DiffPlex.Wpf" Version="1.9.1" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
   </ItemGroup>
 
   <ItemGroup>
     <None Update="Terminal\wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\LICENSE;..\..\THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
     <Resource Include="logo.png" /> <!-- the logo inside the app, 256 px: WPF shows an .ico through one of its small frames -->
     <InternalsVisibleTo Include="CCWrapper.Tests" />
   </ItemGroup>

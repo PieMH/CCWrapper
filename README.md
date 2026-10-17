@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-270%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-289%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -45,6 +45,7 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
   - Titles follow Claude Code: the name given at start or with `/rename`, else its own title for the chat. A session's `/color` tints its title.
   - Click a session to open it: if it already has a tab, that tab comes forward; otherwise it is resumed in its original folder in a new tab. Nothing open is closed.
   - A session open in another terminal gets a read-only tab that says where it is open, e.g. "PowerShell (pid 51708, since 15:07)". **Resume here** offers to close it there (the conversation is saved) and turns the tab into a live one; **Continue here as a copy** forks it instead.
+- **About:** version, the update switch and links to the policies (privacy, terms, code signing, security, third-party notices). When an update is downloaded, a chip "Update X ready" in the bottom bar restarts into it.
 - **Settings:** a window for the account's `settings.json` and the project folder's shared and local ones, without opening the files.
   - **General:** model, effort (also per model), output style, language, theme, time format, update channel, commit trailer and claude.ai connectors.
   - **Permissions:** the default mode and the allow, ask and deny rules. **Hooks** and **Environment** variables can be added, edited and removed; values that look like keys or tokens stay hidden until clicked.
@@ -96,8 +97,8 @@ Confirmations, warnings and errors use the app's dark theme too.
 ## Requirements
 
 - **Windows 10 (1809 or later) or Windows 11.** Developed and tested on Windows 11.
-- **[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)** to build.
-- **WebView2 Runtime.** It's already installed on Windows 11; otherwise get it from [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/).
+- **No .NET needed to run it:** the installer's build carries its own runtime. Building from source needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
+- **WebView2 Runtime.** Already part of Windows 11; the installer adds it if it is missing.
 - **Claude Code, native install**, so that `claude.exe` is on your `PATH`:
   ```powershell
   irm https://claude.ai/install.ps1 | iex
@@ -106,7 +107,23 @@ Confirmations, warnings and errors use the app's dark theme too.
 
 ## Install
 
-There's no prebuilt release yet, so build it from source:
+Download **`PieMH.CCWrapper-win-Setup.exe`** from the [Releases page](https://github.com/PieMH/CCWrapper/releases/latest) and run it.
+
+- It installs for your user only (`%LOCALAPPDATA%\PieMH.CCWrapper`), with **no admin rights**, adds a Start menu shortcut and starts CCWrapper. It installs the WebView2 Runtime too if Windows lacks it.
+- Updates come with it: an installed copy checks GitHub for a new version, but only after you said yes on first start, and installs it when you quit or when you click the "Update ready" chip in the bottom bar. You can turn the check off in **About** (the sidebar).
+- While releases are unsigned or new, Windows SmartScreen may say "Windows protected your PC". Click **More info**, then **Run anyway**. See [Code signing policy](CODE_SIGNING_POLICY.md).
+- A zipped copy is there too (`PieMH.CCWrapper-win-Portable.zip`), if you prefer no installer.
+
+**Verify a download.** Each release lists `SHA256SUMS.txt`, and every file carries a build attestation made by GitHub Actions:
+
+```powershell
+Get-FileHash .\PieMH.CCWrapper-win-Setup.exe -Algorithm SHA256   # compare with SHA256SUMS.txt
+gh attestation verify .\PieMH.CCWrapper-win-Setup.exe -R PieMH/CCWrapper
+```
+
+**Uninstall** in Windows **Settings → Apps → Installed apps → CCWrapper**. That leaves your data in `%LOCALAPPDATA%\CCWrapper` (settings backups, pasted images, browser profiles, `app.json`); delete that folder to remove it. Claude Code's own files are never touched.
+
+### Build from source
 
 ```powershell
 git clone https://github.com/PieMH/CCWrapper.git
@@ -115,10 +132,9 @@ dotnet build CCWrapper.sln -c Release
 .\src\CCWrapper\bin\Release\net10.0-windows\CCWrapper.exe
 ```
 
-> [!IMPORTANT]
-> Keep CCWrapper in a folder **without spaces** in its path (for example `C:\Tools\CCWrapper`, not `C:\Program Files\...`). The status-line relay is called by path, and a path with spaces breaks it.
+`scripts\pack.ps1 -Version 1.2.3` builds an installer like the released one into `artifacts\` (it needs the Visual Studio C++ build tools, for the native status relay). A build from source never checks for updates.
 
-Optional: copy the `net10.0-windows` folder wherever you like, and pin `CCWrapper.exe` to the taskbar or Start menu. Make one shortcut per account with `--account <id>` added to the target.
+Make one shortcut per account with `--account <id>` added to the target.
 
 ## Accounts
 
@@ -163,9 +179,9 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **It edits Claude Code's files only from the Settings window, when you click Save:** the `settings.json` and `CLAUDE.md` files you changed there. A file that changed on disk since the window read it is not overwritten, and the previous version of each saved file is kept in `%LOCALAPPDATA%\CCWrapper\backups`.
 - **It edits `.claude.json` only when you flip a server's folder switch** in Plugins & connectors, the one change there that no `claude` command makes. Like Claude Code itself, it takes the file's lock, reads the file as it is at that moment, changes that folder's list of servers turned off and writes it back; the previous version goes to the same backups folder.
 - **Check health** in Plugins & connectors runs `claude mcp list`, which connects to every MCP server (and starts the local ones) to see if it answers, as `/mcp` does.
-- **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, settings backups, and the live status data described next.
+- **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, settings backups, its own `app.json` (your update choice) and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
-- **It makes no network calls of its own.** The Browser panel loads only what you open in it.
+- **Its only network call is the update check,** and only in an installed copy, only after you said yes on first start; the switch is in **About**. It asks GitHub for the latest release and downloads it; GitHub sees your IP address and the app version, nothing else is sent. The Browser panel loads only what you open in it. Details in [PRIVACY.md](PRIVACY.md).
 - **Plan usage is checked with Claude Code's own `/usage`:** a hidden `claude "/usage"` (MCP servers off) runs in the folder of the account's most recent session, and Claude Code saves the result in `.claude.json`. Each check takes a few seconds, adds `/usage` to that folder's prompt history (Up arrow), and runs your startup hooks like any `claude` start, so automatic checks are skipped when the last one is under 10 minutes old. A check that can't finish in 30 seconds (not logged in, a trust question) is stopped and the last numbers stay.
 - Every session is the unmodified `claude.exe`, run under your own login.
 
@@ -175,7 +191,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **Files panel** only sees edits made with Claude's Edit and Write tools, not files changed by shell commands.
 - **Plan usage between checks** is as fresh as the last hidden `/usage`. On Pro and Max the live status line also updates it after each reply in a session open in the app; Team accounts get no live updates.
 - **Memory:** each open session is a full `claude.exe` (about 200–300 MB), so close the ones you don't need.
-- **Antivirus:** the exe is unsigned. If your antivirus flags `CCWrapper.exe`, add an exception for that one file.
+- **Antivirus and SmartScreen:** releases are unsigned until the [code signing](CODE_SIGNING_POLICY.md) is approved. If your antivirus flags `CCWrapper.exe`, check the download as described under Install, then add an exception for that one file.
 
 ## How it was made
 
@@ -199,7 +215,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 270 tests on synthetic fixtures.
+- xUnit, with 289 tests on synthetic fixtures.
 
 ## Development
 
@@ -218,12 +234,17 @@ src/CCWrapper/             WPF app (Theme.xaml: colors and styles, App.xaml: Flu
 src/CCWrapper.StatusRelay/ silent statusLine relay → %LOCALAPPDATA%\CCWrapper\live
 tests/CCWrapper.Tests/     xUnit tests (one builds every view with the theme loaded)
 docs/                      the screenshot
+scripts/pack.ps1           builds the Velopack installer (CI: .github/workflows)
 ```
 
 **Contributing.** Issues and pull requests are welcome; `main` only takes pull requests.
 - [`CLAUDE.md`](CLAUDE.md) gives Claude Code (and you) the project's rules: what the app must never do, how to build and verify, and why.
 - [`.claude/settings.json`](.claude/settings.json) is the shared project setup: common build, test and read-only git commands need no approval, and `.credentials.json` files, pushes to `main` and force-pushes are denied.
 - For your own additions, copy [`.claude/settings.local.example.json`](.claude/settings.local.example.json) to `.claude/settings.local.json` (git-ignored) and edit it.
+
+## Policies
+
+[Privacy](PRIVACY.md) · [Terms](TERMS.md) · [Code signing policy](CODE_SIGNING_POLICY.md) · [Security](SECURITY.md) · [Third-party notices](THIRD-PARTY-NOTICES.txt)
 
 ## License
 

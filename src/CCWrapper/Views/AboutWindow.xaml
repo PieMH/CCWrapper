@@ -1,0 +1,29 @@
+<Window x:Class="CCWrapper.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About CCWrapper" Width="460" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Background="{StaticResource Bg}" Foreground="{StaticResource Text}">
+    <StackPanel Margin="24">
+        <DockPanel>
+            <Image DockPanel.Dock="Left" Source="/logo.png" Width="48" Height="48" RenderOptions.BitmapScalingMode="HighQuality" Margin="0,0,16,0" />
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="CCWrapper" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock x:Name="VersionText" Style="{StaticResource Dim}" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border Style="{StaticResource Tile}" Padding="14,10" Margin="0,20,0,0">
+            <StackPanel>
+                <DockPanel>
+                    <ToggleButton x:Name="UpdateSwitch" DockPanel.Dock="Right" Style="{StaticResource Switch}" Margin="12,0,0,0" VerticalAlignment="Center"
+                                  AutomationProperties.Name="Check GitHub for new versions" />
+                    <TextBlock Text="Check GitHub for new versions" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock x:Name="UpdateNote" Style="{StaticResource Dim}" TextWrapping="Wrap" TextTrimming="None" Margin="0,6,0,0" />
+            </StackPanel>
+        </Border>
+
+        <TextBlock Text="Documents" Style="{StaticResource SmallLabel}" Margin="4,18,0,4" />
+        <StackPanel x:Name="Links" />
+    </StackPanel>
+</Window>
