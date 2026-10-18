@@ -128,6 +128,71 @@ public sealed class PanelLogicTests
         Assert.NotNull(BrowserPanel.NotAWebPage(null));
     }
 
+    [Fact]
+    public void Browser_new_tab_and_navigate_refuse_a_non_web_scheme()
+    {
+        Assert.Null(BrowserPanel.OpenRefusal("new_tab", BrowserPanel.NormalizeUrl("example.com")));
+        Assert.Null(BrowserPanel.OpenRefusal("new_tab", "about:blank"));
+        Assert.Equal("Refused file:///C:/x.txt: the new_tab tool opens only http, https, blob, about:blank and data addresses.",
+            BrowserPanel.OpenRefusal("new_tab", BrowserPanel.NormalizeUrl("file:///C:/x.txt")));
+        Assert.StartsWith("Refused edge://settings: the navigate tool", BrowserPanel.OpenRefusal("navigate", "edge://settings"));
+    }
+
+    [Fact]
+    public void Browser_tab_list_hides_the_title_and_url_of_a_page_that_is_not_a_web_address() =>
+        Assert.Equal("Tab 1: Example - https://example.com/\nTab 3 (front): (not a web page)\nTab 4: (not a web page)\nTab 5: Two - data:text/html,x",
+            BrowserPanel.DescribeTabs([(1, "Example", "https://example.com/", false), (3, "secret.txt", "file:///C:/secret.txt", true),
+                (4, null, null, false), (5, "Two", "data:text/html,x", false)]));
+
+    [Fact]
+    public void Browser_tab_ids_count_up_never_reused_and_the_new_tab_is_in_front()
+    {
+        var tabs = new BrowserTabs<string>();
+        Assert.Equal(0, tabs.Front);
+        Assert.Null(tabs.FrontTab);
+        Assert.Equal([1, 2, 3], new[] { tabs.Add("a"), tabs.Add("b"), tabs.Add("c") });
+        Assert.Equal(("c", 3), (tabs.FrontTab, tabs.Front));
+        Assert.True(tabs.Switch(1));
+        Assert.False(tabs.Switch(9));
+        Assert.Equal(1, tabs.Front);
+        Assert.True(tabs.Remove(3));
+        Assert.False(tabs.Remove(3));
+        Assert.Equal(4, tabs.Add("d"));
+        Assert.Equal(["a", "b", "d"], tabs.All.Select(t => t.Tab));
+        Assert.Null(tabs[3]);
+    }
+
+    [Fact]
+    public void Browser_closing_the_front_tab_brings_its_right_neighbor_else_its_left_and_the_last_leaves_none()
+    {
+        var tabs = new BrowserTabs<string>();
+        tabs.Add("a"); tabs.Add("b"); tabs.Add("c");
+        tabs.Switch(2);
+        tabs.Remove(2);
+        Assert.Equal(3, tabs.Front);
+        tabs.Remove(3);
+        Assert.Equal(1, tabs.Front);
+        tabs.Add("d");
+        tabs.Switch(1);
+        tabs.Remove(4); // not the front one: the front stays
+        Assert.Equal(1, tabs.Front);
+        tabs.Remove(1);
+        Assert.Equal((0, 0), (tabs.Front, tabs.All.Count)); // the panel then opens a blank tab: id 5, not 1
+        Assert.Equal(5, tabs.Add("e"));
+    }
+
+    [Fact]
+    public void Browser_opens_at_most_twenty_tabs()
+    {
+        var tabs = new BrowserTabs<string>();
+        for (var i = 1; i <= 20; i++) Assert.Equal(i, tabs.Add("t"));
+        Assert.True(tabs.Full);
+        Assert.Equal(0, tabs.Add("over"));
+        Assert.Equal((20, 20), (tabs.All.Count, tabs.Front));
+        tabs.Remove(5);
+        Assert.Equal(21, tabs.Add("again"));
+    }
+
     [Theory]
     [InlineData("12", "[data-ccw-ref=\"12\"]")]
     [InlineData("#login", "#login")]

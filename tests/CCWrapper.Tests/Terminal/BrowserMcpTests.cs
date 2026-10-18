@@ -35,6 +35,11 @@ public sealed class BrowserMcpTests
         public Task<byte[]> ScreenshotAsync(CancellationToken ct) => Do("screenshot", new byte[] { 0x89, 0x50, 0x4e, 0x47 });
         public Task<string> EvaluateAsync(string expression, CancellationToken ct) => Do($"evaluate {expression}", "\"Title\"");
         public Task<string> DevToolsAsync(string method, string paramsJson, CancellationToken ct) => Do($"devtools {method} {paramsJson}", "{}");
+        public Task<string> TabsAsync(CancellationToken ct) => Do("tabs", "Tab 1 (front): T - https://example.com/");
+        public Task<string> NewTabAsync(string url, CancellationToken ct) => Do($"new_tab {url}", "opened");
+        public Task<string> SwitchTabAsync(int id, CancellationToken ct) => id == 99 ? NoTab(id) : Do($"switch_tab {id}", "switched");
+        public Task<string> CloseTabAsync(int id, CancellationToken ct) => id == 99 ? NoTab(id) : Do($"close_tab {id}", "closed");
+        static Task<string> NoTab(int id) => Task.FromException<string>(new InvalidOperationException($"There is no tab {id}"));
     }
 
     readonly FakeDriver _driver = new();
@@ -79,10 +84,11 @@ public sealed class BrowserMcpTests
     }
 
     [Fact]
-    public async Task Tools_list_has_seven_tools_with_object_schemas()
+    public async Task Tools_list_has_eleven_tools_with_object_schemas()
     {
         var tools = Parse(await Mcp().HandleAsync("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}"""))["result"]!["tools"]!.AsArray();
-        Assert.Equal(["navigate", "snapshot", "click", "type", "screenshot", "evaluate", "devtools"], tools.Select(t => t!["name"]!.GetValue<string>()));
+        Assert.Equal(["navigate", "snapshot", "click", "type", "screenshot", "evaluate", "devtools", "tabs", "new_tab", "switch_tab", "close_tab"],
+            tools.Select(t => t!["name"]!.GetValue<string>()));
         Assert.All(tools, t =>
         {
             Assert.False(string.IsNullOrWhiteSpace(t!["description"]!.GetValue<string>()));
@@ -100,6 +106,11 @@ public sealed class BrowserMcpTests
     [InlineData("evaluate", """{"expression":"document.title"}""", "evaluate document.title", "\"Title\"")]
     [InlineData("devtools", """{"method":"DOM.getDocument"}""", "devtools DOM.getDocument {}", "{}")]
     [InlineData("devtools", """{"method":"Page.reload","params":{"ignoreCache":true}}""", """devtools Page.reload {"ignoreCache":true}""", "{}")]
+    [InlineData("tabs", "{}", "tabs", "Tab 1 (front): T - https://example.com/")]
+    [InlineData("new_tab", """{"url":"example.com"}""", "new_tab example.com", "opened")]
+    [InlineData("new_tab", "{}", "new_tab about:blank", "opened")]
+    [InlineData("switch_tab", """{"id":2}""", "switch_tab 2", "switched")]
+    [InlineData("close_tab", """{"id":3}""", "close_tab 3", "closed")]
     public async Task Tools_call_passes_arguments_and_returns_text(string tool, string args, string expectedCall, string expectedText)
     {
         var r = Parse(await Mcp().HandleAsync(Call(4, tool, args)))["result"]!;
@@ -122,6 +133,25 @@ public sealed class BrowserMcpTests
         var r = Parse(await Mcp().HandleAsync(Call(1, "click", """{"target":"#boom"}""")))["result"]!;
         Assert.True(r["isError"]!.GetValue<bool>());
         Assert.Equal("No element matches #boom", r["content"]![0]!["text"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData("switch_tab")]
+    [InlineData("close_tab")]
+    public async Task An_unknown_tab_id_is_a_tool_error(string tool)
+    {
+        var r = Parse(await Mcp().HandleAsync(Call(1, tool, """{"id":99}""")))["result"]!;
+        Assert.True(r["isError"]!.GetValue<bool>());
+        Assert.Equal("There is no tab 99", r["content"]![0]!["text"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Tab_tools_are_off_with_the_switch_too()
+    {
+        _enabled = false;
+        foreach (var (tool, args) in new[] { ("tabs", "{}"), ("new_tab", "{}"), ("switch_tab", """{"id":1}"""), ("close_tab", """{"id":1}""") })
+            Assert.Equal(BrowserMcp.Disabled, Parse(await Mcp().HandleAsync(Call(1, tool, args)))["result"]!["content"]![0]!["text"]!.GetValue<string>());
+        Assert.Empty(_driver.Calls);
     }
 
     [Fact]
@@ -214,6 +244,11 @@ public sealed class BrowserMcpTests
     [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"click","arguments":{"target":true}}}""", -32602)]
     [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"snapshot","arguments":"x"}}""", -32602)]
     [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"devtools","arguments":{"method":"A.b","params":[1]}}}""", -32602)]
+    [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"switch_tab","arguments":{}}}""", -32602)]
+    [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"switch_tab","arguments":{"id":"2"}}}""", -32602)]
+    [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"close_tab","arguments":{"id":1.5}}}""", -32602)]
+    [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"close_tab","arguments":{"id":null}}}""", -32602)]
+    [InlineData("""{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"new_tab","arguments":{"url":true}}}""", -32602)]
     public async Task Bad_messages_get_json_rpc_errors(string line, int code)
     {
         var r = Parse(await Mcp().HandleAsync(line));
