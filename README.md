@@ -115,6 +115,7 @@ Download **`PieMH.CCWrapper-win-Setup.exe`** from the [Releases page](https://gi
 
 - It installs for your user only (`%LOCALAPPDATA%\PieMH.CCWrapper`), with **no admin rights**, adds a Start menu shortcut and starts CCWrapper. It installs the WebView2 Runtime too if Windows lacks it.
 - Updates come with it: an installed copy checks GitHub for a new version, but only after you said yes on first start, and installs it when you quit or when you click the "Update ready" chip in the bottom bar. You can turn the check off in **About** (the sidebar).
+- **Code signing:** free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org). The project has applied; until SignPath approves it, releases are unsigned.
 - While releases are unsigned or new, Windows SmartScreen may say "Windows protected your PC". Click **More info**, then **Run anyway**. See [Code signing policy](CODE_SIGNING_POLICY.md).
 - A zipped copy is there too (`PieMH.CCWrapper-win-Portable.zip`), if you prefer no installer.
 
