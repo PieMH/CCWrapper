@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CCWrapper.Core;
 
 namespace CCWrapper.Terminal;
@@ -22,9 +23,12 @@ public static class ClaudeLaunch
         (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries)
             .Select(d => Path.Combine(d.Trim().Trim('"'), "claude.exe")).FirstOrDefault(File.Exists) ?? "claude.exe";
 
-    public static List<string> Args(LaunchOptions o, string sessionId, string? relaySettings)
+    /// <param name="browserMcp">From <see cref="BrowserMcpConfig"/>: adds the Browser tool and the line that tells Claude to use it.</param>
+    public static List<string> Args(LaunchOptions o, string sessionId, string? relaySettings, string? browserMcp = null)
     {
         List<string> args = o.ResumeId is null ? ["--session-id", sessionId] : o.Fork ? ["--resume", o.ResumeId, "--fork-session"] : ["--resume", o.ResumeId];
+        // --mcp-config takes any number of values: a flag must follow it, or it would swallow the next argument.
+        if (browserMcp is not null) args.AddRange(["--mcp-config", browserMcp, "--append-system-prompt", BrowserPrompt]);
         void Add(string flag, string? value) { if (!string.IsNullOrWhiteSpace(value)) args.AddRange([flag, value]); }
         Add("--model", o.Model);
         Add("--effort", o.Effort);
@@ -32,6 +36,25 @@ public static class ClaudeLaunch
         Add("-n", o.Name);
         Add("--settings", relaySettings);
         return args;
+    }
+
+    public const string BrowserPrompt = "This session runs inside CCWrapper. To open, read or use web pages, use the mcp__ccwrapper-browser__* tools " +
+        "(CCWrapper's Browser panel) instead of launching or driving another browser, unless the user names another browser.";
+
+    /// <summary>The inline <c>--mcp-config</c> JSON that gives the tab the <c>ccwrapper-browser</c> MCP server: the relay exe
+    /// in <c>--browser</c> mode, bridged to this window's <see cref="BrowserPipe"/>. Null when switched off in
+    /// <see cref="AppPrefs"/> or when the relay exe is missing. Claude Code starts the command itself, without a shell, so
+    /// the full path is safe with spaces.</summary>
+    public static string? BrowserMcpConfig(string? relayExe = null, string? prefsPath = null)
+    {
+        if (!AppPrefs.ReadBrowserTool(prefsPath)) return null;
+        relayExe ??= Path.Combine(AppContext.BaseDirectory, "CCWrapper.StatusRelay.exe");
+        if (!File.Exists(relayExe)) return null;
+        var server = new JsonObject
+        {
+            ["type"] = "stdio", ["command"] = relayExe, ["args"] = new JsonArray("--browser", BrowserPipe.NameFor(Environment.ProcessId)),
+        };
+        return new JsonObject { ["mcpServers"] = new JsonObject { ["ccwrapper-browser"] = server } }.ToJsonString();
     }
 
     // Set by a Claude Code session that started this app; a tab must not inherit them (the child would think it is nested in it).

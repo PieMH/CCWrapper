@@ -1,10 +1,14 @@
+using System.Diagnostics;
 using System.IO;
+using System.Text;
+using System.Text.Json.Nodes;
 using System.Windows;
 using CCWrapper.Core;
 
 namespace CCWrapper.Terminal;
 
-/// <summary><c>CCWrapper.exe --smoke</c>: round-trips <c>cmd /c echo</c> through ConPTY into xterm.js, and reads it back plain and styled.</summary>
+/// <summary><c>CCWrapper.exe --smoke</c>: round-trips <c>cmd /c echo</c> through ConPTY into xterm.js, and reads it back plain and styled;
+/// then talks MCP to a <see cref="BrowserPipe"/> through the relay exe in <c>--browser</c> mode, as a Claude Code tab does.</summary>
 public static class Smoke
 {
     /// <summary>Returns the process exit code: 0 on success.</summary>
@@ -12,7 +16,7 @@ public static class Smoke
     {
         try
         {
-            return await EchoAsync();
+            return await EchoAsync() == 0 && await BrowserAsync() ? 0 : 1;
         }
         catch (Exception ex)
         {
@@ -44,5 +48,52 @@ public static class Smoke
         while (!((await host.ReadTextAsync(session))?.Split('\n').Any(line => line.Trim() == "ccw-smoke dim") ?? false))
             await Task.Delay(100);
         return (await host.ReadTailAsync(session, 5, styled: true))?.Contains("ccw-smoke \x1b[2mdim") == true;
+    }
+
+    static async Task<bool> BrowserAsync()
+    {
+        var name = BrowserPipe.NameFor(Environment.ProcessId);
+        using var pipe = new BrowserPipe(name, new BrowserMcp(new SmokeDriver(), () => true));
+        using var relay = Process.Start(new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "CCWrapper.StatusRelay.exe"), ["--browser", name])
+        {
+            RedirectStandardInput = true, RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true,
+            StandardInputEncoding = new UTF8Encoding(false), StandardOutputEncoding = Encoding.UTF8,
+        })!;
+        try
+        {
+            var talk = TalkAsync(relay);
+            if (await Task.WhenAny(talk, Task.Delay(TimeSpan.FromSeconds(10))) == talk && await talk) return true;
+            Console.Error.WriteLine("smoke: the Browser MCP round trip through the relay failed");
+            return false;
+        }
+        finally { try { relay.Kill(); } catch (Exception) { } }
+    }
+
+    static async Task<bool> TalkAsync(Process relay)
+    {
+        async Task<JsonNode?> Ask(string request)
+        {
+            await relay.StandardInput.WriteLineAsync(request);
+            return JsonNode.Parse(await relay.StandardOutput.ReadLineAsync() ?? "null");
+        }
+        var init = await Ask("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}""");
+        await relay.StandardInput.WriteLineAsync("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
+        var list = await Ask("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
+        var call = await Ask("""{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"snapshot","arguments":{}}}""");
+        return init?["result"]?["serverInfo"]?["name"]?.GetValue<string>() == "ccwrapper-browser"
+            && list?["result"]?["tools"]?.AsArray().Count == 7
+            && call?["id"]?.GetValue<int>() == 3
+            && call?["result"]?["content"]?[0]?["text"]?.GetValue<string>() == "smoke-snapshot";
+    }
+
+    sealed class SmokeDriver : IBrowserDriver
+    {
+        public Task<string> SnapshotAsync(CancellationToken ct) => Task.FromResult("smoke-snapshot");
+        public Task<string> NavigateAsync(string url, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> ClickAsync(string target, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> TypeAsync(string target, string text, bool submit, CancellationToken ct) => throw new NotSupportedException();
+        public Task<byte[]> ScreenshotAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> EvaluateAsync(string expression, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> DevToolsAsync(string method, string paramsJson, CancellationToken ct) => throw new NotSupportedException();
     }
 }

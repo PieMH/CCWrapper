@@ -42,6 +42,29 @@ public sealed class UpdateTests : IDisposable
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("{ nope")]
+    [InlineData("""{"browserTool":"no"}""")]
+    public void Browser_tool_is_on_unless_switched_off(string? content)
+    {
+        if (content is not null) { Directory.CreateDirectory(_dir); File.WriteAllText(File_, content); }
+        Assert.True(AppPrefs.ReadBrowserTool(File_));
+    }
+
+    [Fact]
+    public void Browser_tool_write_keeps_other_keys()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(File_, """{"updateCheck":true,"compact":{"x":1}}""");
+        AppPrefs.WriteBrowserTool(false, File_);
+        Assert.False(AppPrefs.ReadBrowserTool(File_));
+        Assert.True(AppPrefs.ReadUpdateCheck(File_));
+        Assert.Contains("\"compact\":{\"x\":1}", File.ReadAllText(File_));
+        AppPrefs.WriteBrowserTool(true, File_);
+        Assert.True(AppPrefs.ReadBrowserTool(File_));
+    }
+
+    [Theory]
     [InlineData("0.1.0", false)]
     [InlineData("1.2.3", false)]
     [InlineData("0.2.0-beta.1", true)]
