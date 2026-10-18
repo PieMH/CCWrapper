@@ -98,18 +98,35 @@ public sealed class PanelLogicTests
     [InlineData("https://example.com", true)]
     [InlineData("HTTP://localhost:3000", true)]
     [InlineData("about:blank", true)]
+    [InlineData("ABOUT:Blank#x", true)]
+    [InlineData("about:srcdoc", false)]
+    [InlineData("about:blank?x", false)]
+    [InlineData("about:", false)]
+    [InlineData("about:version", false)]
     [InlineData("data:text/html,<h1>x</h1>", true)]
+    [InlineData("blob:https://example.com/1", true)]
     [InlineData("file:///C:/Users/x/.claude/.credentials.json", false)]
     [InlineData("FILE:///C:/x", false)]
     [InlineData("javascript:alert(1)", false)]
     [InlineData("view-source:https://example.com", false)]
     [InlineData("edge://settings", false)]
     [InlineData("chrome-extension://abc/x.html", false)]
-    [InlineData("blob:https://example.com/1", false)]
     [InlineData("", false)]
     [InlineData("example.com", false)] // not normalized yet: no scheme
     public void Browser_lets_pages_and_Claude_open_only_web_schemes(string url, bool allowed) =>
         Assert.Equal(allowed, BrowserPanel.SchemeAllowed(url));
+
+    [Fact]
+    public void Browser_tools_refuse_a_page_that_is_not_a_web_address()
+    {
+        Assert.Null(BrowserPanel.NotAWebPage("https://example.com/"));
+        Assert.Equal("The Browser panel shows a page that is not a web address (file:); Claude's tools work only on web pages. Navigate to a web address first.",
+            BrowserPanel.NotAWebPage("file:///C:/x.txt"));
+        Assert.Contains("(edge:)", BrowserPanel.NotAWebPage("edge://settings"));
+        Assert.Contains("(about:)", BrowserPanel.NotAWebPage("about:version"));
+        Assert.NotNull(BrowserPanel.NotAWebPage(""));
+        Assert.NotNull(BrowserPanel.NotAWebPage(null));
+    }
 
     [Theory]
     [InlineData("12", "[data-ccw-ref=\"12\"]")]

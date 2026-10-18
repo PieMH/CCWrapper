@@ -162,6 +162,7 @@ public sealed class BrowserMcpTests
     [InlineData("Network.clearBrowserCookies")]
     [InlineData("Network.loadNetworkResource")]
     [InlineData("DOM.setFileInputFiles")]
+    [InlineData("Input.dispatchKeyEvent")] // Ctrl+V or commands:["paste"] would paste the system clipboard
     [InlineData("Input.dispatchDragEvent")]
     [InlineData("Page.setDownloadBehavior")]
     [InlineData("Page.addScriptToEvaluateOnNewDocument")]

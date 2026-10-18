@@ -50,16 +50,16 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
     readonly SemaphoreSlim _queue = new(1, 1);
     readonly TimeSpan _limit = callLimit ?? TimeSpan.FromSeconds(60);
 
-    const string DevToolsLimits = "devtools reaches only the Accessibility, Animation, CSS, DOM, DOMSnapshot, Emulation, Input, Log, Overlay, Page, " +
+    const string DevToolsLimits = "devtools reaches only the Accessibility, Animation, CSS, DOM, DOMSnapshot, Emulation, Log, Overlay, Page, " +
         "Performance, Runtime and Network domains, and refuses cookie access (Network.getAllCookies, getCookies, setCookie, setCookies, " +
         "deleteCookies, clearBrowserCookies, Page.getCookies, Page.deleteCookie), Network.loadNetworkResource, DOM.setFileInputFiles, " +
-        "Input.dispatchDragEvent, Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument, Page.addScriptToEvaluateOnLoad and Page.navigate (use the navigate tool).";
+        "Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument, Page.addScriptToEvaluateOnLoad and Page.navigate (use the navigate tool).";
 
-    static readonly HashSet<string> DevToolsDomains = new(["Accessibility", "Animation", "CSS", "DOM", "DOMSnapshot", "Emulation", "Input", "Log",
+    static readonly HashSet<string> DevToolsDomains = new(["Accessibility", "Animation", "CSS", "DOM", "DOMSnapshot", "Emulation", "Log",
         "Overlay", "Page", "Performance", "Runtime", "Network"], StringComparer.OrdinalIgnoreCase);
 
     // What would reach past the page: other sites' cookies, local files, the disk, every future page.
-    static readonly HashSet<string> DevToolsDenied = new(["DOM.setFileInputFiles", "Input.dispatchDragEvent", "Page.setDownloadBehavior",
+    static readonly HashSet<string> DevToolsDenied = new(["DOM.setFileInputFiles", "Page.setDownloadBehavior",
         "Page.addScriptToEvaluateOnNewDocument", "Page.navigate", "Network.getAllCookies", "Network.getCookies", "Network.setCookie",
         "Network.setCookies", "Network.deleteCookies", "Network.clearBrowserCookies", "Network.loadNetworkResource",
         "Page.addScriptToEvaluateOnLoad", "Page.getCookies", "Page.deleteCookie"], StringComparer.OrdinalIgnoreCase);

@@ -10,7 +10,7 @@ namespace CCWrapper.Views;
 /// <summary>The Browser tool's hands: Claude's calls drive this panel's own WebView2, in-process (no remote debugging port).</summary>
 public partial class BrowserPanel : IBrowserDriver
 {
-    static readonly TimeSpan LoadLimit = TimeSpan.FromSeconds(30), ActionLimit = TimeSpan.FromSeconds(3);
+    static readonly TimeSpan LoadLimit = TimeSpan.FromSeconds(30), StartLimit = TimeSpan.FromSeconds(20), ActionLimit = TimeSpan.FromSeconds(3);
 
     readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -18,7 +18,7 @@ public partial class BrowserPanel : IBrowserDriver
     {
         url = NormalizeUrl(url);
         return SchemeAllowed(url) ? NavigateAllowedAsync(url, ct)
-            : Task.FromException<string>(new InvalidOperationException($"Refused {url}: the navigate tool opens only http, https, about and data addresses."));
+            : Task.FromException<string>(new InvalidOperationException($"Refused {url}: the navigate tool opens only http, https, blob, about:blank and data addresses."));
     }
 
     Task<string> NavigateAllowedAsync(string url, CancellationToken ct) => OnUi(ct, async core =>
@@ -27,7 +27,7 @@ public partial class BrowserPanel : IBrowserDriver
         return done is null ? $"Still loading after 30 s: {core.Source}"
             : done.IsSuccess ? $"Loaded {core.Source} (title: {core.DocumentTitle})"
             : $"Could not load {url}: {done.WebErrorStatus}";
-    });
+    }, anyPage: true);
 
     public Task<string> SnapshotAsync(CancellationToken ct) =>
         OnUi(ct, async _ => (string)(await Js(BrowserScripts.Snapshot))["value"]!);
@@ -81,16 +81,20 @@ public partial class BrowserPanel : IBrowserDriver
         return core.CallDevToolsProtocolMethodAsync(method, paramsJson);
     });
 
-    /// <summary>On the UI thread, with the panel in front and its WebView2 started: a TabControl loads only the selected tab.</summary>
-    async Task<T> OnUi<T>(CancellationToken ct, Func<CoreWebView2, Task<T>> body) => await await Dispatcher.InvokeAsync(async () =>
+    /// <summary>On the UI thread, with the panel in front and its WebView2 started: a TabControl loads only the selected tab.
+    /// Refuses unless the page shown is a web page (history, an address-bar file: page...); only navigate passes <paramref name="anyPage"/>.</summary>
+    async Task<T> OnUi<T>(CancellationToken ct, Func<CoreWebView2, Task<T>> body, bool anyPage = false) => await await Dispatcher.InvokeAsync(async () =>
     {
         if (Parent is TabItem { IsSelected: false } tab)
         {
             tab.IsSelected = true;
             await Dispatcher.Yield(DispatcherPriority.Loaded); // let the panel lay out, so a screenshot is not a blank frame
         }
-        try { await _ready.Task.WaitAsync(LoadLimit, ct); }
-        catch (TimeoutException) { throw new InvalidOperationException("The Browser panel's WebView2 did not start within 30 s."); }
+        try { await _ready.Task.WaitAsync(StartLimit, ct); }
+        catch (TimeoutException) { throw new InvalidOperationException("The Browser panel's WebView2 did not start within 20 s."); }
+        var source = Web.CoreWebView2.Source;
+        if (source.Length == 0 && !anyPage) source = (string?)(await Js("location.href"))["value"] ?? ""; // WebView2 reports no Source for a data: page
+        if (!anyPage && NotAWebPage(source) is { } refusal) throw new InvalidOperationException(refusal);
         return await body(Web.CoreWebView2).WaitAsync(ct);
     }, DispatcherPriority.Normal, ct);
 

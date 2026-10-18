@@ -65,12 +65,23 @@ public partial class BrowserPanel : UserControl
         return (local ? "http://" : "https://") + s;
     }
 
-    /// <summary>Whether a page or Claude may open <paramref name="url"/>: only http, https, about and data. The address bar is not gated.</summary>
+    /// <summary>Whether a page or Claude may open <paramref name="url"/>: http, https, blob, data and about:blank (any other about: page may
+    /// be an internal edge:// page). The address bar is not gated.</summary>
     public static bool SchemeAllowed(string url)
     {
         var colon = url.IndexOf(':');
-        return colon > 0 && url[..colon].ToLowerInvariant() is "http" or "https" or "about" or "data";
+        if (colon <= 0) return false;
+        return url[..colon].ToLowerInvariant() switch
+        {
+            "http" or "https" or "blob" or "data" => true,
+            "about" => url[(colon + 1)..].Split('#')[0].Equals("blank", StringComparison.OrdinalIgnoreCase),
+            _ => false,
+        };
     }
+
+    /// <summary>Null when Claude's tools may work on the page at <paramref name="source"/>; otherwise the refusal Claude reads.</summary>
+    public static string? NotAWebPage(string? source) => SchemeAllowed(source ?? "") ? null
+        : $"The Browser panel shows a page that is not a web address ({(source?.IndexOf(':') is > 0 and var c ? source[..c] : "")}:); Claude's tools work only on web pages. Navigate to a web address first.";
 
     void OnAddressKeyDown(object sender, KeyEventArgs e)
     {
