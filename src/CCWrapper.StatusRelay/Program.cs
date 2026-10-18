@@ -47,7 +47,7 @@ static class Browser
             return 1;
         }
         using var pipe = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-        try { pipe.Connect(3000); }
+        try { pipe.Connect(10_000); } // Claude Code does not retry a server that fails to start
         catch (Exception ex)
         {
             Console.Error.WriteLine($"CCWrapper browser: cannot reach the CCWrapper window ({name}): {ex.Message}");

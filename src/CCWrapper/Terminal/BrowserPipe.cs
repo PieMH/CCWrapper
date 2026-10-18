@@ -22,7 +22,7 @@ public sealed class BrowserPipe : IDisposable
     {
         _handler = handler;
         var first = Listen(name);
-        _ = AcceptAsync(name, first);
+        _ = Task.Run(() => AcceptAsync(name, first)); // off the UI thread: a busy dispatcher must not leave no instance listening
     }
 
     static NamedPipeServerStream Listen(string name) =>

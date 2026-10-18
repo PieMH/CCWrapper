@@ -14,9 +14,15 @@ public partial class BrowserPanel : IBrowserDriver
 
     readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public Task<string> NavigateAsync(string url, CancellationToken ct) => OnUi(ct, async core =>
+    public Task<string> NavigateAsync(string url, CancellationToken ct)
     {
         url = NormalizeUrl(url);
+        return SchemeAllowed(url) ? NavigateAllowedAsync(url, ct)
+            : Task.FromException<string>(new InvalidOperationException($"Refused {url}: the navigate tool opens only http, https, about and data addresses."));
+    }
+
+    Task<string> NavigateAllowedAsync(string url, CancellationToken ct) => OnUi(ct, async core =>
+    {
         var done = await AfterAsync(() => { Navigate(url); return Task.CompletedTask; }, LoadLimit, certain: true, ct);
         return done is null ? $"Still loading after 30 s: {core.Source}"
             : done.IsSuccess ? $"Loaded {core.Source} (title: {core.DocumentTitle})"
@@ -78,7 +84,11 @@ public partial class BrowserPanel : IBrowserDriver
     /// <summary>On the UI thread, with the panel in front and its WebView2 started: a TabControl loads only the selected tab.</summary>
     async Task<T> OnUi<T>(CancellationToken ct, Func<CoreWebView2, Task<T>> body) => await await Dispatcher.InvokeAsync(async () =>
     {
-        if (Parent is TabItem tab) tab.IsSelected = true;
+        if (Parent is TabItem { IsSelected: false } tab)
+        {
+            tab.IsSelected = true;
+            await Dispatcher.Yield(DispatcherPriority.Loaded); // let the panel lay out, so a screenshot is not a blank frame
+        }
         try { await _ready.Task.WaitAsync(LoadLimit, ct); }
         catch (TimeoutException) { throw new InvalidOperationException("The Browser panel's WebView2 did not start within 30 s."); }
         return await body(Web.CoreWebView2).WaitAsync(ct);

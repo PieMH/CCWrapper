@@ -95,6 +95,23 @@ public sealed class PanelLogicTests
         Assert.Equal(expected, BrowserPanel.NormalizeUrl(typed));
 
     [Theory]
+    [InlineData("https://example.com", true)]
+    [InlineData("HTTP://localhost:3000", true)]
+    [InlineData("about:blank", true)]
+    [InlineData("data:text/html,<h1>x</h1>", true)]
+    [InlineData("file:///C:/Users/x/.claude/.credentials.json", false)]
+    [InlineData("FILE:///C:/x", false)]
+    [InlineData("javascript:alert(1)", false)]
+    [InlineData("view-source:https://example.com", false)]
+    [InlineData("edge://settings", false)]
+    [InlineData("chrome-extension://abc/x.html", false)]
+    [InlineData("blob:https://example.com/1", false)]
+    [InlineData("", false)]
+    [InlineData("example.com", false)] // not normalized yet: no scheme
+    public void Browser_lets_pages_and_Claude_open_only_web_schemes(string url, bool allowed) =>
+        Assert.Equal(allowed, BrowserPanel.SchemeAllowed(url));
+
+    [Theory]
     [InlineData("12", "[data-ccw-ref=\"12\"]")]
     [InlineData("#login", "#login")]
     [InlineData("a1", "a1")]

@@ -5,7 +5,8 @@ namespace CCWrapper.Terminal;
 
 /// <summary>What the <c>ccwrapper-browser</c> MCP tools do to CCWrapper's Browser panel. Every member may be called from any
 /// thread; an implementation marshals to the UI thread itself and brings the Browser panel into view when a call needs it.
-/// Calls never overlap: <see cref="BrowserMcp"/> runs them one at a time across every tab. A failure throws, and the
+/// Calls never overlap: <see cref="BrowserMcp"/> runs them one at a time across every tab, except that a call past its time
+/// limit is abandoned (its token cancelled) and the next one may start while it lingers. A failure throws, and the
 /// exception's message is what Claude reads, so make it say what went wrong ("No element matches #login").</summary>
 /// <remarks>A <c>target</c> that is all ASCII digits is a ref number from the latest <see cref="SnapshotAsync"/>; anything
 /// else is a CSS selector, and the first element it matches is used. A ref that no longer exists throws.</remarks>
@@ -41,11 +42,35 @@ public interface IBrowserDriver
 /// <summary>The MCP server of the Browser tool, without its transport: one newline-delimited JSON-RPC 2.0 message in, zero
 /// or one response line out. One instance serves every connection, so its queue runs tool calls one at a time across tabs.</summary>
 /// <param name="enabled">Read on each tools/call: the Settings switch.</param>
-public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
+/// <param name="callLimit">How long one tools/call may hold the queue before it is abandoned. Default 60 s.</param>
+public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSpan? callLimit = null)
 {
     public const string Disabled = "The Browser tool is turned off in CCWrapper Settings.";
 
     readonly SemaphoreSlim _queue = new(1, 1);
+    readonly TimeSpan _limit = callLimit ?? TimeSpan.FromSeconds(60);
+
+    const string DevToolsLimits = "devtools reaches only the Accessibility, Animation, CSS, DOM, DOMSnapshot, Emulation, Input, Log, Overlay, Page, " +
+        "Performance, Runtime and Network domains, and refuses cookie access (Network.getAllCookies, getCookies, setCookie, setCookies, " +
+        "deleteCookies, clearBrowserCookies), Network.loadNetworkResource, DOM.setFileInputFiles, Input.dispatchDragEvent, " +
+        "Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument and Page.navigate (use the navigate tool).";
+
+    static readonly HashSet<string> DevToolsDomains = new(["Accessibility", "Animation", "CSS", "DOM", "DOMSnapshot", "Emulation", "Input", "Log",
+        "Overlay", "Page", "Performance", "Runtime", "Network"], StringComparer.OrdinalIgnoreCase);
+
+    // What would reach past the page: other sites' cookies, local files, the disk, every future page.
+    static readonly HashSet<string> DevToolsDenied = new(["DOM.setFileInputFiles", "Input.dispatchDragEvent", "Page.setDownloadBehavior",
+        "Page.addScriptToEvaluateOnNewDocument", "Page.navigate", "Network.getAllCookies", "Network.getCookies", "Network.setCookie",
+        "Network.setCookies", "Network.deleteCookies", "Network.clearBrowserCookies", "Network.loadNetworkResource"], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Null when the devtools tool may call <paramref name="method"/>; otherwise the refusal Claude reads.</summary>
+    public static string? DevToolsRefusal(string method)
+    {
+        if (method.Equals("Page.navigate", StringComparison.OrdinalIgnoreCase)) return "Refused Page.navigate: use the navigate tool.";
+        return method.Split('.') is [var domain, var name] && name.Length > 0 && name.All(char.IsAsciiLetter)
+            && DevToolsDomains.Contains(domain) && !DevToolsDenied.Contains(method)
+            ? null : $"Refused {method}: {DevToolsLimits}";
+    }
 
     /// <summary>The reply line (without its newline), or null for a notification. Throws only when <paramref name="ct"/> is cancelled.</summary>
     public async Task<string?> HandleAsync(string line, CancellationToken ct = default)
@@ -67,7 +92,7 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
         {
             "initialize" => Result(id, new JsonObject
             {
-                ["protocolVersion"] = Text(p?["protocolVersion"]) ?? "2025-06-18",
+                ["protocolVersion"] = Text(p?["protocolVersion"]) is var v && v is "2024-11-05" or "2025-03-26" or "2025-06-18" ? v : "2025-06-18",
                 ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
                 ["serverInfo"] = new JsonObject { ["name"] = "ccwrapper-browser", ["version"] = typeof(BrowserMcp).Assembly.GetName().Version?.ToString(3) ?? "0" },
             }),
@@ -80,7 +105,7 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
 
     async Task<string> CallAsync(JsonNode? id, JsonObject? p, CancellationToken ct)
     {
-        Func<Task<JsonObject>> run;
+        Func<CancellationToken, Task<JsonObject>> run;
         try
         {
             var args = p?["arguments"] switch
@@ -92,22 +117,24 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
             // Every argument is read here, before the queue, so a bad one answers -32602 at once.
             run = Text(p?["name"]) switch
             {
-                "navigate" => Run(Arg(args, "url"), url => driver.NavigateAsync(url, ct)),
-                "snapshot" => () => TextResult(driver.SnapshotAsync(ct)),
-                "click" => Run(Arg(args, "target"), target => driver.ClickAsync(target, ct)),
+                "navigate" => Run(Arg(args, "url"), driver.NavigateAsync),
+                "snapshot" => c => TextResult(driver.SnapshotAsync(c)),
+                "click" => Run(Arg(args, "target"), driver.ClickAsync),
                 "type" => Run((Target: Arg(args, "target"), Text: Arg(args, "text"), Submit: args["submit"]?.GetValueKind() == JsonValueKind.True),
-                    a => driver.TypeAsync(a.Target, a.Text, a.Submit, ct)),
-                "screenshot" => async () => Content(new JsonObject
+                    (a, c) => driver.TypeAsync(a.Target, a.Text, a.Submit, c)),
+                "screenshot" => async c => Content(new JsonObject
                 {
-                    ["type"] = "image", ["mimeType"] = "image/png", ["data"] = Convert.ToBase64String(await driver.ScreenshotAsync(ct)),
+                    ["type"] = "image", ["mimeType"] = "image/png", ["data"] = Convert.ToBase64String(await driver.ScreenshotAsync(c)),
                 }),
-                "evaluate" => Run(Arg(args, "expression"), expression => driver.EvaluateAsync(expression, ct)),
+                "evaluate" => Run(Arg(args, "expression"), driver.EvaluateAsync),
                 "devtools" => Run((Method: Arg(args, "method"), Params: args["params"] switch
                 {
                     null => "{}",
                     JsonObject o => o.ToJsonString(),
                     _ => throw new ArgumentException("'params' must be an object."),
-                }), a => driver.DevToolsAsync(a.Method, a.Params, ct)),
+                }), (a, c) => DevToolsRefusal(a.Method) is { } why
+                    ? Task.FromException<string>(new InvalidOperationException(why))
+                    : driver.DevToolsAsync(a.Method, a.Params, c)),
                 var name => throw new ArgumentException("Unknown tool: " + name),
             };
         }
@@ -115,10 +142,16 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
 
         if (!enabled()) return Result(id, Failure(Disabled));
         await _queue.WaitAsync(ct);
-        try { return Result(id, await run()); }
+        // A hung page (a dialog open, a Promise that never settles) must not hold every tab's calls forever.
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(_limit);
+        try { return Result(id, await run(limit.Token).WaitAsync(limit.Token)); }
+        catch (OperationCanceledException) when (limit.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            return Result(id, Failure($"The Browser panel did not answer within {_limit.TotalSeconds:0} s (a page dialog may be open, or the page is busy); the call was abandoned."));
+        }
         catch (Exception ex) when (!ct.IsCancellationRequested) { return Result(id, Failure(ex.Message)); }
         finally { _queue.Release(); }
-
     }
 
     // A ref may arrive as a JSON number; anything else that is not a string is a bad param.
@@ -129,7 +162,7 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
         _ => throw new ArgumentException($"Missing or invalid '{key}'."),
     };
 
-    static Func<Task<JsonObject>> Run<T>(T args, Func<T, Task<string>> call) => () => TextResult(call(args));
+    static Func<CancellationToken, Task<JsonObject>> Run<T>(T args, Func<T, CancellationToken, Task<string>> call) => c => TextResult(call(args, c));
 
     static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue(out string? s) ? s : null;
 
@@ -175,7 +208,7 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled)
             "description": "Run a JavaScript expression in the current page and return its value as JSON. A returned Promise is awaited.",
             "inputSchema": { "type": "object", "properties": { "expression": { "type": "string", "description": "The JavaScript expression, e.g. document.title." } }, "required": ["expression"] } },
           { "name": "devtools",
-            "description": "Call a Chrome DevTools Protocol method on the current page (e.g. Network.getCookies, Emulation.setDeviceMetricsOverride) and return its JSON result. For what the other tools cannot do.",
+            "description": "Call a Chrome DevTools Protocol method on the current page (e.g. Emulation.setDeviceMetricsOverride, Network.getResponseBody) and return its JSON result. For what the other tools cannot do. {{DevToolsLimits}}",
             "inputSchema": { "type": "object", "properties": {
               "method": { "type": "string", "description": "The CDP method, Domain.method." },
               "params": { "type": "object", "description": "The method's parameters. Default {}." } }, "required": ["method"] } }

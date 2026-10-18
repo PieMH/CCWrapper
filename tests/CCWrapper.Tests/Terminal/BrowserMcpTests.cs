@@ -22,6 +22,7 @@ public sealed class BrowserMcpTests
             var now = Interlocked.Increment(ref _active);
             lock (Calls) MaxActive = Math.Max(MaxActive, now);
             await Task.Delay(Delay);
+            if (call.Contains("hang")) await new TaskCompletionSource().Task; // never answers, ignores its token too
             Interlocked.Decrement(ref _active);
             if (call.Contains("boom")) throw new InvalidOperationException("No element matches #boom");
             return result;
@@ -55,6 +56,18 @@ public sealed class BrowserMcpTests
         Assert.Equal("ccwrapper-browser", r["result"]!["serverInfo"]!["name"]!.GetValue<string>());
     }
 
+    [Theory]
+    [InlineData("2025-03-26", "2025-03-26")]
+    [InlineData("2025-06-18", "2025-06-18")]
+    [InlineData("2099-01-01", "2025-06-18")]
+    [InlineData(null, "2025-06-18")]
+    public async Task Initialize_answers_a_version_it_does_not_know_with_2025_06_18(string? asked, string answered)
+    {
+        var version = asked is null ? "" : $",\"protocolVersion\":\"{asked}\"";
+        var r = Parse(await Mcp().HandleAsync("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}""" + version + "}}"));
+        Assert.Equal(answered, r["result"]!["protocolVersion"]!.GetValue<string>());
+    }
+
     [Fact]
     public async Task Notifications_get_no_reply_and_ping_gets_an_empty_result()
     {
@@ -85,7 +98,7 @@ public sealed class BrowserMcpTests
     [InlineData("type", """{"target":"3","text":"hi","submit":true}""", "type 3 hi True", "typed")]
     [InlineData("type", """{"target":"3","text":"hi"}""", "type 3 hi False", "typed")]
     [InlineData("evaluate", """{"expression":"document.title"}""", "evaluate document.title", "\"Title\"")]
-    [InlineData("devtools", """{"method":"Network.getCookies"}""", "devtools Network.getCookies {}", "{}")]
+    [InlineData("devtools", """{"method":"DOM.getDocument"}""", "devtools DOM.getDocument {}", "{}")]
     [InlineData("devtools", """{"method":"Page.reload","params":{"ignoreCache":true}}""", """devtools Page.reload {"ignoreCache":true}""", "{}")]
     public async Task Tools_call_passes_arguments_and_returns_text(string tool, string args, string expectedCall, string expectedText)
     {
@@ -109,6 +122,70 @@ public sealed class BrowserMcpTests
         var r = Parse(await Mcp().HandleAsync(Call(1, "click", """{"target":"#boom"}""")))["result"]!;
         Assert.True(r["isError"]!.GetValue<bool>());
         Assert.Equal("No element matches #boom", r["content"]![0]!["text"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_call_that_never_answers_is_abandoned_and_the_next_call_runs()
+    {
+        var mcp = new BrowserMcp(_driver, () => true, TimeSpan.FromMilliseconds(300));
+        var r = Parse(await mcp.HandleAsync(Call(1, "evaluate", """{"expression":"hang"}""")).WaitAsync(TimeSpan.FromSeconds(10)))["result"]!;
+        Assert.True(r["isError"]!.GetValue<bool>());
+        var text = r["content"]![0]!["text"]!.GetValue<string>();
+        Assert.StartsWith("The Browser panel did not answer within ", text);
+        Assert.EndsWith(" s (a page dialog may be open, or the page is busy); the call was abandoned.", text);
+
+        var next = Parse(await mcp.HandleAsync(Call(2, "snapshot")).WaitAsync(TimeSpan.FromSeconds(10)))["result"]!;
+        Assert.Null(next["isError"]);
+        Assert.Equal("[1] button Go", next["content"]![0]!["text"]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData("Runtime.evaluate")]
+    [InlineData("DOM.getDocument")]
+    [InlineData("Emulation.setDeviceMetricsOverride")]
+    [InlineData("Network.getResponseBody")]
+    [InlineData("Page.captureScreenshot")]
+    [InlineData("Accessibility.getFullAXTree")]
+    public void Devtools_allows_methods_of_the_page_domains(string method) => Assert.Null(BrowserMcp.DevToolsRefusal(method));
+
+    [Theory]
+    [InlineData("Target.createTarget")]
+    [InlineData("Browser.close")]
+    [InlineData("Storage.getCookies")]
+    [InlineData("SystemInfo.getInfo")]
+    [InlineData("Network.getAllCookies")]
+    [InlineData("network.GETALLCOOKIES")] // case does not slip past
+    [InlineData("Network.getCookies")]
+    [InlineData("Network.setCookie")]
+    [InlineData("Network.setCookies")]
+    [InlineData("Network.deleteCookies")]
+    [InlineData("Network.clearBrowserCookies")]
+    [InlineData("Network.loadNetworkResource")]
+    [InlineData("DOM.setFileInputFiles")]
+    [InlineData("Input.dispatchDragEvent")]
+    [InlineData("Page.setDownloadBehavior")]
+    [InlineData("Page.addScriptToEvaluateOnNewDocument")]
+    [InlineData("Network.getAllCookies ")]
+    [InlineData("Runtime")]
+    [InlineData("Runtime.evaluate.x")]
+    [InlineData("")]
+    public void Devtools_refuses_other_domains_and_methods_that_reach_past_the_page(string method)
+    {
+        var why = BrowserMcp.DevToolsRefusal(method);
+        Assert.NotNull(why);
+        Assert.StartsWith($"Refused {method}: devtools reaches only the Accessibility,", why);
+    }
+
+    [Fact]
+    public async Task Devtools_refusal_is_a_tool_error_and_Page_navigate_points_to_navigate()
+    {
+        Assert.Equal("Refused Page.navigate: use the navigate tool.", BrowserMcp.DevToolsRefusal("Page.navigate"));
+        var r = Parse(await Mcp().HandleAsync(Call(1, "devtools", """{"method":"Network.getAllCookies"}""")))["result"]!;
+        Assert.True(r["isError"]!.GetValue<bool>());
+        Assert.StartsWith("Refused Network.getAllCookies: ", r["content"]![0]!["text"]!.GetValue<string>());
+        Assert.Empty(_driver.Calls);
+        var tools = Parse(await Mcp().HandleAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}"""))["result"]!["tools"]!.AsArray();
+        Assert.Contains("refuses cookie access", tools.Single(t => t!["name"]!.GetValue<string>() == "devtools")!["description"]!.GetValue<string>());
     }
 
     [Fact]
@@ -235,7 +312,7 @@ public sealed class BrowserMcpTests
     public void Relay_refuses_a_bad_or_missing_pipe(params string[] args)
     {
         using var relay = StartRelay(args);
-        Assert.True(relay.WaitForExit(10_000));
+        Assert.True(relay.WaitForExit(20_000)); // nobody listening waits out the relay's 10 s connect
         Assert.Equal(1, relay.ExitCode);
         Assert.StartsWith("CCWrapper browser:", relay.StandardError.ReadToEnd());
     }

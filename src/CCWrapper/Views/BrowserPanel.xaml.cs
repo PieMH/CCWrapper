@@ -33,8 +33,8 @@ public partial class BrowserPanel : UserControl
                 return;
             }
             _ready.TrySetResult();
-            // target=_blank and window.open stay in this single view
-            Web.CoreWebView2.NewWindowRequested += (_, n) => { n.Handled = true; Web.CoreWebView2.Navigate(n.Uri); };
+            // target=_blank and window.open stay in this single view; a page's window.open('file:...') is dropped, not opened
+            Web.CoreWebView2.NewWindowRequested += (_, n) => { n.Handled = true; if (SchemeAllowed(n.Uri)) Web.CoreWebView2.Navigate(n.Uri); };
             if (_pending is { } url) Web.CoreWebView2.Navigate(url);
             _pending = null;
         };
@@ -63,6 +63,13 @@ public partial class BrowserPanel : UserControl
         var host = s.Split('/', '?', '#')[0];
         var local = host.StartsWith("localhost", StringComparison.OrdinalIgnoreCase) || host.StartsWith("127.") || host.StartsWith("0.0.0.0") || host.StartsWith("[::1]");
         return (local ? "http://" : "https://") + s;
+    }
+
+    /// <summary>Whether a page or Claude may open <paramref name="url"/>: only http, https, about and data. The address bar is not gated.</summary>
+    public static bool SchemeAllowed(string url)
+    {
+        var colon = url.IndexOf(':');
+        return colon > 0 && url[..colon].ToLowerInvariant() is "http" or "https" or "about" or "data";
     }
 
     void OnAddressKeyDown(object sender, KeyEventArgs e)
