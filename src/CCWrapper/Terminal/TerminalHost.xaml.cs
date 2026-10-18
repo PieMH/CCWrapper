@@ -56,7 +56,7 @@ public partial class TerminalHost : UserControl
         var tab = GetOrAdd(session);
         tab.Options = options;
         tab.Feed ??= new StatusLineFeed(session);
-        var args = ClaudeLaunch.Args(options, id, ClaudeLaunch.RelaySettings(session.Account, options.Cwd));
+        var args = ClaudeLaunch.Args(options, id, ClaudeLaunch.RelaySettings(session.Account, options.Cwd), ClaudeLaunch.BrowserMcpConfig());
         await StartAsync(tab, ClaudeLaunch.FindClaude(), args, options.Cwd,
             ClaudeLaunch.Env(session.Account, session.TabId, Environment.GetEnvironmentVariables()));
     }

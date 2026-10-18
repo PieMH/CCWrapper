@@ -45,7 +45,8 @@ If you write to the publisher (see Contact), the publisher handles your message 
 
 ### 3. Websites you open
 
-- The Browser panel is a WebView2 browser. It loads only what you open in it. Those sites see what any website sees, and may set cookies.
+- The Browser panel is a WebView2 browser. It loads only what you open in it, or what Claude opens in it (next point). Those sites see what any website sees, and may set cookies.
+- Claude can use the Browser panel: each session gets it as a local MCP server (`ccwrapper-browser`), unless you turn it off in Settings → CCWrapper (`browserTool` in `app.json`). CCWrapper itself sends nothing new. The pages load only when Claude or you open them, in the panel's profile for the account, which is stored on your computer in `%LOCALAPPDATA%\CCWrapper\WebView2\browser-<letter>`, so those sites see your logins there, and what Claude runs in a page (the `evaluate` and `devtools` tools) acts with them. `devtools` refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag, so it cannot paste your clipboard), the page history and scripts that persist across pages. Claude opens only `http`, `https`, `blob`, `about:blank` and `data` addresses, not local files, and its tools refuse to work on a page that is not a web address (for example a `file:` page you opened in the address bar yourself). The tool talks to its CCWrapper window through a named pipe on your own computer that only your Windows user can open. What Claude Code does with a page's text, screenshots or script results is covered in section 2, and Claude Code asks your permission per tool.
 - A link in the terminal opens in the Browser panel if it points to your own computer (`localhost`), and in your default browser otherwise. Only `http` and `https` links open.
 - Each account has its own browser profile, stored on your computer (see below).
 
@@ -77,7 +78,7 @@ If the runtime is missing on your PC, the installer (`Setup.exe`) downloads it f
 | `%LOCALAPPDATA%\CCWrapper\WebView2` | Browser profiles of the terminal and of the Browser panel, one per account: cookies, cache, site data. |
 | `%LOCALAPPDATA%\CCWrapper\backups` | Earlier versions of files you saved from the app. |
 | `%LOCALAPPDATA%\CCWrapper\live` | Live status data (model, context, cost, usage) from the status-line relay, one small file per tab. |
-| `%LOCALAPPDATA%\CCWrapper\app.json` | The app's own settings: `updateCheck` and the bottom bar's `compact` hint (on/off, threshold, prompt). |
+| `%LOCALAPPDATA%\CCWrapper\app.json` | The app's own settings: `updateCheck`, `browserTool` (whether Claude may use the Browser panel) and the bottom bar's `compact` hint (on/off, threshold, prompt). |
 
 These files stay on your computer. The publisher cannot see them.
 

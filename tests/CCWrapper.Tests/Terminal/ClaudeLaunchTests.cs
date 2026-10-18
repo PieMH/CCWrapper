@@ -34,6 +34,33 @@ public sealed class ClaudeLaunchTests : IDisposable
     }
 
     [Fact]
+    public void Args_with_the_browser_tool_keep_mcp_config_followed_by_a_flag()
+    {
+        var args = ClaudeLaunch.Args(new LaunchOptions(@"C:\p", Model: "opus"), "s1", @"{""statusLine"":1}", "{\"mcpServers\":{}}");
+        Assert.Equal(["--session-id", "s1", "--mcp-config", "{\"mcpServers\":{}}", "--append-system-prompt", ClaudeLaunch.BrowserPrompt,
+            "--model", "opus", "--settings", @"{""statusLine"":1}"], args);
+        Assert.StartsWith("--", args[args.IndexOf("--mcp-config") + 2]); // variadic: the next flag ends its values
+    }
+
+    [Fact]
+    public void BrowserMcpConfig_runs_the_relay_on_this_window_pipe_unless_turned_off()
+    {
+        var exe = Relay();
+        var prefs = Path.Combine(_dir, "app.json");
+        var json = ClaudeLaunch.BrowserMcpConfig(exe, prefs); // no app.json: on
+
+        using var doc = JsonDocument.Parse(json!);
+        var server = doc.RootElement.GetProperty("mcpServers").GetProperty("ccwrapper-browser");
+        Assert.Equal("stdio", server.GetProperty("type").GetString());
+        Assert.Equal(exe, server.GetProperty("command").GetString());
+        Assert.Equal(["--browser", $"CCWrapper.browser.{Environment.ProcessId}"], server.GetProperty("args").EnumerateArray().Select(a => a.GetString()));
+
+        AppPrefs.WriteBrowserTool(false, prefs);
+        Assert.Null(ClaudeLaunch.BrowserMcpConfig(exe, prefs));
+        Assert.Null(ClaudeLaunch.BrowserMcpConfig(Path.Combine(_dir, "gone.exe"), Path.Combine(_dir, "none.json")));
+    }
+
+    [Fact]
     public void Env_copies_parent_applies_account_and_adds_tab_vars()
     {
         var tab = Guid.NewGuid();

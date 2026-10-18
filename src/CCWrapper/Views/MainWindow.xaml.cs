@@ -24,12 +24,15 @@ public partial class MainWindow : Window, IAppCommands
     SessionEntry? _elsewhere; // shown read-only in the center: open in another claude process
     string? _gitCwd;
     CancellationTokenSource? _gitCts;
+    readonly BrowserPipe? _browserPipe;
     bool _polling, _confirmedEnd, _resuming;
 
     public MainWindow(Account account)
     {
         _state = AppState.Current = new AppState(account, this); // before InitializeComponent: child views read it
         InitializeComponent();
+        try { _browserPipe = new BrowserPipe(BrowserPipe.NameFor(Environment.ProcessId), new BrowserMcp(Browser, () => AppPrefs.ReadBrowserTool())); }
+        catch (Exception) { } // the Browser tool is optional: without its pipe the tabs show the server as failed, the app runs
         var letter = ShellModel.LetterOf(account.Letter);
         var color = (Color)ColorConverter.ConvertFromString(ShellModel.ColorOf(account.Letter));
         Title = $"CCWrapper · {letter} · {account.Label}";
@@ -59,6 +62,7 @@ public partial class MainWindow : Window, IAppCommands
             _statusTimer.Stop();
             _gitRefresh.Stop();
             _gitCts?.Cancel();
+            _browserPipe?.Dispose();
         };
     }
 
