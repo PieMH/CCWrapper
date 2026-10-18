@@ -48,6 +48,7 @@ public partial class SettingsWindow : Window
     bool _filling, _quiet, _saved;
     string? _jsonError, _envError, _appError; // typed text that does not parse: Save waits until it does
     CompactPrefs _app = CompactPrefs.Load(), _appSaved = CompactPrefs.Load(); // the CCWrapper page: app.json, not a settings file
+    bool _browser = AppPrefs.ReadBrowserTool(), _browserSaved = AppPrefs.ReadBrowserTool();
 
     public SettingsWindow(Account account, string? cwd)
     {
@@ -584,6 +585,7 @@ public partial class SettingsWindow : Window
     void ShowApp()
     {
         _quiet = true;
+        BrowserOn.IsChecked = _browser;
         (CompactOn.IsChecked, CompactThreshold.Text, CompactPrompt.Text) = (_app.Enabled, _app.Threshold.ToString(), _app.Prompt);
         _quiet = false;
     }
@@ -591,6 +593,7 @@ public partial class SettingsWindow : Window
     void OnAppEdited(object sender, RoutedEventArgs e)
     {
         if (!_ready || _quiet) return;
+        _browser = BrowserOn.IsChecked == true;
         _appError = !int.TryParse(CompactThreshold.Text, out var threshold) || !CompactPrefs.ValidThreshold(threshold) ? "The threshold must be a whole number from 1 to 99."
             : CompactPrompt.Text.Trim().Length == 0 ? "The prompt can't be empty." : null;
         if (_appError is null) _app = new(CompactOn.IsChecked == true, threshold, CompactPrompt.Text.Trim());
@@ -632,7 +635,7 @@ public partial class SettingsWindow : Window
     List<string> DirtyNames() =>
         _files.Values.Where(f => f.Dirty).Select(f => $"{f.Scope} settings")
             .Concat(_memory.Where(m => m.Value.Dirty).Select(m => m.Key == SettingsScope.Local ? "CLAUDE.local.md" : $"{m.Key} CLAUDE.md"))
-            .Concat(_app != _appSaved ? new[] { "CCWrapper settings" } : [])
+            .Concat(_app != _appSaved || _browser != _browserSaved ? new[] { "CCWrapper settings" } : [])
             .ToList();
 
     void UpdateSaveBar()
@@ -664,6 +667,7 @@ public partial class SettingsWindow : Window
 
     IEnumerable<(string Path, string? Error)> SaveApp()
     {
+        if (_browser != _browserSaved) { AppPrefs.WriteBrowserTool(_browser); _browserSaved = _browser; } // swallows its own failure, like the update switch
         if (_app == _appSaved) yield break;
         var error = _app.Save();
         if (error is null) _appSaved = _app;
@@ -672,7 +676,7 @@ public partial class SettingsWindow : Window
 
     void OnRevert(object sender, RoutedEventArgs e)
     {
-        _app = _appSaved;
+        (_app, _browser) = (_appSaved, _browserSaved);
         foreach (var f in _files.Values) f.Revert();
         foreach (var m in _memory.Values) m.Revert();
         _saved = false;

@@ -406,7 +406,10 @@
                             <TextBlock Text="Prompt after /compact" Margin="0,0,0,4" />
                             <TextBox x:Name="CompactPrompt" Style="{StaticResource Field}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90"
                                      VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" TextChanged="OnAppEdited" AutomationProperties.Name="Compact prompt" />
-                            <TextBlock Style="{StaticResource Dim}" Margin="0,8,0,0" Text="Saved in %LOCALAPPDATA%\CCWrapper\app.json. Line breaks become spaces." />
+                            <TextBlock Style="{StaticResource Dim}" Margin="0,8,0,16" Text="Saved in %LOCALAPPDATA%\CCWrapper\app.json. Line breaks become spaces." />
+                            <CheckBox x:Name="BrowserOn" Content="Let Claude use the Browser panel" Checked="OnAppEdited" Unchecked="OnAppEdited" />
+                            <TextBlock Style="{StaticResource Dim}" TextWrapping="Wrap" TextTrimming="None" Margin="0,2,0,0"
+                                       Text="New sessions get the tool and are told to prefer it. Off also refuses calls from sessions already open." />
                         </StackPanel>
                     </Border>
                 </ScrollViewer>
