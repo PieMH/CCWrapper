@@ -83,6 +83,7 @@ public partial class BrowserPanel : UserControl
     async Task StartAsync(Tab tab)
     {
         await _loaded.Task; // nothing starts before the panel is first shown
+        if (_env is { IsFaulted: true }) _env = null; // a failed start is retried by the next tab, not cached
         try { await tab.Web.EnsureCoreWebView2Async(await (_env ??= CoreWebView2Environment.CreateAsync(null, _profile))); }
         catch (Exception ex)
         {
@@ -92,6 +93,7 @@ public partial class BrowserPanel : UserControl
         }
         var core = tab.Web.CoreWebView2;
         core.NewWindowRequested += OnNewWindow;
+        core.WindowCloseRequested += (_, _) => Dispatcher.InvokeAsync(() => CloseTab(tab.Id)); // window.close() of a script-opened tab (an OAuth popup)
         core.DocumentTitleChanged += (_, _) => Retitle(tab);
         if (tab.Pending is { } url) core.Navigate(url);
         tab.Pending = null;
@@ -140,7 +142,20 @@ public partial class BrowserPanel : UserControl
             t.Header.IsChecked = t == tab;
         }
         Bar.DataContext = tab.Web;
+        NewTab.IsEnabled = !_tabs.Full;
+        NewTab.ToolTip = _tabs.Full ? $"At most {BrowserTabs<Tab>.Max} tabs" : "New tab";
+        FitTabs();
+        tab.Header.BringIntoView();
         Address.Text = tab.Web.Source?.ToString() ?? tab.Pending ?? "";
+    }
+
+    void OnStripResized(object sender, SizeChangedEventArgs e) => FitTabs();
+
+    // equal widths that fill the strip; the style's MinWidth is the floor, its MaxWidth the ceiling
+    void FitTabs()
+    {
+        var w = Math.Max(0, Scroll.ActualWidth / Math.Max(1, _tabs.All.Count) - 2);
+        foreach (var (_, t) in _tabs.All) t.Header.Width = w;
     }
 
     /// <summary>Disposes the tab's WebView2; closing the last tab leaves one blank tab. False when there is no tab <paramref name="id"/>.</summary>

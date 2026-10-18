@@ -336,6 +336,7 @@
     <Style x:Key="BrowserTab" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{StaticResource Muted}" />
         <Setter Property="Height" Value="28" />
+        <Setter Property="MinWidth" Value="80" />
         <Setter Property="MaxWidth" Value="200" />
         <Setter Property="Margin" Value="0,0,2,0" />
         <Setter Property="Padding" Value="10,0,2,0" />

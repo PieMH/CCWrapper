@@ -144,7 +144,7 @@ public partial class BrowserPanel : IBrowserDriver
         var core = await Started(tab, ct);
         async Task Check()
         {
-            if (_tabs[tab.Id] != tab) return; // the user closed it meanwhile: it shows nothing any more
+            if (_tabs[tab.Id] != tab) throw new InvalidOperationException($"Tab {tab.Id} was closed during the call."); // fail closed: nothing left to check
             if (NotAWebPage(await SourceOf(core)) is { } refusal) throw new InvalidOperationException(refusal);
         }
         if (!anyPage) await Check();

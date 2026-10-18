@@ -108,7 +108,7 @@ public static class Smoke
     static async Task<bool> PanelStepsAsync(IBrowserDriver panel)
     {
         const string html = "<h1>Smoke</h1><a href='#x'>link</a><input name=q placeholder=Q><button onclick=\"document.title='clicked:'+document.querySelector('input').value\">Go</button>"
-            + "<button id=pop onclick=\"window.w=window.open('about:blank')\">Pop</button>";
+            + "<button id=pop onclick=\"window.w=window.open('about:blank')\">Pop</button><button id=bad onclick=\"window.open('ftp://example.com/')\">Bad</button>";
         await panel.NavigateAsync("data:text/html," + Uri.EscapeDataString(html), default);
         var snap = await panel.SnapshotAsync(default);
         var button = System.Text.RegularExpressions.Regex.Match(snap, @"\[(\d+)\] button ""Go""");
@@ -128,6 +128,9 @@ public static class Smoke
         if (!(await panel.ClickAsync("#pop", default)).Contains("Tab 2 is now in front") || !(await panel.TabsAsync(default)).Contains("Tab 2 (front): ")) return false;
         await panel.SwitchTabAsync(1, default);
         if (await panel.EvaluateAsync("!!window.w && !window.w.closed", default) != "true") return false; // the popup tab kept its opener link
+        var dropped = await panel.ClickAsync("#bad", default); // an ftp: popup is refused (a file: one never reaches NewWindowRequested): no new tab
+        var listed = await panel.TabsAsync(default);
+        if (dropped.Contains("is now in front") || !listed.Contains("Tab 2") || listed.Contains("Tab 3")) return false;
         var opened = await panel.NewTabAsync("data:text/html," + Uri.EscapeDataString("<title>Two</title><h1>Second</h1>"), default);
         if (!opened.StartsWith("Opened tab 3 in front. Loaded") || await panel.EvaluateAsync("document.title", default) != "\"Two\"") return false;
         await panel.SwitchTabAsync(1, default);

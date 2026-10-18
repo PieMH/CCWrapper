@@ -55,7 +55,7 @@ dotnet test
   terminal's WebView2, never a remote debugging port. The pipe is `CurrentUserOnly`, and the only launch flags it adds are
   `--mcp-config` and `--append-system-prompt`. `browserTool` off: new tabs get no flags and `BrowserMcp` refuses calls from open ones.
   Hardened: each tools/call has a 60 s limit, `navigate`, `new_tab` and `window.open` (which opens a tab, max 20, else dropped) pass only http, https, blob,
-  about:blank and data (`BrowserPanel.SchemeAllowed`), every tool but `navigate` refuses while the front tab shows any other page (`OnUi` captures the front tab once per call and runs both checks, before and after the body, on that tab, whatever got it
+  about:blank and data (`BrowserPanel.SchemeAllowed`), every page tool but `navigate` refuses while the front tab shows any other page (`OnUi` captures the front tab once per call and runs both checks, before and after the body, on that tab, whatever got it
   there: history, the address bar; `tabs` lists such a tab as "(not a web page)", without title or URL), and `devtools` is an allow-list by domain (`BrowserMcp.DevToolsRefusal`) that denies cookies,
   downloads, local files, new-document scripts, history navigation and the whole Input domain (keyboard, mouse, touch, drag: it would paste the clipboard). `evaluate` runs with the page's own access.
   (PRIVACY.md and the README say so too, keep them in step).

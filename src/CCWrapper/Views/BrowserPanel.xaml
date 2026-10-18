@@ -3,9 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <DockPanel>
         <DockPanel DockPanel.Dock="Top" Margin="8,4,8,4">
-            <Button DockPanel.Dock="Right" Style="{StaticResource Flat}" Width="28" Padding="0" Margin="4,0,0,0" ToolTip="New tab" AutomationProperties.Name="New tab" Click="OnNewTab"><TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" /></Button>
-            <!-- one row of equal tabs that shrink as more open -->
-            <UniformGrid x:Name="Strip" Rows="1" HorizontalAlignment="Left" />
+            <Button x:Name="NewTab" DockPanel.Dock="Right" Style="{StaticResource Flat}" Width="28" Padding="0" Margin="4,0,0,0" ToolTip="New tab" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="New tab" Click="OnNewTab"><TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" /></Button>
+            <!-- one row of equal tabs that shrink as more open, down to the tab style's MinWidth; then the row scrolls -->
+            <ScrollViewer x:Name="Scroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" SizeChanged="OnStripResized">
+                <StackPanel x:Name="Strip" Orientation="Horizontal" />
+            </ScrollViewer>
         </DockPanel>
         <!-- DataContext: the front tab's WebView2 -->
         <Grid x:Name="Bar" DockPanel.Dock="Top" Margin="8,0,8,8">
