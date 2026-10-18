@@ -29,7 +29,7 @@ dotnet test
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs), `BrowserMcp`/`BrowserPipe` (the Browser tool: MCP handler and the window's named pipe) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
 | `src/CCWrapper/Theme.xaml` | Every color and custom style; `App.xaml` recolors Fluent's own brushes |
-| `src/CCWrapper.StatusRelay` | The silent relay, two jobs: the statusLine command, and with `--browser <pipe>` the stdio MCP server of the Browser tool (native AOT in releases; launched by 8.3 short path, so install paths with spaces work) |
+| `src/CCWrapper.StatusRelay` | The silent relay, two jobs: the statusLine command, and with `--browser <pipe>` the stdio MCP server of the Browser tool (native AOT in releases; only the statusLine command is launched by 8.3 short path, as it is a shell command string, so install paths with spaces work; the `--browser` MCP command is the full path, spawned without a shell) |
 | `scripts/`, `.github/workflows` | `pack.ps1` builds the Velopack release; `ci.yml` tests, `release.yml` publishes |
 | Root `*.md`, `THIRD-PARTY-NOTICES.txt` | PRIVACY, TERMS, CODE_SIGNING_POLICY, SECURITY: the policies the About window and SignPath point to |
 | `tests/CCWrapper.Tests` | xUnit, synthetic fixtures only (never real transcripts) |
@@ -53,7 +53,10 @@ dotnet test
   or tab has the session; it refuses any path outside the account's `projects\<dir>\<id>.jsonl`.
 - **The browser tool drives only the Browser panel's WebView2** (its own user-data folder) through in-process CDP. Never the
   terminal's WebView2, never a remote debugging port. The pipe is `CurrentUserOnly`, and the only launch flags it adds are
-  `--mcp-config` and `--append-system-prompt`. `browserTool` off: new tabs get no flags and `BrowserMcp` refuses calls from open ones
+  `--mcp-config` and `--append-system-prompt`. `browserTool` off: new tabs get no flags and `BrowserMcp` refuses calls from open ones.
+  Hardened: each tools/call has a 60 s limit, `navigate` and `window.open` pass only http, https, about and data
+  (`BrowserPanel.SchemeAllowed`), and `devtools` is an allow-list by domain (`BrowserMcp.DevToolsRefusal`) that denies cookies,
+  downloads, local files and new-document scripts. `evaluate` runs with the page's own access.
   (PRIVACY.md and the README say so too, keep them in step).
 - **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden
   (`ClaudeCli`), only after the user's click, with a confirm before anything is removed. These commands never call the

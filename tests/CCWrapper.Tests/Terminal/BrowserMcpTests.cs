@@ -165,6 +165,9 @@ public sealed class BrowserMcpTests
     [InlineData("Input.dispatchDragEvent")]
     [InlineData("Page.setDownloadBehavior")]
     [InlineData("Page.addScriptToEvaluateOnNewDocument")]
+    [InlineData("Page.addScriptToEvaluateOnLoad")] // deprecated aliases
+    [InlineData("Page.getCookies")]
+    [InlineData("Page.deleteCookie")]
     [InlineData("Network.getAllCookies ")]
     [InlineData("Runtime")]
     [InlineData("Runtime.evaluate.x")]

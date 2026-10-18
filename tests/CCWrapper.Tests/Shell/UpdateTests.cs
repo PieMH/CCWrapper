@@ -64,6 +64,16 @@ public sealed class UpdateTests : IDisposable
         Assert.True(AppPrefs.ReadBrowserTool(File_));
     }
 
+    [Fact]
+    public void Prefs_write_returns_the_error_when_the_file_cannot_be_written()
+    {
+        Directory.CreateDirectory(File_); // the path is a directory
+        Assert.NotNull(AppPrefs.WriteBrowserTool(false, File_));
+        Assert.NotNull(AppPrefs.WriteUpdateCheck(false, File_));
+        Directory.Delete(File_);
+        Assert.Null(AppPrefs.WriteBrowserTool(false, File_));
+    }
+
     [Theory]
     [InlineData("0.1.0", false)]
     [InlineData("1.2.3", false)]

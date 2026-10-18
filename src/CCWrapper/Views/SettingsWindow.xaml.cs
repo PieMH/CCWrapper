@@ -667,7 +667,12 @@ public partial class SettingsWindow : Window
 
     IEnumerable<(string Path, string? Error)> SaveApp()
     {
-        if (_browser != _browserSaved) { AppPrefs.WriteBrowserTool(_browser); _browserSaved = _browser; } // swallows its own failure, like the update switch
+        if (_browser != _browserSaved)
+        {
+            var browserError = AppPrefs.WriteBrowserTool(_browser);
+            if (browserError is null) _browserSaved = _browser;
+            yield return (AppPrefs.DefaultPath, browserError);
+        }
         if (_app == _appSaved) yield break;
         var error = _app.Save();
         if (error is null) _appSaved = _app;

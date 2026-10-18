@@ -52,8 +52,8 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
 
     const string DevToolsLimits = "devtools reaches only the Accessibility, Animation, CSS, DOM, DOMSnapshot, Emulation, Input, Log, Overlay, Page, " +
         "Performance, Runtime and Network domains, and refuses cookie access (Network.getAllCookies, getCookies, setCookie, setCookies, " +
-        "deleteCookies, clearBrowserCookies), Network.loadNetworkResource, DOM.setFileInputFiles, Input.dispatchDragEvent, " +
-        "Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument and Page.navigate (use the navigate tool).";
+        "deleteCookies, clearBrowserCookies, Page.getCookies, Page.deleteCookie), Network.loadNetworkResource, DOM.setFileInputFiles, " +
+        "Input.dispatchDragEvent, Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument, Page.addScriptToEvaluateOnLoad and Page.navigate (use the navigate tool).";
 
     static readonly HashSet<string> DevToolsDomains = new(["Accessibility", "Animation", "CSS", "DOM", "DOMSnapshot", "Emulation", "Input", "Log",
         "Overlay", "Page", "Performance", "Runtime", "Network"], StringComparer.OrdinalIgnoreCase);
@@ -61,7 +61,8 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
     // What would reach past the page: other sites' cookies, local files, the disk, every future page.
     static readonly HashSet<string> DevToolsDenied = new(["DOM.setFileInputFiles", "Input.dispatchDragEvent", "Page.setDownloadBehavior",
         "Page.addScriptToEvaluateOnNewDocument", "Page.navigate", "Network.getAllCookies", "Network.getCookies", "Network.setCookie",
-        "Network.setCookies", "Network.deleteCookies", "Network.clearBrowserCookies", "Network.loadNetworkResource"], StringComparer.OrdinalIgnoreCase);
+        "Network.setCookies", "Network.deleteCookies", "Network.clearBrowserCookies", "Network.loadNetworkResource",
+        "Page.addScriptToEvaluateOnLoad", "Page.getCookies", "Page.deleteCookie"], StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Null when the devtools tool may call <paramref name="method"/>; otherwise the refusal Claude reads.</summary>
     public static string? DevToolsRefusal(string method)
