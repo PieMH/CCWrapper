@@ -1,3 +1,4 @@
+using System.Reflection;
 using CCWrapper.Data;
 using CCWrapper.Views;
 
@@ -208,5 +209,15 @@ public sealed class PanelLogicTests
         var evil = "x\"); alert(1); (\"</script>\n";
         var js = BrowserScripts.Call("(s, t) => s", evil, "t");
         Assert.Equal("((s, t) => s)(\"x\\u0022); alert(1); (\\u0022\\u003C/script\\u003E\\n\",\"t\")", js);
+    }
+
+    [Fact]
+    public void WebView2_update_renamed_the_window_close_handler_fix_DropControlsCloseHandler()
+    {
+        var field = typeof(Microsoft.Web.WebView2.Core.CoreWebView2).GetField(BrowserPanel.CloseEventField, BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.Equal(typeof(EventHandler<object>), field?.FieldType);
+        // not a base of WebView2 in this package: the control's helper class that holds the handler
+        var control = typeof(Microsoft.Web.WebView2.Wpf.WebView2).Assembly.GetType("Microsoft.Web.WebView2.Wpf.WebView2Base");
+        Assert.NotNull(control?.GetMethod(BrowserPanel.ControlCloseHandler, BindingFlags.NonPublic | BindingFlags.Instance));
     }
 }

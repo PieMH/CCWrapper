@@ -148,7 +148,8 @@ public static class Smoke
         await panel.SwitchTabAsync(2, default);
         await panel.EvaluateAsync("setTimeout(() => window.close(), 300)", default);
         await Task.Delay(1000);
-        if ((await panel.TabsAsync(default)).Contains("Tab 2")) return false;
+        var afterPopup = await panel.TabsAsync(default);
+        if (afterPopup.Contains("Tab 2") || !afterPopup.Contains("Tab 1 (front)")) return false; // tab 3 is its strip neighbour, but tab 1 opened it
         await panel.CloseTabAsync(3, default);
         var left = await panel.TabsAsync(default);
         if (left.Contains("Tab 2") || left.Contains("Tab 3") || !left.Contains("Tab 1 (front)")) return false;

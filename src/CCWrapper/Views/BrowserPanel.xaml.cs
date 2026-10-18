@@ -21,6 +21,7 @@ public partial class BrowserPanel : UserControl
         public Task Ready = Task.CompletedTask;
         public string? Pending; // a Navigate() that came before this tab's WebView2 was ready
         public bool Popup; // opened by a page's user-initiated window.open: the only kind a page's window.close() may close
+        public Tab? Opener; // the tab whose page opened this pop-up; it comes back to front when the pop-up closes itself
     }
 
     readonly string _profile;
@@ -95,18 +96,30 @@ public partial class BrowserPanel : UserControl
         var core = tab.Web.CoreWebView2;
         DropControlsCloseHandler(core);
         core.NewWindowRequested += OnNewWindow;
-        core.WindowCloseRequested += (_, _) => { if (tab.Popup) Dispatcher.InvokeAsync(() => CloseTab(tab.Id)); }; // window.close() of a pop-up tab (an OAuth popup); any other tab stays, as Claude's tools work on it
+        core.WindowCloseRequested += (_, _) => { if (tab.Popup) Dispatcher.InvokeAsync(() => ClosePopup(tab)); }; // window.close() of a pop-up tab (an OAuth popup); any other tab stays, as Claude's tools work on it
         core.DocumentTitleChanged += (_, _) => Retitle(tab);
         if (tab.Pending is { } url) core.Navigate(url);
         tab.Pending = null;
     }
 
+    // The WebView2 package's private names DropControlsCloseHandler reflects on; PanelLogicTests fails when an update renames them.
+    public const string CloseEventField = "privateWindowCloseRequested";
+    public const string ControlCloseHandler = "CoreWebView2_WindowCloseRequested";
+
     // WPF's WebView2 closes its whole parent Window on a page's window.close(), the app's too. shortcut: reflection on the Core
-    // assembly's private field; if a package update renames it the handler stays, and the smoke test's window.close step fails.
+    // assembly's private field; if a package update renames it the handler stays, the test and the smoke test's window.close step fail.
     static void DropControlsCloseHandler(CoreWebView2 core)
     {
-        if (typeof(CoreWebView2).GetField("privateWindowCloseRequested", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(core) is not EventHandler<object> all) return;
-        foreach (var h in all.GetInvocationList().Where(h => h.Method.Name == "CoreWebView2_WindowCloseRequested")) core.WindowCloseRequested -= (EventHandler<object>)h;
+        if (typeof(CoreWebView2).GetField(CloseEventField, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(core) is not EventHandler<object> all) return;
+        foreach (var h in all.GetInvocationList().Where(h => h.Method.Name == ControlCloseHandler)) core.WindowCloseRequested -= (EventHandler<object>)h;
+    }
+
+    // a pop-up that closes itself while in front hands the front back to the tab that opened it, not to its strip neighbour
+    void ClosePopup(Tab popup)
+    {
+        var wasFront = popup == _tabs.FrontTab;
+        if (!CloseTab(popup.Id) || !wasFront || popup.Opener is not { } opener || _tabs[opener.Id] != opener) return;
+        Show(opener);
     }
 
     /// <summary>target=_blank and window.open by a click, from any tab: a new tab in front. A page's window.open('file:...') is dropped,
@@ -115,6 +128,7 @@ public partial class BrowserPanel : UserControl
     {
         if (!e.IsUserInitiated || !SchemeAllowed(e.Uri) || AddTab() is not { } tab) { e.Handled = true; return; }
         tab.Popup = true;
+        tab.Opener = _tabs.All.Select(t => t.Tab).FirstOrDefault(t => t.Web.CoreWebView2 == sender);
         var deferral = e.GetDeferral();
         try
         {
