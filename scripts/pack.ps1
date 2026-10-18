@@ -18,10 +18,10 @@ function Run([string]$exe) {
 
 if ($Stage -in 'publish', 'all') {
     Remove-Item $publish -Recurse -Force -ErrorAction Ignore
-    Run dotnet publish "$root/src/CCWrapper" -c Release -r win-x64 --self-contained -p:Version=$Version -o $publish
+    Run dotnet publish "$root/src/CCWrapper" -c Release -r win-x64 --self-contained "-p:Version=$Version" -o $publish
     $relay = Join-Path $root 'artifacts/relay'
     Remove-Item $relay -Recurse -Force -ErrorAction Ignore
-    Run dotnet publish "$root/src/CCWrapper.StatusRelay" -c Release -r win-x64 -p:Version=$Version -o $relay
+    Run dotnet publish "$root/src/CCWrapper.StatusRelay" -c Release -r win-x64 "-p:Version=$Version" -o $relay
     # The app publish carries the framework-dependent relay (dll + runtimeconfig); only the native exe may ship.
     Remove-Item "$publish/CCWrapper.StatusRelay.*" -Force
     Copy-Item "$relay/CCWrapper.StatusRelay.exe" $publish
