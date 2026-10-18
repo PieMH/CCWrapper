@@ -211,7 +211,7 @@ public sealed class BrowserMcpTests
     [Fact]
     public async Task Relay_bridges_stdio_to_the_pipe()
     {
-        var name = BrowserPipe.NameFor(Environment.ProcessId);
+        var name = BrowserPipe.NameFor(Random.Shared.Next(1_000_000_000, int.MaxValue)); // digits only for the relay, but not our pid: ThemeLoadTests' MainWindow owns that name
         using var server = new BrowserPipe(name, Mcp());
         using var relay = StartRelay("--browser", name);
         try

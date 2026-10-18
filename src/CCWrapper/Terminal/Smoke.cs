@@ -16,7 +16,7 @@ public static class Smoke
     {
         try
         {
-            return await EchoAsync() == 0 && await BrowserAsync() ? 0 : 1;
+            return await EchoAsync() == 0 && await BrowserAsync() && await PanelAsync() ? 0 : 1;
         }
         catch (Exception ex)
         {
@@ -84,6 +84,40 @@ public static class Smoke
             && list?["result"]?["tools"]?.AsArray().Count == 7
             && call?["id"]?.GetValue<int>() == 3
             && call?["result"]?["content"]?[0]?["text"]?.GetValue<string>() == "smoke-snapshot";
+    }
+
+    // The real Browser panel in a throwaway profile: snapshot refs, typing, clicking and evaluating on a data: page.
+    static async Task<bool> PanelAsync()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "ccw-smoke-browser");
+        try { Directory.Delete(dir, true); } catch (Exception) { } // the last run's profile; WebView2 still holds it until the process ends
+        var panel = new CCWrapper.Views.BrowserPanel(dir);
+        new Window
+        {
+            Content = panel, Width = 900, Height = 500, Left = -32000, Top = -32000, Title = "CCWrapper smoke browser",
+            WindowStartupLocation = WindowStartupLocation.Manual, WindowStyle = WindowStyle.None,
+            ShowInTaskbar = false, ShowActivated = false,
+        }.Show();
+        var run = PanelStepsAsync(panel);
+        if (await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(40))) == run && await run) return true;
+        Console.Error.WriteLine("smoke: the Browser panel steps failed");
+        return false;
+    }
+
+    static async Task<bool> PanelStepsAsync(IBrowserDriver panel)
+    {
+        const string html = "<h1>Smoke</h1><a href='#x'>link</a><input name=q placeholder=Q><button onclick=\"document.title='clicked:'+document.querySelector('input').value\">Go</button>";
+        await panel.NavigateAsync("data:text/html," + Uri.EscapeDataString(html), default);
+        var snap = await panel.SnapshotAsync(default);
+        var button = System.Text.RegularExpressions.Regex.Match(snap, @"\[(\d+)\] button ""Go""");
+        var input = System.Text.RegularExpressions.Regex.Match(snap, @"\[(\d+)\] input text name=""q""");
+        if (!snap.Contains("# Smoke") || !snap.Contains("link \"link\" -> ") || !button.Success || !input.Success) return false;
+        await panel.TypeAsync(input.Groups[1].Value, "hello", false, default);
+        await panel.ClickAsync(button.Groups[1].Value, default);
+        var title = await panel.EvaluateAsync("document.title", default);
+        try { await panel.ClickAsync("999", default); return false; }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("No element matches")) { }
+        return title == "\"clicked:hello\"";
     }
 
     sealed class SmokeDriver : IBrowserDriver

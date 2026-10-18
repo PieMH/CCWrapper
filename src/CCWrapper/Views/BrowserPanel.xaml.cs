@@ -11,18 +11,28 @@ public partial class BrowserPanel : UserControl
 {
     string? _pending; // a Navigate() that came before the WebView2 was ready
 
-    public BrowserPanel()
+    public BrowserPanel() : this(null) { }
+
+    /// <param name="userDataFolder">Null: this account's own profile.</param>
+    public BrowserPanel(string? userDataFolder)
     {
         InitializeComponent();
         // its own profile per account, so each account keeps its own cookies and parallel windows don't clash
         Web.CreationProperties = new CoreWebView2CreationProperties
         {
-            UserDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            UserDataFolder = userDataFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "CCWrapper", "WebView2", "browser-" + AppState.Current.Account.Letter),
         };
         Web.CoreWebView2InitializationCompleted += (_, e) =>
         {
-            if (!e.IsSuccess) { Address.Text = "WebView2 failed to start: " + e.InitializationException?.Message; return; }
+            if (!e.IsSuccess)
+            {
+                var why = "WebView2 failed to start: " + e.InitializationException?.Message;
+                Address.Text = why;
+                _ready.TrySetException(new InvalidOperationException("The Browser panel's " + why));
+                return;
+            }
+            _ready.TrySetResult();
             // target=_blank and window.open stay in this single view
             Web.CoreWebView2.NewWindowRequested += (_, n) => { n.Handled = true; Web.CoreWebView2.Navigate(n.Uri); };
             if (_pending is { } url) Web.CoreWebView2.Navigate(url);
@@ -49,7 +59,7 @@ public partial class BrowserPanel : UserControl
     public static string NormalizeUrl(string input)
     {
         var s = input.Trim();
-        if (s.Contains("://") || s.StartsWith("about:", StringComparison.OrdinalIgnoreCase)) return s;
+        if (s.Contains("://") || s.StartsWith("about:", StringComparison.OrdinalIgnoreCase) || s.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return s;
         var host = s.Split('/', '?', '#')[0];
         var local = host.StartsWith("localhost", StringComparison.OrdinalIgnoreCase) || host.StartsWith("127.") || host.StartsWith("0.0.0.0") || host.StartsWith("[::1]");
         return (local ? "http://" : "https://") + s;
