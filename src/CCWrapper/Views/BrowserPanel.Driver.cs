@@ -90,6 +90,7 @@ public partial class BrowserPanel : IBrowserDriver
         var rows = new List<(int, string?, string?, bool)>();
         foreach (var (id, tab) in _tabs.All.ToList())
         {
+            if (_tabs[id] != tab) continue; // closed during an earlier tab's wait
             string? title = "(not started)", url = tab.Pending ?? "about:blank";
             if (tab.Ready.IsCompletedSuccessfully)
             {

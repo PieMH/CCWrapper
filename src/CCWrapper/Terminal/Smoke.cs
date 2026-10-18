@@ -87,7 +87,8 @@ public static class Smoke
     }
 
     // The real Browser panel in a throwaway profile: snapshot refs, typing, clicking and evaluating on a data: page; then tabs:
-    // a window.open that becomes a tab with its opener's window object, new_tab, switch_tab and close_tab.
+    // a click's window.open that becomes a tab with its opener's window object, a timer's that is dropped, new_tab, switch_tab,
+    // window.close() (pop-up tabs only) and close_tab.
     static async Task<bool> PanelAsync()
     {
         var dir = Path.Combine(Path.GetTempPath(), "ccw-smoke-browser");
@@ -131,14 +132,24 @@ public static class Smoke
         var dropped = await panel.ClickAsync("#bad", default); // an ftp: popup is refused (a file: one never reaches NewWindowRequested): no new tab
         var listed = await panel.TabsAsync(default);
         if (dropped.Contains("is now in front") || !listed.Contains("Tab 2") || listed.Contains("Tab 3")) return false;
-        var opened = await panel.NewTabAsync("data:text/html," + Uri.EscapeDataString("<title>Two</title><h1>Second</h1>"), default);
+        // a page that opens a window on its own timer, with no click: dropped, so no tab 4 and the front stays
+        var opened = await panel.NewTabAsync("data:text/html," + Uri.EscapeDataString("<title>Two</title><h1>Second</h1><script>setTimeout(() => window.open('https://example.com/'), 100)</script>"), default);
         if (!opened.StartsWith("Opened tab 3 in front. Loaded") || await panel.EvaluateAsync("document.title", default) != "\"Two\"") return false;
+        await Task.Delay(1000);
+        if ((await panel.TabsAsync(default)).Contains("Tab 4")) return false;
         await panel.SwitchTabAsync(1, default);
         await panel.SwitchTabAsync(3, default);
         var tabs = await panel.TabsAsync(default);
         if (!tabs.Contains("Tab 1: clicked:hello - data:") || !tabs.Contains("Tab 3 (front): Two - data:")) return false;
+        // window.close() leaves a tab Claude or the user opened (one history entry, which Chromium lets a script close) and closes a pop-up tab
+        await panel.EvaluateAsync("setTimeout(() => window.close(), 300)", default);
+        await Task.Delay(1000);
+        if (!(await panel.TabsAsync(default)).Contains("Tab 3 (front)")) return false;
+        await panel.SwitchTabAsync(2, default);
+        await panel.EvaluateAsync("setTimeout(() => window.close(), 300)", default);
+        await Task.Delay(1000);
+        if ((await panel.TabsAsync(default)).Contains("Tab 2")) return false;
         await panel.CloseTabAsync(3, default);
-        await panel.CloseTabAsync(2, default);
         var left = await panel.TabsAsync(default);
         if (left.Contains("Tab 2") || left.Contains("Tab 3") || !left.Contains("Tab 1 (front)")) return false;
         try { await panel.SwitchTabAsync(3, default); return false; }

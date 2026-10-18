@@ -20,6 +20,7 @@ public partial class BrowserPanel : UserControl
         public readonly TextBlock Title = title;
         public Task Ready = Task.CompletedTask;
         public string? Pending; // a Navigate() that came before this tab's WebView2 was ready
+        public bool Popup; // opened by a page's user-initiated window.open: the only kind a page's window.close() may close
     }
 
     readonly string _profile;
@@ -92,18 +93,28 @@ public partial class BrowserPanel : UserControl
             throw new InvalidOperationException("The Browser panel's " + why, ex);
         }
         var core = tab.Web.CoreWebView2;
+        DropControlsCloseHandler(core);
         core.NewWindowRequested += OnNewWindow;
-        core.WindowCloseRequested += (_, _) => Dispatcher.InvokeAsync(() => CloseTab(tab.Id)); // window.close() of a script-opened tab (an OAuth popup)
+        core.WindowCloseRequested += (_, _) => { if (tab.Popup) Dispatcher.InvokeAsync(() => CloseTab(tab.Id)); }; // window.close() of a pop-up tab (an OAuth popup); any other tab stays, as Claude's tools work on it
         core.DocumentTitleChanged += (_, _) => Retitle(tab);
         if (tab.Pending is { } url) core.Navigate(url);
         tab.Pending = null;
     }
 
-    /// <summary>target=_blank and window.open, from any tab: a new tab in front. A page's window.open('file:...') is dropped, not
-    /// opened, and so is one past the tab limit.</summary>
+    // WPF's WebView2 closes its whole parent Window on a page's window.close(), the app's too. shortcut: reflection on the Core
+    // assembly's private field; if a package update renames it the handler stays, and the smoke test's window.close step fails.
+    static void DropControlsCloseHandler(CoreWebView2 core)
+    {
+        if (typeof(CoreWebView2).GetField("privateWindowCloseRequested", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(core) is not EventHandler<object> all) return;
+        foreach (var h in all.GetInvocationList().Where(h => h.Method.Name == "CoreWebView2_WindowCloseRequested")) core.WindowCloseRequested -= (EventHandler<object>)h;
+    }
+
+    /// <summary>target=_blank and window.open by a click, from any tab: a new tab in front. A page's window.open('file:...') is dropped,
+    /// not opened, and so is one the page opened on its own (a timer) or past the tab limit: the front tab must not change unasked.</summary>
     async void OnNewWindow(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
-        if (!SchemeAllowed(e.Uri) || AddTab() is not { } tab) { e.Handled = true; return; }
+        if (!e.IsUserInitiated || !SchemeAllowed(e.Uri) || AddTab() is not { } tab) { e.Handled = true; return; }
+        tab.Popup = true;
         var deferral = e.GetDeferral();
         try
         {
@@ -154,7 +165,7 @@ public partial class BrowserPanel : UserControl
     // equal widths that fill the strip; the style's MinWidth is the floor, its MaxWidth the ceiling
     void FitTabs()
     {
-        var w = Math.Max(0, Scroll.ActualWidth / Math.Max(1, _tabs.All.Count) - 2);
+        var w = Math.Max(0, Scroll.ActualWidth / Math.Max(1, _tabs.All.Count) - 3);
         foreach (var (_, t) in _tabs.All) t.Header.Width = w;
     }
 
