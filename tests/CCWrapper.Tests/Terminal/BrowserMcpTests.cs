@@ -169,6 +169,8 @@ public sealed class BrowserMcpTests
     [InlineData("Page.addScriptToEvaluateOnLoad")] // deprecated aliases
     [InlineData("Page.getCookies")]
     [InlineData("Page.deleteCookie")]
+    [InlineData("Page.navigateToHistoryEntry")] // a navigate that skips SchemeAllowed
+    [InlineData("Page.getNavigationHistory")] // lists local pages the user opened
     [InlineData("Network.getAllCookies ")]
     [InlineData("Runtime")]
     [InlineData("Runtime.evaluate.x")]

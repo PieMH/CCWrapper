@@ -82,7 +82,7 @@ public partial class BrowserPanel : IBrowserDriver
     });
 
     /// <summary>On the UI thread, with the panel in front and its WebView2 started: a TabControl loads only the selected tab.
-    /// Refuses unless the page shown is a web page (history, an address-bar file: page...); only navigate passes <paramref name="anyPage"/>.</summary>
+    /// Refuses, before and after the body, unless the page shown is a web page (history, an address-bar file: page...); only navigate passes <paramref name="anyPage"/>.</summary>
     async Task<T> OnUi<T>(CancellationToken ct, Func<CoreWebView2, Task<T>> body, bool anyPage = false) => await await Dispatcher.InvokeAsync(async () =>
     {
         if (Parent is TabItem { IsSelected: false } tab)
@@ -92,10 +92,16 @@ public partial class BrowserPanel : IBrowserDriver
         }
         try { await _ready.Task.WaitAsync(StartLimit, ct); }
         catch (TimeoutException) { throw new InvalidOperationException("The Browser panel's WebView2 did not start within 20 s."); }
-        var source = Web.CoreWebView2.Source;
-        if (source.Length == 0 && !anyPage) source = (string?)(await Js("location.href"))["value"] ?? ""; // WebView2 reports no Source for a data: page
-        if (!anyPage && NotAWebPage(source) is { } refusal) throw new InvalidOperationException(refusal);
-        return await body(Web.CoreWebView2).WaitAsync(ct);
+        async Task Check()
+        {
+            var source = Web.CoreWebView2.Source;
+            if (source.Length == 0) source = (string?)(await Js("location.href"))["value"] ?? ""; // WebView2 reports no Source for a data: page
+            if (NotAWebPage(source) is { } refusal) throw new InvalidOperationException(refusal);
+        }
+        if (!anyPage) await Check();
+        var result = await body(Web.CoreWebView2).WaitAsync(ct);
+        if (!anyPage) await Check(); // a history move the body scheduled may have committed a local page meanwhile: never return what it read
+        return result;
     }, DispatcherPriority.Normal, ct);
 
     Task<string> Cdp(string method, JsonObject args) => Web.CoreWebView2.CallDevToolsProtocolMethodAsync(method, args.ToJsonString());

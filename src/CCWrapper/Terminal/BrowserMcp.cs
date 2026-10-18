@@ -53,7 +53,7 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
     const string DevToolsLimits = "devtools reaches only the Accessibility, Animation, CSS, DOM, DOMSnapshot, Emulation, Log, Overlay, Page, " +
         "Performance, Runtime and Network domains, and refuses cookie access (Network.getAllCookies, getCookies, setCookie, setCookies, " +
         "deleteCookies, clearBrowserCookies, Page.getCookies, Page.deleteCookie), Network.loadNetworkResource, DOM.setFileInputFiles, " +
-        "Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument, Page.addScriptToEvaluateOnLoad and Page.navigate (use the navigate tool).";
+        "Page.setDownloadBehavior, Page.addScriptToEvaluateOnNewDocument, Page.addScriptToEvaluateOnLoad, Page.navigateToHistoryEntry, Page.getNavigationHistory and Page.navigate (use the navigate tool).";
 
     static readonly HashSet<string> DevToolsDomains = new(["Accessibility", "Animation", "CSS", "DOM", "DOMSnapshot", "Emulation", "Log",
         "Overlay", "Page", "Performance", "Runtime", "Network"], StringComparer.OrdinalIgnoreCase);
@@ -62,7 +62,7 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
     static readonly HashSet<string> DevToolsDenied = new(["DOM.setFileInputFiles", "Page.setDownloadBehavior",
         "Page.addScriptToEvaluateOnNewDocument", "Page.navigate", "Network.getAllCookies", "Network.getCookies", "Network.setCookie",
         "Network.setCookies", "Network.deleteCookies", "Network.clearBrowserCookies", "Network.loadNetworkResource",
-        "Page.addScriptToEvaluateOnLoad", "Page.getCookies", "Page.deleteCookie"], StringComparer.OrdinalIgnoreCase);
+        "Page.addScriptToEvaluateOnLoad", "Page.getCookies", "Page.deleteCookie", "Page.navigateToHistoryEntry", "Page.getNavigationHistory"], StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Null when the devtools tool may call <paramref name="method"/>; otherwise the refusal Claude reads.</summary>
     public static string? DevToolsRefusal(string method)

@@ -55,9 +55,9 @@ dotnet test
   terminal's WebView2, never a remote debugging port. The pipe is `CurrentUserOnly`, and the only launch flags it adds are
   `--mcp-config` and `--append-system-prompt`. `browserTool` off: new tabs get no flags and `BrowserMcp` refuses calls from open ones.
   Hardened: each tools/call has a 60 s limit, `navigate` and `window.open` pass only http, https, blob, about:blank and data
-  (`BrowserPanel.SchemeAllowed`), every tool but `navigate` refuses while the panel shows any other page (`OnUi`, whatever got it
+  (`BrowserPanel.SchemeAllowed`), every tool but `navigate` refuses while the panel shows any other page (`OnUi`, checked before and after the body, whatever got it
   there: history, the address bar), and `devtools` is an allow-list by domain (`BrowserMcp.DevToolsRefusal`) that denies cookies,
-  downloads, local files, new-document scripts and the whole Input domain (it would paste the clipboard). `evaluate` runs with the page's own access.
+  downloads, local files, new-document scripts, history navigation and the whole Input domain (keyboard, mouse, touch, drag: it would paste the clipboard). `evaluate` runs with the page's own access.
   (PRIVACY.md and the README say so too, keep them in step).
 - **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden
   (`ClaudeCli`), only after the user's click, with a confirm before anything is removed. These commands never call the
