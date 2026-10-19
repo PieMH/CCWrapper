@@ -230,7 +230,15 @@ public partial class BrowserPanel : UserControl
 
     /// <summary>The tabs tool's text, one line per tab. A tab whose page is not a web address shows neither its title nor its URL.</summary>
     public static string DescribeTabs(IEnumerable<(int Id, string? Title, string? Url, bool Front)> tabs) => string.Join("\n", tabs.Select(t =>
-        $"Tab {t.Id}{(t.Front ? " (front)" : "")}: " + (NotAWebPage(t.Url) is null ? $"{t.Title} - {t.Url}" : "(not a web page)")));
+        $"Tab {t.Id}{(t.Front ? " (front)" : "")}: " + (NotAWebPage(t.Url) is null ? Page(t.Url, t.Title) : "(not a web page)")));
+
+    /// <summary>"title - url", the URL cut at 80 characters (a data: URL can be the whole page); just the URL when the page has
+    /// no title of its own (WebView2 then reports the URL as the title).</summary>
+    public static string Page(string? url, string? title)
+    {
+        var shown = url is { Length: > 80 } ? url[..79] + "…" : url ?? "";
+        return string.IsNullOrWhiteSpace(title) || title == url || title == shown ? shown : $"{title} - {shown}";
+    }
 
     void OnAddressKeyDown(object sender, KeyEventArgs e)
     {

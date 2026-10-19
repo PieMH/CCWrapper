@@ -145,6 +145,22 @@ public sealed class PanelLogicTests
             BrowserPanel.DescribeTabs([(1, "Example", "https://example.com/", false), (3, "secret.txt", "file:///C:/secret.txt", true),
                 (4, null, null, false), (5, "Two", "data:text/html,x", false)]));
 
+    [Theory]
+    [InlineData("https://example.com/", "Example", "Example - https://example.com/")]
+    [InlineData("data:text/html,<h1>t8</h1>", "data:text/html,<h1>t8</h1>", "data:text/html,<h1>t8</h1>")] // no <title>: WebView2 reports the URL
+    [InlineData("https://example.com/", "", "https://example.com/")]
+    public void Browser_page_text_drops_a_title_that_only_repeats_the_url(string url, string title, string expected) =>
+        Assert.Equal(expected, BrowserPanel.Page(url, title));
+
+    [Fact]
+    public void Browser_page_text_cuts_a_long_url_at_80_characters()
+    {
+        var url = "data:text/html," + new string('x', 200);
+        var shown = BrowserPanel.Page(url, url);
+        Assert.Equal(80, shown.Length);
+        Assert.EndsWith("…", shown);
+    }
+
     [Fact]
     public void Browser_tab_ids_count_up_never_reused_and_the_new_tab_is_in_front()
     {

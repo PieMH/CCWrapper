@@ -23,8 +23,9 @@ public partial class BrowserPanel : IBrowserDriver
     async Task<string> LoadAsync(CoreWebView2 core, string url, CancellationToken ct)
     {
         var done = await AfterAsync(core, () => { core.Navigate(url); return Task.CompletedTask; }, LoadLimit, certain: true, ct);
-        return done is null ? $"Still loading after 30 s: {core.Source}"
-            : done.IsSuccess ? $"Loaded {core.Source} (title: {core.DocumentTitle})"
+        var source = await SourceOf(core); // a data: page has no Source
+        return done is null ? $"Still loading after 30 s: {Page(source, null)}"
+            : done.IsSuccess ? $"Loaded {Page(source, core.DocumentTitle)}"
             : $"Could not load {url}: {done.WebErrorStatus}";
     }
 
