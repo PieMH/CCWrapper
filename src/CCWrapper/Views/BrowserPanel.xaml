@@ -1,20 +1,28 @@
 <UserControl x:Class="CCWrapper.Views.BrowserPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <DockPanel>
-        <Grid DockPanel.Dock="Top" Margin="8,4,8,8">
+        <DockPanel DockPanel.Dock="Top" Margin="8,4,8,4">
+            <Button x:Name="NewTab" DockPanel.Dock="Right" Style="{StaticResource Flat}" Width="28" Padding="0" Margin="4,0,0,0" ToolTip="New tab" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="New tab" Click="OnNewTab"><TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="12" /></Button>
+            <!-- one row of equal tabs that shrink as more open, down to the tab style's MinWidth; then the row scrolls -->
+            <ScrollViewer x:Name="Scroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" SizeChanged="OnStripResized">
+                <StackPanel x:Name="Strip" Orientation="Horizontal" />
+            </ScrollViewer>
+        </DockPanel>
+        <!-- DataContext: the front tab's WebView2 -->
+        <Grid x:Name="Bar" DockPanel.Dock="Top" Margin="8,0,8,8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Button Style="{StaticResource Flat}" Width="30" Padding="0" ToolTip="Back" AutomationProperties.Name="Back" Click="OnBack" IsEnabled="{Binding CanGoBack, ElementName=Web}"><TextBlock Style="{StaticResource Icon}" Text="&#xE72B;" FontSize="13" /></Button>
-            <Button Grid.Column="1" Style="{StaticResource Flat}" Width="30" Padding="0" Margin="2,0,0,0" ToolTip="Forward" AutomationProperties.Name="Forward" Click="OnForward" IsEnabled="{Binding CanGoForward, ElementName=Web}"><TextBlock Style="{StaticResource Icon}" Text="&#xE72A;" FontSize="13" /></Button>
+            <Button Style="{StaticResource Flat}" Width="30" Padding="0" ToolTip="Back" AutomationProperties.Name="Back" Click="OnBack" IsEnabled="{Binding CanGoBack, FallbackValue=False}"><TextBlock Style="{StaticResource Icon}" Text="&#xE72B;" FontSize="13" /></Button>
+            <Button Grid.Column="1" Style="{StaticResource Flat}" Width="30" Padding="0" Margin="2,0,0,0" ToolTip="Forward" AutomationProperties.Name="Forward" Click="OnForward" IsEnabled="{Binding CanGoForward, FallbackValue=False}"><TextBlock Style="{StaticResource Icon}" Text="&#xE72A;" FontSize="13" /></Button>
             <Button Grid.Column="2" Style="{StaticResource Flat}" Width="30" Padding="0" Margin="2,0,6,0" ToolTip="Reload" AutomationProperties.Name="Reload" Click="OnReload"><TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="13" /></Button>
             <TextBox x:Name="Address" Grid.Column="3" KeyDown="OnAddressKeyDown" GotKeyboardFocus="OnAddressFocus" />
         </Grid>
-        <wv2:WebView2 x:Name="Web" />
+        <!-- each tab's WebView2; only the front one is visible -->
+        <Grid x:Name="Pages" />
     </DockPanel>
 </UserControl>

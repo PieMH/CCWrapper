@@ -81,12 +81,14 @@ public static class Smoke
         var list = await Ask("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
         var call = await Ask("""{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"snapshot","arguments":{}}}""");
         return init?["result"]?["serverInfo"]?["name"]?.GetValue<string>() == "ccwrapper-browser"
-            && list?["result"]?["tools"]?.AsArray().Count == 7
+            && list?["result"]?["tools"]?.AsArray().Count == 11
             && call?["id"]?.GetValue<int>() == 3
             && call?["result"]?["content"]?[0]?["text"]?.GetValue<string>() == "smoke-snapshot";
     }
 
-    // The real Browser panel in a throwaway profile: snapshot refs, typing, clicking and evaluating on a data: page.
+    // The real Browser panel in a throwaway profile: snapshot refs, typing, clicking and evaluating on a data: page; then tabs:
+    // a click's window.open that becomes a tab with its opener's window object, a timer's that is dropped, new_tab, switch_tab,
+    // window.close() (pop-up tabs only) and close_tab.
     static async Task<bool> PanelAsync()
     {
         var dir = Path.Combine(Path.GetTempPath(), "ccw-smoke-browser");
@@ -99,14 +101,15 @@ public static class Smoke
             ShowInTaskbar = false, ShowActivated = false,
         }.Show();
         var run = PanelStepsAsync(panel);
-        if (await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(40))) == run && await run) return true;
+        if (await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(60))) == run && await run) return true;
         Console.Error.WriteLine("smoke: the Browser panel steps failed");
         return false;
     }
 
     static async Task<bool> PanelStepsAsync(IBrowserDriver panel)
     {
-        const string html = "<h1>Smoke</h1><a href='#x'>link</a><input name=q placeholder=Q><button onclick=\"document.title='clicked:'+document.querySelector('input').value\">Go</button>";
+        const string html = "<h1>Smoke</h1><a href='#x'>link</a><input name=q placeholder=Q><button onclick=\"document.title='clicked:'+document.querySelector('input').value\">Go</button>"
+            + "<button id=pop onclick=\"window.w=window.open('about:blank')\">Pop</button><button id=bad onclick=\"window.open('ftp://example.com/')\">Bad</button>";
         await panel.NavigateAsync("data:text/html," + Uri.EscapeDataString(html), default);
         var snap = await panel.SnapshotAsync(default);
         var button = System.Text.RegularExpressions.Regex.Match(snap, @"\[(\d+)\] button ""Go""");
@@ -117,7 +120,42 @@ public static class Smoke
         var title = await panel.EvaluateAsync("document.title", default);
         try { await panel.ClickAsync("999", default); return false; }
         catch (InvalidOperationException ex) when (ex.Message.StartsWith("No element matches")) { }
-        return title == "\"clicked:hello\"";
+        if (title != "\"clicked:hello\"") return false;
+        return await TabStepsAsync(panel);
+    }
+
+    static async Task<bool> TabStepsAsync(IBrowserDriver panel)
+    {
+        if (!(await panel.ClickAsync("#pop", default)).Contains("Tab 2 is now in front") || !(await panel.TabsAsync(default)).Contains("Tab 2 (front): ")) return false;
+        await panel.SwitchTabAsync(1, default);
+        if (await panel.EvaluateAsync("!!window.w && !window.w.closed", default) != "true") return false; // the popup tab kept its opener link
+        var dropped = await panel.ClickAsync("#bad", default); // an ftp: popup is refused (a file: one never reaches NewWindowRequested): no new tab
+        var listed = await panel.TabsAsync(default);
+        if (dropped.Contains("is now in front") || !listed.Contains("Tab 2") || listed.Contains("Tab 3")) return false;
+        // a page that opens a window on its own timer, with no click: dropped, so no tab 4 and the front stays
+        var opened = await panel.NewTabAsync("data:text/html," + Uri.EscapeDataString("<title>Two</title><h1>Second</h1><script>setTimeout(() => window.open('https://example.com/'), 100)</script>"), default);
+        if (!opened.StartsWith("Opened tab 3 in front. Loaded") || await panel.EvaluateAsync("document.title", default) != "\"Two\"") return false;
+        await Task.Delay(1000);
+        if ((await panel.TabsAsync(default)).Contains("Tab 4")) return false;
+        await panel.SwitchTabAsync(1, default);
+        await panel.SwitchTabAsync(3, default);
+        var tabs = await panel.TabsAsync(default);
+        if (!tabs.Contains("Tab 1: clicked:hello - data:") || !tabs.Contains("Tab 3 (front): Two - data:")) return false;
+        // window.close() leaves a tab Claude or the user opened (one history entry, which Chromium lets a script close) and closes a pop-up tab
+        await panel.EvaluateAsync("setTimeout(() => window.close(), 300)", default);
+        await Task.Delay(1000);
+        if (!(await panel.TabsAsync(default)).Contains("Tab 3 (front)")) return false;
+        await panel.SwitchTabAsync(2, default);
+        await panel.EvaluateAsync("setTimeout(() => window.close(), 300)", default);
+        await Task.Delay(1000);
+        var afterPopup = await panel.TabsAsync(default);
+        if (afterPopup.Contains("Tab 2") || !afterPopup.Contains("Tab 1 (front)")) return false; // tab 3 is its strip neighbour, but tab 1 opened it
+        await panel.CloseTabAsync(3, default);
+        var left = await panel.TabsAsync(default);
+        if (left.Contains("Tab 2") || left.Contains("Tab 3") || !left.Contains("Tab 1 (front)")) return false;
+        try { await panel.SwitchTabAsync(3, default); return false; }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("There is no tab 3")) { }
+        return (await panel.SnapshotAsync(default)).Contains("# Smoke");
     }
 
     sealed class SmokeDriver : IBrowserDriver
@@ -129,5 +167,9 @@ public static class Smoke
         public Task<byte[]> ScreenshotAsync(CancellationToken ct) => throw new NotSupportedException();
         public Task<string> EvaluateAsync(string expression, CancellationToken ct) => throw new NotSupportedException();
         public Task<string> DevToolsAsync(string method, string paramsJson, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> TabsAsync(CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> NewTabAsync(string url, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> SwitchTabAsync(int id, CancellationToken ct) => throw new NotSupportedException();
+        public Task<string> CloseTabAsync(int id, CancellationToken ct) => throw new NotSupportedException();
     }
 }

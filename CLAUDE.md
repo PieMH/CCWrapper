@@ -51,12 +51,12 @@ dotnet test
   inside the usage policy. One deletion besides: the right-click Delete of a session removes its transcript
   `<id>.jsonl` and its `<id>\` folder (`SessionCatalog.Delete`), only after a confirm and never while a claude process
   or tab has the session; it refuses any path outside the account's `projects\<dir>\<id>.jsonl`.
-- **The browser tool drives only the Browser panel's WebView2** (its own user-data folder) through in-process CDP. Never the
+- **The browser tool drives only the Browser panel's WebView2** (its own user-data folder) through in-process CDP, one WebView2 per tab on the panel's one profile. Never the
   terminal's WebView2, never a remote debugging port. The pipe is `CurrentUserOnly`, and the only launch flags it adds are
   `--mcp-config` and `--append-system-prompt`. `browserTool` off: new tabs get no flags and `BrowserMcp` refuses calls from open ones.
-  Hardened: each tools/call has a 60 s limit, `navigate` and `window.open` pass only http, https, blob, about:blank and data
-  (`BrowserPanel.SchemeAllowed`), every tool but `navigate` refuses while the panel shows any other page (`OnUi`, checked before and after the body, whatever got it
-  there: history, the address bar), and `devtools` is an allow-list by domain (`BrowserMcp.DevToolsRefusal`) that denies cookies,
+  Hardened: each tools/call has a 60 s limit, `navigate`, `new_tab` and `window.open` (which opens a tab only when user-initiated, max 20, else dropped; `window.close()` closes only such pop-up tabs, and `DropControlsCloseHandler` stops WPF's WebView2 closing the whole window on it) pass only http, https, blob,
+  about:blank and data (`BrowserPanel.SchemeAllowed`), every page tool but `navigate` refuses while the front tab shows any other page (`OnUi` captures the front tab once per call and runs both checks, before and after the body, on that tab, whatever got it
+  there: history, the address bar; `tabs` lists such a tab as "(not a web page)", without title or URL), and `devtools` is an allow-list by domain (`BrowserMcp.DevToolsRefusal`) that denies cookies,
   downloads, local files, new-document scripts, history navigation and the whole Input domain (keyboard, mouse, touch, drag: it would paste the clipboard). `evaluate` runs with the page's own access.
   (PRIVACY.md and the README say so too, keep them in step).
 - **Changes go through Claude Code's own CLI.** Plugins & connectors runs `claude plugin …` and `claude mcp …` hidden

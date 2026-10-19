@@ -9,7 +9,9 @@ namespace CCWrapper.Terminal;
 /// limit is abandoned (its token cancelled) and the next one may start while it lingers. A failure throws, and the
 /// exception's message is what Claude reads, so make it say what went wrong ("No element matches #login").</summary>
 /// <remarks>A <c>target</c> that is all ASCII digits is a ref number from the latest <see cref="SnapshotAsync"/>; anything
-/// else is a CSS selector, and the first element it matches is used. A ref that no longer exists throws.</remarks>
+/// else is a CSS selector, and the first element it matches is used. A ref that no longer exists throws.
+/// <para>The panel has tabs of its own, each with an id (1, 2, 3…, never reused). Every member but the four tab members acts on
+/// the front tab; a page's target=_blank or window.open opens a new tab in front.</para></remarks>
 public interface IBrowserDriver
 {
     /// <summary>Opens <paramref name="url"/> and waits for the page to load. Returns a short text for Claude, e.g. the final
@@ -37,6 +39,18 @@ public interface IBrowserDriver
     /// <summary>Calls one Chrome DevTools Protocol method on the page (<paramref name="paramsJson"/> is a JSON object) and
     /// returns its JSON result.</summary>
     Task<string> DevToolsAsync(string method, string paramsJson, CancellationToken ct);
+
+    /// <summary>The open tabs as text: id, title and URL of each, and which one is in front.</summary>
+    Task<string> TabsAsync(CancellationToken ct);
+
+    /// <summary>Opens a new tab in front, loads <paramref name="url"/> in it and waits for the page to load.</summary>
+    Task<string> NewTabAsync(string url, CancellationToken ct);
+
+    /// <summary>Brings tab <paramref name="id"/> to front. An unknown id throws.</summary>
+    Task<string> SwitchTabAsync(int id, CancellationToken ct);
+
+    /// <summary>Closes tab <paramref name="id"/>; closing the last one leaves one blank tab. An unknown id throws.</summary>
+    Task<string> CloseTabAsync(int id, CancellationToken ct);
 }
 
 /// <summary>The MCP server of the Browser tool, without its transport: one newline-delimited JSON-RPC 2.0 message in, zero
@@ -136,6 +150,10 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
                 }), (a, c) => DevToolsRefusal(a.Method) is { } why
                     ? Task.FromException<string>(new InvalidOperationException(why))
                     : driver.DevToolsAsync(a.Method, a.Params, c)),
+                "tabs" => c => TextResult(driver.TabsAsync(c)),
+                "new_tab" => Run(args["url"] is null ? "about:blank" : Arg(args, "url"), driver.NewTabAsync),
+                "switch_tab" => Run(Id(args), driver.SwitchTabAsync),
+                "close_tab" => Run(Id(args), driver.CloseTabAsync),
                 var name => throw new ArgumentException("Unknown tool: " + name),
             };
         }
@@ -163,6 +181,9 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
         _ => throw new ArgumentException($"Missing or invalid '{key}'."),
     };
 
+    static int Id(JsonObject args) => args["id"] is JsonValue v && v.GetValueKind() == JsonValueKind.Number && v.TryGetValue(out int id)
+        ? id : throw new ArgumentException("Missing or invalid 'id': a tab id (an integer) from the tabs tool.");
+
     static Func<CancellationToken, Task<JsonObject>> Run<T>(T args, Func<T, CancellationToken, Task<string>> call) => c => TextResult(call(args, c));
 
     static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue(out string? s) ? s : null;
@@ -184,35 +205,49 @@ public sealed class BrowserMcp(IBrowserDriver driver, Func<bool> enabled, TimeSp
     static string Error(JsonNode? id, int code, string message) =>
         new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id?.DeepClone(), ["error"] = new JsonObject { ["code"] = code, ["message"] = message } }.ToJsonString();
 
+    const string TabId = """{ "type": "integer", "description": "A tab id from the tabs tool." }""";
+
     const string Target = """{ "type": "string", "description": "A ref number from the latest snapshot (e.g. \"12\"), or a CSS selector." }""";
 
     const string Tools = $$"""
         [
           { "name": "navigate",
-            "description": "Open a URL in CCWrapper's Browser panel (the browser inside this app, beside the terminal) and wait for it to load.",
+            "description": "Open a URL in the front tab of CCWrapper's Browser panel (the browser inside this app, beside the terminal) and wait for it to load. The panel has tabs: every tool but tabs, new_tab, switch_tab and close_tab acts on the front tab, and a link or window.open that opens a new window opens a new tab in front.",
             "inputSchema": { "type": "object", "properties": { "url": { "type": "string", "description": "The address to open, e.g. https://example.com." } }, "required": ["url"] } },
           { "name": "snapshot",
-            "description": "Read the current page as text: headings, text, links, buttons and form fields, each element you can click or type into tagged with a ref number like [12]. Take a new snapshot after the page changes: each one renumbers the refs.",
+            "description": "Read the front tab's page as text: headings, text, links, buttons and form fields, each element you can click or type into tagged with a ref number like [12]. Take a new snapshot after the page changes: each one renumbers the refs.",
             "inputSchema": { "type": "object", "properties": {} } },
           { "name": "click",
-            "description": "Click an element of the current page.",
+            "description": "Click an element of the front tab's page. If it opens a new tab, that tab comes to front and the result says so.",
             "inputSchema": { "type": "object", "properties": { "target": {{Target}} }, "required": ["target"] } },
           { "name": "type",
-            "description": "Replace the value of an input, textarea or editable element with text, as if typed. Set submit to press Enter afterwards.",
+            "description": "Replace the value of an input, textarea or editable element of the front tab's page with text, as if typed. Set submit to press Enter afterwards.",
             "inputSchema": { "type": "object", "properties": { "target": {{Target}},
               "text": { "type": "string", "description": "The text to type." },
               "submit": { "type": "boolean", "description": "Press Enter after typing. Default false." } }, "required": ["target", "text"] } },
           { "name": "screenshot",
-            "description": "Capture the visible part of the current page as a PNG image.",
+            "description": "Capture the visible part of the front tab's page as a PNG image.",
             "inputSchema": { "type": "object", "properties": {} } },
           { "name": "evaluate",
-            "description": "Run a JavaScript expression in the current page and return its value as JSON. A returned Promise is awaited.",
+            "description": "Run a JavaScript expression in the front tab's page and return its value as JSON. A returned Promise is awaited.",
             "inputSchema": { "type": "object", "properties": { "expression": { "type": "string", "description": "The JavaScript expression, e.g. document.title." } }, "required": ["expression"] } },
           { "name": "devtools",
-            "description": "Call a Chrome DevTools Protocol method on the current page (e.g. Emulation.setDeviceMetricsOverride, Network.getResponseBody) and return its JSON result. For what the other tools cannot do. {{DevToolsLimits}}",
+            "description": "Call a Chrome DevTools Protocol method on the front tab's page (e.g. Emulation.setDeviceMetricsOverride, Network.getResponseBody) and return its JSON result. For what the other tools cannot do. {{DevToolsLimits}}",
             "inputSchema": { "type": "object", "properties": {
               "method": { "type": "string", "description": "The CDP method, Domain.method." },
-              "params": { "type": "object", "description": "The method's parameters. Default {}." } }, "required": ["method"] } }
+              "params": { "type": "object", "description": "The method's parameters. Default {}." } }, "required": ["method"] } },
+          { "name": "tabs",
+            "description": "List the Browser panel's tabs: the id, title and URL of each, and which one is in front (the one the other tools act on). A tab showing a page that is not a web address lists as (not a web page).",
+            "inputSchema": { "type": "object", "properties": {} } },
+          { "name": "new_tab",
+            "description": "Open a new tab in front and load a URL in it; the other tools then act on it. At most 20 tabs.",
+            "inputSchema": { "type": "object", "properties": { "url": { "type": "string", "description": "The address to open, e.g. https://example.com. Default about:blank." } } } },
+          { "name": "switch_tab",
+            "description": "Bring a tab to front, so the other tools act on it.",
+            "inputSchema": { "type": "object", "properties": { "id": {{TabId}} }, "required": ["id"] } },
+          { "name": "close_tab",
+            "description": "Close a tab. Closing the last tab leaves one blank tab.",
+            "inputSchema": { "type": "object", "properties": { "id": {{TabId}} }, "required": ["id"] } }
         ]
         """;
 }
