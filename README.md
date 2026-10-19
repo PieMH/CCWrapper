@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-441%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-445%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -91,7 +91,7 @@ Confirmations, warnings and errors use the app's dark theme too.
 **Right panel**
 - **Files:** a tree of every file Claude changed this session, with `+/−` lines in green and red, or the size change for binaries. Click a file to see all of it with the changes highlighted.
 - **Agents:** this session's subagents, running or finished, with model, effort, context and tokens. Click one to see its live transcript.
-- **Browser:** a built-in WebView2 browser for your dev server, with tabs (the **+** button opens one, up to 20; tabs are not restored after a restart). A pop-up a click opens appears in a new tab; pop-ups a page opens on its own are dropped, and a page's `window.close()` closes only pop-up tabs. Claude browses in it too: every session can navigate, read the page, click, type, take screenshots, run scripts, use DevTools, and list, open, switch and close tabs there, and is told to prefer it over another browser. Ask for Chrome by name and it uses Chrome. Scripts and DevTools act with the page's own logins in that profile; DevTools refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag, so it cannot paste your clipboard), the page history and scripts that persist across pages. Claude opens only http, https, blob, about:blank and data addresses, never local files (a pop-up to any other address is dropped), and its tools refuse to work on a page that is not a web address (for example a `file:` page you opened yourself). Its tools act on the tab in front. To turn this off, clear **Let Claude use the Browser panel** in Settings → CCWrapper.
+- **Browser:** a built-in WebView2 browser for your dev server, with tabs (the **+** button opens one, up to 20; tabs are not restored after a restart). A pop-up a click opens appears in a new tab; pop-ups a page opens on its own are dropped (a page can still open one in the few seconds after a click, Claude's clicks included, as in any browser), and a page's `window.close()` closes only pop-up tabs. Claude browses in it too: every session can navigate, read the page, click, type, take screenshots, run scripts, use DevTools, and list, open, switch and close tabs there, and is told to prefer it over another browser. Ask for Chrome by name and it uses Chrome. Scripts and DevTools act with the page's own logins in that profile; DevTools refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag, so it cannot paste your clipboard), the page history and scripts that persist across pages. Claude opens only http, https, blob, about:blank and data addresses, never local files (a pop-up to any other address is dropped), and its tools refuse to work on a page that is not a web address (for example a `file:` page you opened yourself). Its tools act on the tab in front. To turn this off, clear **Let Claude use the Browser panel** in Settings → CCWrapper.
 
 **Bottom bar**
 - Model, effort and permission-mode switches that drive Claude Code's own `/model`, `/effort` and Shift+Tab.
@@ -222,7 +222,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 441 tests on synthetic fixtures.
+- xUnit, with 445 tests on synthetic fixtures.
 
 ## Development
 
