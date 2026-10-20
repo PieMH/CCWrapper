@@ -15,7 +15,12 @@ dotnet test
   they may be talking to you through it.
 - **Verification is tests, `--smoke` and targeted live checks.** No UI automation: no screenshots, synthetic keystrokes or
   WebView2 remote debugging. Antivirus behavior shields flag those and quarantine the build.
-- **Live checks against real accounts:** scratch sessions only, and never a prompt that spends the user's plan usage.
+- **Live checks against real accounts:** scratch sessions only, and never a prompt that spends the user's plan usage. A check
+  that needs the real account (rare) deletes its own sessions afterwards.
+- **A scratch `claude` never gets the user's config folder.** Start it with `CLAUDE_CONFIG_DIR` = a fresh temp dir,
+  `ANTHROPIC_BASE_URL=http://127.0.0.1:9`, a dummy `ANTHROPIC_API_KEY` (answer Yes at "use this API key?") and
+  `ClaudeLaunch.ParentSessionVars` stripped; delete the temp dir and its cwd when the check ends. Otherwise its sessions
+  pile up in the session list and `.claude.json`.
 - **New non-trivial logic leaves a test.** `ThemeLoadTests` builds every view with `App.xaml` loaded, so a missing theme
   key fails the tests instead of the app.
 
@@ -24,7 +29,7 @@ dotnet test
 | Folder | What |
 |---|---|
 | `src/CCWrapper` (root) | `Program.cs`: the Velopack hook runs before WPF starts |
-| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `DraftStore` (compose-box drafts, `drafts-<letter>.json`, saved on exit, before an update restart and when the app is deactivated with an update it knows of; another window's update restart can still lose the drafts of a window that has not seen the update); `AppUpdate` (auto-update), `AppPrefs` (`updateCheck`, `browserTool`) and `CompactPrefs` (`app.json`: each rewrites only its own key) |
+| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `Housekeeping` (start-up deletes by age: pasted images, orphaned status line files); `DraftStore` (compose-box drafts, `drafts-<letter>.json`, saved on exit, before an update restart and when the app is deactivated with an update it knows of; another window's update restart can still lose the drafts of a window that has not seen the update); `AppUpdate` (auto-update), `AppPrefs` (`updateCheck`, `browserTool`) and `CompactPrefs` (`app.json`: each rewrites only its own key) |
 | `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SlashCommands` (the `/` list, with enabled plugins' commands and skills), `UsageStats` (the usage popup's token counts); `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md`; `ClaudeJson`, locked updates of `.claude.json` |
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs), `BrowserMcp`/`BrowserPipe` (the Browser tool: MCP handler and the window's named pipe) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
