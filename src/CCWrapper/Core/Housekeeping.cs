@@ -19,7 +19,6 @@ public static class Housekeeping
         var now = DateTime.UtcNow;
         DeleteOlderThan(Path.Combine(ClaudeLaunch.AppDataDir, "paste"), PasteHandler.FilePattern, PasteMaxAge, now);
         DeleteOlderThan(StatusLineFeed.LiveDir, "*.json", LiveMaxAge, now);
-        try { Directory.Delete(Path.Combine(ClaudeLaunch.AppDataDir, "WebView2", "smoke"), recursive: true); } catch (Exception) { } // --smoke's terminal profile; still held while a smoke run is going
     }
 
     /// <summary>Deletes the files of <paramref name="dir"/> (not its subfolders) matching <paramref name="pattern"/> that were last written more than

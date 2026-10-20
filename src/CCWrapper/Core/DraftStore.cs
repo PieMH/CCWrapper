@@ -49,13 +49,15 @@ public sealed class DraftStore
     public void Set(LiveSession s, string text, int caret)
     {
         var tab = TabKey(s);
-        Drop(tab);
         var key = s.SessionId ?? tab;
+        // The same text again (a tab switch, a caret move) is no edit: the 14 days count from the last real change.
+        var at = _drafts.TryGetValue(key, out var same) && same.Text == text && _changed.TryGetValue(key, out var was) ? was : DateTime.UtcNow;
+        Drop(tab);
         // Only the draft this tab wrote: another tab may have resumed the old id and edited it since.
         if (_lastKey.TryGetValue(s.TabId, out var old) && old.Key != key && _drafts.TryGetValue(old.Key, out var cur) && ReferenceEquals(cur, old.Draft)) Drop(old.Key);
         Drop(key);
         Draft? draft = text.Length > 0 ? new(text, caret) : null;
-        if (draft is not null) { _drafts[key] = draft; _changed[key] = DateTime.UtcNow; }
+        if (draft is not null) { _drafts[key] = draft; _changed[key] = at; }
         _lastKey[s.TabId] = (key, draft);
     }
 

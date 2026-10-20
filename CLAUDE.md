@@ -18,8 +18,8 @@ dotnet test
 - **Live checks against real accounts:** scratch sessions only, and never a prompt that spends the user's plan usage. A check
   that needs the real account (rare) deletes its own sessions afterwards.
 - **A scratch `claude` never gets the user's config folder.** Start it with `CLAUDE_CONFIG_DIR` = a fresh temp dir,
-  `ANTHROPIC_BASE_URL=http://127.0.0.1:9`, a dummy `ANTHROPIC_API_KEY` (answer Yes at "use this API key?") and
-  `ClaudeLaunch.ParentSessionVars` stripped; delete the temp dir and its cwd when the check ends. Otherwise its sessions
+  `ANTHROPIC_BASE_URL=http://127.0.0.1:9`, a dummy `ANTHROPIC_API_KEY` (answer Yes at "use this API key?" and at "Trust this folder?") and
+  `ClaudeLaunch.ParentSessionVars` stripped; under Git Bash set `MSYS_NO_PATHCONV=1` (else "/help" becomes a Windows path); delete the temp dir and its cwd when the check ends. Otherwise its sessions
   pile up in the session list and `.claude.json`.
 - **New non-trivial logic leaves a test.** `ThemeLoadTests` builds every view with `App.xaml` loaded, so a missing theme
   key fails the tests instead of the app.

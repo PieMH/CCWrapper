@@ -169,6 +169,26 @@ public sealed class DraftStoreTests : IDisposable
     }
 
     [Fact]
+    public void The_same_text_again_keeps_the_date_of_the_last_edit()
+    {
+        var path = PathOf("d.json");
+        var edited = DateTime.UtcNow - DraftStore.MaxAge + TimeSpan.FromHours(1); // 1 hour from expiring
+        File.WriteAllText(path, $$"""[{"Key":"k","Text":"a","Caret":0,"Changed":"{{edited:O}}"}]""");
+        var store = new DraftStore(path);
+        var s = Tab("k");
+
+        store.Set(s, "a", 1); // a tab switch re-stashes the text, only the caret moved
+        store.Save();
+        Assert.True(ChangedOn(path) < edited.AddSeconds(1));
+
+        store.Set(s, "b", 1); // a real edit
+        store.Save();
+        Assert.True(ChangedOn(path) > edited.AddDays(1));
+    }
+
+    static DateTime ChangedOn(string path) => System.Text.Json.JsonDocument.Parse(File.ReadAllText(path)).RootElement[0].GetProperty("Changed").GetDateTime().ToUniversalTime();
+
+    [Fact]
     public void Remove_drops_the_draft_of_a_deleted_session()
     {
         var path = PathOf("d.json");
