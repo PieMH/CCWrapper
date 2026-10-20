@@ -8,7 +8,7 @@ public sealed record Draft(string Text, int Caret);
 
 /// <summary>The compose box's unsent text per Claude Code session, kept in memory while the app runs and written to
 /// <c>%LocalAppData%\CCWrapper\drafts-&lt;letter&gt;.json</c> (one file per account, so windows of two accounts never clobber each other)
-/// only by <see cref="SaveAll"/> on exit. Keyed by the session id, which survives a resume; a tab that has none yet by its
+/// only by <see cref="SaveAll"/> (on exit, before an update restart, and when an update is ready to install). Keyed by the session id, which survives a resume; a tab that has none yet by its
 /// tab id, and that draft moves to the session id once it appears. A missing or broken file reads as no drafts.
 /// shortcut: two windows of the same account overwrite each other's file, last exit wins; merge on write if that happens.</summary>
 public sealed class DraftStore(string path)
@@ -18,6 +18,7 @@ public sealed class DraftStore(string path)
     static readonly Dictionary<string, DraftStore> Stores = []; // UI thread only
 
     readonly OrderedDictionary<string, Draft> _drafts = Read(path); // oldest edit first
+    readonly Dictionary<Guid, string> _lastKey = []; // per tab: the key its draft sits under, so a changed session id (/clear, fork) leaves no copy behind
 
     public static DraftStore For(Account account) => Stores.TryGetValue(account.Letter, out var s)
         ? s : Stores[account.Letter] = new(Path.Combine(ClaudeLaunch.AppDataDir, $"drafts-{account.Letter}.json"));
@@ -44,6 +45,8 @@ public sealed class DraftStore(string path)
         var tab = TabKey(s);
         _drafts.Remove(tab);
         var key = s.SessionId ?? tab;
+        if (_lastKey.TryGetValue(s.TabId, out var old) && old != key) _drafts.Remove(old);
+        _lastKey[s.TabId] = key;
         _drafts.Remove(key);
         if (text.Length > 0) _drafts[key] = new(text, caret);
     }

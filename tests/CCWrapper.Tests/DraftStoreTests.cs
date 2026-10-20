@@ -55,6 +55,22 @@ public sealed class DraftStoreTests : IDisposable
     }
 
     [Fact]
+    public void A_new_session_id_on_the_same_tab_leaves_no_copy_under_the_old_one()
+    {
+        var path = PathOf("drafts-c.json");
+        var store = new DraftStore(path);
+        var s = Tab("old");
+        store.Set(s, "already sent", 3);
+        s.SessionId = "new"; // /clear or a fork rebinds the tab
+        store.Set(s, "next", 1);
+        store.Save();
+
+        var reloaded = new DraftStore(path);
+        Assert.Null(reloaded.Get(Tab("old")));
+        Assert.Equal("next", reloaded.Get(Tab("new"))!.Text);
+    }
+
+    [Fact]
     public void Empty_text_drops_the_draft()
     {
         var s = Tab("x");

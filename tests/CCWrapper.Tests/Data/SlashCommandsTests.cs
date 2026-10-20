@@ -166,6 +166,26 @@ public sealed class SlashCommandsTests : IDisposable
     }
 
     [Fact]
+    public void Synced_plugins_come_only_from_the_folder_of_the_current_login()
+    {
+        var account = _home.AddAccount("x", """{"oauthAccount":{"organizationUuid":"org1","accountUuid":"acc1"}}""");
+        var synced = Path.Combine(account.ConfigRoot, "plugins", "synced");
+        FakeHome.WriteFile(Path.Combine(synced, "org1_acc1", "now", "commands", "a.md"), "Current");
+        FakeHome.WriteFile(Path.Combine(synced, "org0_old", "stale", "commands", "b.md"), "Old login");
+        var list = SlashCommands.List(account, null).ToDictionary(c => c.Name);
+        Assert.Contains("now:a", list.Keys);
+        Assert.DoesNotContain("stale:b", list.Keys);
+
+        // no ids in .claude.json: every folder, as before
+        var other = _home.AddAccount("y", """{"oauthAccount":{"organizationUuid":"org1"}}""");
+        FakeHome.WriteFile(Path.Combine(other.ConfigRoot, "plugins", "synced", "u1", "p", "commands", "a.md"), "A");
+        FakeHome.WriteFile(Path.Combine(other.ConfigRoot, "plugins", "synced", "u2", "q", "commands", "b.md"), "B");
+        var names = SlashCommands.List(other, null).Select(c => c.Name).ToList();
+        Assert.Contains("p:a", names);
+        Assert.Contains("q:b", names);
+    }
+
+    [Fact]
     public void An_installed_plugin_hides_a_synced_one_of_the_same_name()
     {
         var account = _home.AddAccount("x");

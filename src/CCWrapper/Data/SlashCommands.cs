@@ -91,7 +91,7 @@ public static class SlashCommands
             rows.AddRange(Commands(Path.Combine(root, "commands"), "plugin " + name, name + ":"));
             rows.AddRange(Skills(Path.Combine(root, "skills"), "plugin " + name, name + ":"));
         }
-        rows.AddRange(Synced(account.ConfigRoot, enabled));
+        rows.AddRange(Synced(account, enabled));
         return rows;
     }
 
@@ -99,18 +99,24 @@ public static class SlashCommands
     // generation (plugin.json and the manifest name the plugin without it); the highest comes first and is the one kept.
     // shortcut: every synced plugin seen has installation_preference "available" and is offered, so only a known off-value or an
     // enabledPlugins false hides one; upgrade if Claude Code writes another vocabulary.
+    // The user-id folder is "<organizationUuid>_<accountUuid>" of .claude.json's oauthAccount: when both are there only that one is
+    // read (an older login leaves its folder behind and Claude Code ignores it), else every folder is.
     static readonly string[] SyncedOff = ["disabled", "hidden", "unavailable", "uninstalled"];
 
-    static List<SlashCommand> Synced(string configRoot, Dictionary<string, bool> enabled)
+    static List<SlashCommand> Synced(Account account, Dictionary<string, bool> enabled)
     {
         var rows = new List<SlashCommand>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var top = Path.Combine(configRoot, "plugins", "synced");
+        var top = Path.Combine(account.ConfigRoot, "plugins", "synced");
+        var current = ReadJson(account.GlobalConfigPath, r => r.Prop("oauthAccount") is { ValueKind: JsonValueKind.Object } o
+            ? (Org: o.Prop("organizationUuid").Str(), User: o.Prop("accountUuid").Str()) : default);
         try
         {
             if (!Directory.Exists(top)) return rows;
             foreach (var userDir in Directory.EnumerateDirectories(top))
             {
+                if (current is { Org.Length: > 0, User.Length: > 0 }
+                    && !Path.GetFileName(userDir).Equals($"{current.Org}_{current.User}", StringComparison.OrdinalIgnoreCase)) continue;
                 var manifest = ReadJson(Path.Combine(userDir, "manifest.json"), r => r.Prop("plugins") is { ValueKind: JsonValueKind.Array } a
                     ? a.EnumerateArray().Select(e => (Id: e.Prop("pluginId").Str(), Name: e.Prop("name").Str(), Pref: e.Prop("installationPreference").Str(),
                         Market: e.Prop("marketplaceName").Str())).ToList() : []) ?? [];

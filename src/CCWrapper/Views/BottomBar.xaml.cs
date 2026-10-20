@@ -110,7 +110,16 @@ public partial class BottomBar : UserControl
     void OnUsageTip(object sender, ToolTipEventArgs e) => UsageGroup.ToolTip = _usageTip();
 
     // StaysOpen=false closes the popup on the mouse-down of a click on the group itself, so a click right after a close must not reopen it.
-    void OnUsageClick(object sender, MouseButtonEventArgs e)
+    void OnUsageClick(object sender, MouseButtonEventArgs e) => OpenUsage();
+
+    void OnUsageGroupKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Enter or Key.Space)) return;
+        OpenUsage();
+        e.Handled = true;
+    }
+
+    void OpenUsage()
     {
         if (UsagePopup.IsOpen || DateTime.UtcNow - _usageClosedAt < TimeSpan.FromMilliseconds(250)) return;
         _usageFocus = Keyboard.FocusedElement;
@@ -119,7 +128,8 @@ public partial class BottomBar : UserControl
         var now = _usageNow;
         ShowUsage(now, null, loading: account is not null);
         UsagePopup.IsOpen = true;
-        Keyboard.Focus(UsagePanel); // so Esc reaches OnUsageKey
+        // Once the popup's window exists, focus goes into it; before that the terminal may still hold it.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (UsagePopup.IsOpen) Keyboard.Focus(UsagePanel); });
         if (account is null) return;
         // The transcripts are read off the UI thread; reopening within a minute gets the cached result at once.
         _ = Task.Run(() => UsageStats.Get(account, now.FiveReset, now.WeekReset)).ContinueWith(t =>
@@ -130,6 +140,8 @@ public partial class BottomBar : UserControl
 
     void OnUsageClosed(object? sender, EventArgs e) => _usageClosedAt = DateTime.UtcNow;
 
+    // Esc is taken here, in the tunnelling phase, while the popup's own window holds the keyboard focus: key messages go to the
+    // focused window only, so the terminal's WebView2 (and the TUI behind it, where Esc interrupts a running turn) never sees them.
     void OnUsageKey(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Escape) return;
@@ -255,7 +267,7 @@ public partial class BottomBar : UserControl
         var others = AppUpdate.OtherInstances();
         var text = $"Restart now to install {AppUpdate.ReadyVersion}?";
         if (busy > 0) text += $"\n\nThis ends {busy} busy or waiting session(s); they stay resumable.";
-        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.";
+        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way. Their unsent drafts written after the update became ready are lost.";
         if (Dialog.Show(Window.GetWindow(this), text, "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             AppUpdate.RestartNow(AppState.Current?.Account.Letter);
     }

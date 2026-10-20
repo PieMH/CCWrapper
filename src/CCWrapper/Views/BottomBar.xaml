@@ -42,7 +42,7 @@
             </StackPanel>
             <Border Style="{StaticResource Sep}" />
             <StackPanel x:Name="UsageGroup" Orientation="Horizontal" ToolTipOpening="OnUsageTip" Cursor="Hand" Background="Transparent"
-                        MouseLeftButtonUp="OnUsageClick">
+                        Focusable="True" AutomationProperties.Name="Plan usage details" MouseLeftButtonUp="OnUsageClick" KeyDown="OnUsageGroupKey">
                 <TextBlock Text="5h" Style="{StaticResource Dim}" />
                 <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
                 <TextBlock x:Name="FiveHourText" MinWidth="28" />
@@ -52,7 +52,7 @@
             </StackPanel>
             <!-- A Popup is its own window, so it may sit over the terminal's WebView2. Not inside UsageGroup: clicks in it would bubble to the toggle. -->
             <Popup x:Name="UsagePopup" PlacementTarget="{Binding ElementName=UsageGroup}" Placement="Top" StaysOpen="False" Closed="OnUsageClosed">
-                <Border x:Name="UsagePanel" Style="{StaticResource UsagePanel}" Focusable="True" KeyDown="OnUsageKey">
+                <Border x:Name="UsagePanel" Style="{StaticResource UsagePanel}" Focusable="True" PreviewKeyDown="OnUsageKey">
                     <StackPanel x:Name="UsageBody" />
                 </Border>
             </Popup>
