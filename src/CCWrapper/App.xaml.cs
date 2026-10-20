@@ -17,6 +17,7 @@ public partial class App : Application
             Shutdown(await Smoke.RunAsync());
             return;
         }
+        _ = Task.Run(Housekeeping.Run); // old pasted images and status-line files, off the UI thread
         // One stray exception must not take every session down with the process (job objects).
         DispatcherUnhandledException += OnUnhandled;
         // Another window's "Restart now" force-stops this process without OnExit, and the user must activate that window first.

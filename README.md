@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-490%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-496%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -82,9 +82,9 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 **Compose box** (optional, under the terminal)
 - A real multi-line editor with a round send button: Enter sends, Shift+Enter adds a line, and Up recalls earlier prompts.
 - When Claude Code suggests your next prompt, the empty box shows it greyed too, as the terminal does: Tab takes it to edit, Enter sends it, typing replaces it.
-- Pasted screenshots become image files.
+- Pasted screenshots become image files in `%LOCALAPPDATA%\CCWrapper\paste`; those older than 7 days are deleted when the app starts.
 - The **+** button adds files or folders (as a drop would) and opens the slash commands. Typing `/` (or a `/` word after a space or line break) lists Claude Code's commands, your custom commands and skills, and those of your enabled plugins and claude.ai synced plugins (not MCP prompts), narrowing as you type: Up/Down choose, Enter runs it, Tab completes it without sending (after a space or line break, Enter only completes). Text that starts with a known command shows in blue. A slash command goes in as short pastes (at most 500 characters and one line break each), so Claude Code runs it instead of folding it into `[Pasted text]`.
-- Each session keeps its own draft: switching tabs leaves it as it is, and drafts are saved when the app exits, restarts to update, or loses focus once it knows an update is ready to install, and come back when the session is reopened. An update restart started from another window can still lose the drafts of a window that has not noticed the update.
+- Each session keeps its own draft: switching tabs leaves it as it is, and drafts are saved when the app exits, restarts to update, or loses focus once it knows an update is ready to install, and come back when the session is reopened; a draft nobody changed for 14 days, or whose session you delete, is dropped. An update restart started from another window can still lose the drafts of a window that has not noticed the update.
 - It never types into a permission prompt or a dialog. Those you always answer in the terminal.
 
 Confirmations, warnings and errors use the app's dark theme too.
@@ -127,7 +127,7 @@ Get-FileHash .\PieMH.CCWrapper-win-Setup.exe -Algorithm SHA256   # compare with 
 gh attestation verify .\PieMH.CCWrapper-win-Setup.exe -R PieMH/CCWrapper
 ```
 
-**Uninstall** in Windows **Settings → Apps → Installed apps → CCWrapper**. That leaves your data in `%LOCALAPPDATA%\CCWrapper` (settings backups, pasted images, browser profiles, `app.json`); delete that folder to remove it. Claude Code's own files are never touched.
+**Uninstall** in Windows **Settings → Apps → Installed apps → CCWrapper**. That leaves your data in `%LOCALAPPDATA%\CCWrapper` (settings backups, recent pasted images, browser profiles, `app.json`); delete that folder to remove it. Claude Code's own files are never touched.
 
 ### Build from source
 
@@ -186,7 +186,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **It deletes a session's files only when you pick Delete on its right-click menu and confirm:** the transcript `projects\<folder>\<id>.jsonl` and its `<id>\` folder, for good. A session that is open anywhere is refused, and nothing outside those two paths is touched.
 - **It edits `.claude.json` only when you flip a server's folder switch** in Plugins & connectors, the one change there that no `claude` command makes. Like Claude Code itself, it takes the file's lock, reads the file as it is at that moment, changes that folder's list of servers turned off and writes it back; the previous version goes to the same backups folder.
 - **Check health** in Plugins & connectors runs `claude mcp list`, which connects to every MCP server (and starts the local ones) to see if it answers, as `/mcp` does.
-- **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images, the browser profiles, settings backups, `app.json` (CCWrapper's own settings: your update choice, the compact hint and the browser choice), and the live status data described next.
+- **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images (deleted after 7 days), the browser profiles (a Browser cache over 100 MB is cleared at start; cookies stay until you clear them), settings backups, `app.json` (CCWrapper's own settings: your update choice, the compact hint and the browser choice), and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
 - **The Browser tool:** each session also gets that relay as a local MCP server (`ccwrapper-browser`, through `--mcp-config`), and a line in its system prompt (`--append-system-prompt`) to prefer it. The server talks only to its own CCWrapper window, through a local pipe that only your Windows user can open. Pages Claude opens load in the Browser panel's profile for the account (all tabs share it), with your logins, and Claude Code asks permission per tool as it does for any MCP tool. Its scripts and DevTools act with those logins, but DevTools refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag), the page history and scripts that persist across pages. Claude opens only http, https, blob, about:blank and data addresses, not local files, and its tools refuse to work on a page that is not a web address. The same holds for every tab. Turn it off in Settings → CCWrapper.
 - **Its only network call is the update check,** and only in an installed copy, only after you said yes on first start; the switch is in **About**. It asks GitHub for the latest release and downloads it; GitHub sees your IP address and the app version, nothing else is sent. The Browser panel loads only what you or Claude open in it. Details in [PRIVACY.md](PRIVACY.md).
@@ -223,7 +223,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 490 tests on synthetic fixtures.
+- xUnit, with 496 tests on synthetic fixtures.
 
 ## Development
 

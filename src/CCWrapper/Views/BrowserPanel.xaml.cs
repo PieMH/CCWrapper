@@ -28,6 +28,7 @@ public partial class BrowserPanel : UserControl
     readonly BrowserTabs<Tab> _tabs = new();
     readonly TaskCompletionSource _loaded = new(TaskCreationOptions.RunContinuationsAsynchronously);
     Task<CoreWebView2Environment>? _env;
+    bool _cacheChecked;
 
     Tab Front => _tabs.FrontTab!;
 
@@ -94,12 +95,24 @@ public partial class BrowserPanel : UserControl
             throw new InvalidOperationException("The Browser panel's " + why, ex);
         }
         var core = tab.Web.CoreWebView2;
+        if (!_cacheChecked) { _cacheChecked = true; _ = TrimCacheAsync(core); }
         DropControlsCloseHandler(core);
         core.NewWindowRequested += OnNewWindow;
         core.WindowCloseRequested += (_, _) => { if (tab.Popup) Dispatcher.InvokeAsync(() => ClosePopup(tab)); }; // window.close() of a pop-up tab (an OAuth popup); any other tab stays, as Claude's tools work on it
         core.DocumentTitleChanged += (_, _) => Retitle(tab);
         if (tab.Pending is { } url) core.Navigate(url);
         tab.Pending = null;
+    }
+
+    // Once per panel start: a disk cache over Housekeeping.CacheLimit is cleared by the supported API; cookies and site data are never touched.
+    async Task TrimCacheAsync(CoreWebView2 core)
+    {
+        try
+        {
+            if (await Task.Run(() => Housekeeping.CacheBytes(_profile)) > Housekeeping.CacheLimit)
+                await core.Profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.DiskCache);
+        }
+        catch (Exception) { } // best effort: the cache is only a cache
     }
 
     // The WebView2 package's private names DropControlsCloseHandler reflects on; PanelLogicTests fails when an update renames them.

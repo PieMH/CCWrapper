@@ -145,4 +145,41 @@ public sealed class DraftStoreTests : IDisposable
 
         Assert.Equal("same", store.Get(b)!.Text);
     }
+
+    [Fact]
+    public void A_draft_unchanged_for_14_days_is_dropped_and_one_without_a_date_is_kept()
+    {
+        var path = PathOf("d.json");
+        var old = DateTime.UtcNow - DraftStore.MaxAge - TimeSpan.FromHours(1);
+        var recent = DateTime.UtcNow - DraftStore.MaxAge + TimeSpan.FromHours(1);
+        File.WriteAllText(path, $$"""
+            [{"Key":"old","Text":"a","Caret":0,"Changed":"{{old:O}}"},
+             {"Key":"recent","Text":"b","Caret":0,"Changed":"{{recent:O}}"},
+             {"Key":"undated","Text":"c","Caret":0}]
+            """);
+
+        var store = new DraftStore(path);
+
+        Assert.Null(store.Get(Tab("old")));
+        Assert.Equal("b", store.Get(Tab("recent"))!.Text);
+        Assert.Equal("c", store.Get(Tab("undated"))!.Text);
+        store.Save();
+        Assert.Contains("\"Changed\"", File.ReadAllText(path)); // the date is written back
+        Assert.DoesNotContain("\"old\"", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void Remove_drops_the_draft_of_a_deleted_session()
+    {
+        var path = PathOf("d.json");
+        var store = new DraftStore(path);
+        store.Set(Tab("gone"), "x", 0);
+        store.Set(Tab("kept"), "y", 0);
+        store.Remove("gone");
+        store.Save();
+
+        var back = new DraftStore(path);
+        Assert.Null(back.Get(Tab("gone")));
+        Assert.NotNull(back.Get(Tab("kept")));
+    }
 }

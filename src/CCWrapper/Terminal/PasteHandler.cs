@@ -30,6 +30,9 @@ public static class PasteHandler
     public static string? ForCompose(IDataObject data, string? dir = null) =>
         Text(data) ?? (data.GetData(DataFormats.Bitmap) is BitmapSource image ? QuotePaths([SaveImage(image, dir)]) : null);
 
+    /// <summary>The names <see cref="SaveImage"/> gives; <see cref="CCWrapper.Core.Housekeeping"/> deletes only files of this shape.</summary>
+    public const string FilePattern = "paste-*.png";
+
     /// <summary>Saves to %LOCALAPPDATA%\CCWrapper\paste (or <paramref name="dir"/>) and returns the file path.</summary>
     public static string SaveImage(BitmapSource image, string? dir = null)
     {
