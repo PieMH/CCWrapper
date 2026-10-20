@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-488%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-489%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -84,7 +84,7 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 - When Claude Code suggests your next prompt, the empty box shows it greyed too, as the terminal does: Tab takes it to edit, Enter sends it, typing replaces it.
 - Pasted screenshots become image files.
 - The **+** button adds files or folders (as a drop would) and opens the slash commands. Typing `/` (or a `/` word after a space or line break) lists Claude Code's commands, your custom commands and skills, and those of your enabled plugins and claude.ai synced plugins (not MCP prompts), narrowing as you type: Up/Down choose, Enter runs it, Tab completes it without sending (after a space or line break, Enter only completes). Text that starts with a known command shows in blue. A slash command goes in as short pastes (at most 500 characters and one line break each), so Claude Code runs it instead of folding it into `[Pasted text]`.
-- Each session keeps its own draft: switching tabs leaves it as it is, and drafts are saved when the app exits, restarts to update, or has an update ready to install, and come back when the session is reopened.
+- Each session keeps its own draft: switching tabs leaves it as it is, and drafts are saved when the app exits, restarts to update, or loses focus with an update ready to install, and come back when the session is reopened.
 - It never types into a permission prompt or a dialog. Those you always answer in the terminal.
 
 Confirmations, warnings and errors use the app's dark theme too.
@@ -223,7 +223,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 488 tests on synthetic fixtures.
+- xUnit, with 489 tests on synthetic fixtures.
 
 ## Development
 

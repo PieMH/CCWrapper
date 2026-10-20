@@ -109,26 +109,20 @@ public partial class BottomBar : UserControl
     // Built when it opens: the "in 2h 10m" of the reset times is relative to now, not to the last render.
     void OnUsageTip(object sender, ToolTipEventArgs e) => UsageGroup.ToolTip = _usageTip();
 
-    // StaysOpen=false closes the popup on the mouse-down of a click on the group itself, so a click right after a close must not reopen it.
-    void OnUsageClick(object sender, MouseButtonEventArgs e) => OpenUsage();
-
-    void OnUsageGroupKey(object sender, KeyEventArgs e)
-    {
-        if (e.Key is not (Key.Enter or Key.Space)) return;
-        OpenUsage();
-        e.Handled = true;
-    }
+    // StaysOpen=false closes the popup on the mouse-down of a click on the button itself, so a click right after a close must not reopen it.
+    void OnUsageClick(object sender, RoutedEventArgs e) => OpenUsage();
 
     void OpenUsage()
     {
         if (UsagePopup.IsOpen || DateTime.UtcNow - _usageClosedAt < TimeSpan.FromMilliseconds(250)) return;
         _usageFocus = Keyboard.FocusedElement;
+        Keyboard.Focus(UsageGroup); // a no-op for a click (the Button focused itself), but it also moves Win32 focus off the WebView2 for Enter and Space
         UsagePopup.HorizontalOffset = UsageGroup.ActualWidth - UsagePanel.Width; // right edges line up; WPF keeps it on screen
         var account = AppState.Current?.Account;
         var now = _usageNow;
         ShowUsage(now, null, loading: account is not null);
         UsagePopup.IsOpen = true;
-        // Once the popup's window exists, focus goes into it; before that the terminal may still hold it.
+        // The popup window is WS_EX_NOACTIVATE, so Win32 focus stays in the main window, on the button: the WebView2 lost it when the button took focus. WPF focus moves into the popup once it exists.
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (UsagePopup.IsOpen) Keyboard.Focus(UsagePanel); });
         if (account is null) return;
         // The transcripts are read off the UI thread; reopening within a minute gets the cached result at once.
@@ -140,8 +134,8 @@ public partial class BottomBar : UserControl
 
     void OnUsageClosed(object? sender, EventArgs e) => _usageClosedAt = DateTime.UtcNow;
 
-    // Esc is taken here, in the tunnelling phase, while the popup's own window holds the keyboard focus: key messages go to the
-    // focused window only, so the terminal's WebView2 (and the TUI behind it, where Esc interrupts a running turn) never sees them.
+    // Esc is taken here, in the tunnelling phase. Win32 focus is on the main window (the button took it from the WebView2), so the key
+    // message reaches WPF and never the terminal's WebView2 (and the TUI behind it, where Esc interrupts a running turn).
     void OnUsageKey(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Escape) return;
@@ -267,7 +261,7 @@ public partial class BottomBar : UserControl
         var others = AppUpdate.OtherInstances();
         var text = $"Restart now to install {AppUpdate.ReadyVersion}?";
         if (busy > 0) text += $"\n\nThis ends {busy} busy or waiting session(s); they stay resumable.";
-        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way. Their unsent drafts written after the update became ready are lost.";
+        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.";
         if (Dialog.Show(Window.GetWindow(this), text, "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             AppUpdate.RestartNow(AppState.Current?.Account.Letter);
     }

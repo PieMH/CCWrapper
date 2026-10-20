@@ -19,6 +19,8 @@ public partial class App : Application
         }
         // One stray exception must not take every session down with the process (job objects).
         DispatcherUnhandledException += OnUnhandled;
+        // Another window's "Restart now" force-stops this process without OnExit, and the user must activate that window first.
+        Deactivated += (_, _) => { if (AppUpdate.ReadyVersion is not null) DraftStore.SaveAll(); };
         TaskScheduler.UnobservedTaskException += (_, t) => t.SetObserved();
         var i = Array.FindIndex(e.Args, a => a.Equals("--account", StringComparison.OrdinalIgnoreCase));
         var account = i >= 0 && i + 1 < e.Args.Length ? AccountStore.Find(e.Args[i + 1]) : null;

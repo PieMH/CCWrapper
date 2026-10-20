@@ -108,11 +108,11 @@ public static class SlashCommands
         var rows = new List<SlashCommand>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var top = Path.Combine(account.ConfigRoot, "plugins", "synced");
+        if (!Directory.Exists(top)) return rows; // no synced plugins: .claude.json stays unread
         var current = ReadJson(account.GlobalConfigPath, r => r.Prop("oauthAccount") is { ValueKind: JsonValueKind.Object } o
             ? (Org: o.Prop("organizationUuid").Str(), User: o.Prop("accountUuid").Str()) : default);
         try
         {
-            if (!Directory.Exists(top)) return rows;
             foreach (var userDir in Directory.EnumerateDirectories(top))
             {
                 if (current is { Org.Length: > 0, User.Length: > 0 }

@@ -112,7 +112,6 @@ public static class AppUpdate
             }
             if (ct.IsCancellationRequested || AppPrefs.ReadUpdateCheck() != true) return; // switched off meanwhile
             _ready = asset;
-            DraftStore.SaveAll(); // another window's "Restart now" force-stops this process without App.OnExit
             Changed?.Invoke();
         }
         catch (Exception) { } // offline, rate-limited, no release yet: nothing to tell the user

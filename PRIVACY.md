@@ -78,7 +78,7 @@ If the runtime is missing on your PC, the installer (`Setup.exe`) downloads it f
 | `%LOCALAPPDATA%\CCWrapper\WebView2` | Browser profiles of the terminal and of the Browser panel, one per account: cookies, cache, site data. |
 | `%LOCALAPPDATA%\CCWrapper\backups` | Earlier versions of files you saved from the app. |
 | `%LOCALAPPDATA%\CCWrapper\live` | Live status data (model, context, cost, usage) from the status-line relay, one small file per tab. |
-| `%LOCALAPPDATA%\CCWrapper\drafts-<letter>.json` | The unsent text of each session's compose box, one file per account: session id, text and cursor position, at most 100 drafts. Written only when the app exits, when it restarts to update, and when an update is ready to install (so other windows lost to that restart keep their drafts), and read when a session is reopened. Not encrypted. Not removed when you delete a session. If two windows of one account are open, the one that exits last wins. |
+| `%LOCALAPPDATA%\CCWrapper\drafts-<letter>.json` | The unsent text of each session's compose box, one file per account: session id, text and cursor position, at most 100 drafts. Written only when the app exits, when it restarts to update, and whenever the app loses focus while an update is ready to install (so a restart started from another window cannot lose them), and read when a session is reopened. Not encrypted. Not removed when you delete a session. If two windows of one account are open, the one that exits last wins. |
 | `%LOCALAPPDATA%\CCWrapper\app.json` | The app's own settings: `updateCheck`, `browserTool` (whether Claude may use the Browser panel) and the bottom bar's `compact` hint (on/off, threshold, prompt). |
 
 These files stay on your computer. The publisher cannot see them.

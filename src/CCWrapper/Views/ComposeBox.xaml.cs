@@ -494,7 +494,7 @@ public static class TuiInput
 
     /// <summary>The pastes <paramref name="text"/> goes in as: one, but a slash command as several of at most
     /// <see cref="PasteChunk"/> characters and one line break each (at its start). Claude Code folds a paste over 800
-    /// characters or 3 lines into "[Pasted text #1]", and a folded slash command is sent as a plain prompt.
+    /// characters or of 4 lines or more into "[Pasted text #1]", and a folded slash command is sent as a plain prompt.
     /// shortcut: a terminal under about 12 rows may fold even a one-break paste; send breaks some other way if that shows up.</summary>
     internal static IEnumerable<string> Pastes(string text)
     {

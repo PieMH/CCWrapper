@@ -114,4 +114,20 @@ public sealed class DraftStoreTests : IDisposable
         Assert.NotNull(back.Get(Tab("s0")));
         Assert.NotNull(back.Get(Tab($"s{DraftStore.Cap + 4}")));
     }
+
+    [Fact]
+    public void A_changed_session_id_does_not_delete_the_draft_another_tab_wrote_under_the_old_one()
+    {
+        var store = new DraftStore(PathOf("d.json"));
+        var a = Tab("X");
+        store.Set(a, "from A", 0);
+        a.SessionId = "Y"; // /clear in the background tab
+        var b = Tab("X"); // resumed X in another tab
+        store.Set(b, "from B", 0);
+
+        store.Set(a, "A again", 0);
+
+        Assert.Equal("from B", store.Get(b)!.Text);
+        Assert.Equal("A again", store.Get(a)!.Text);
+    }
 }

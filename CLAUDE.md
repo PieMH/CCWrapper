@@ -24,7 +24,7 @@ dotnet test
 | Folder | What |
 |---|---|
 | `src/CCWrapper` (root) | `Program.cs`: the Velopack hook runs before WPF starts |
-| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `DraftStore` (compose-box drafts, `drafts-<letter>.json`, saved on exit, before an update restart and when an update is ready); `AppUpdate` (auto-update), `AppPrefs` (`updateCheck`, `browserTool`) and `CompactPrefs` (`app.json`: each rewrites only its own key) |
+| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `DraftStore` (compose-box drafts, `drafts-<letter>.json`, saved on exit, before an update restart and when the app is deactivated with an update ready); `AppUpdate` (auto-update), `AppPrefs` (`updateCheck`, `browserTool`) and `CompactPrefs` (`app.json`: each rewrites only its own key) |
 | `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SlashCommands` (the `/` list, with enabled plugins' commands and skills), `UsageStats` (the usage popup's token counts); `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md`; `ClaudeJson`, locked updates of `.claude.json` |
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs), `BrowserMcp`/`BrowserPipe` (the Browser tool: MCP handler and the window's named pipe) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
@@ -75,7 +75,7 @@ dotnet test
   field as optional, and show "—" when one is missing.
 - **Never type into a permission prompt.** Anything that sends text or keys to the TUI goes through `TuiInput`. It
   re-reads the registry right before sending and fails closed. A slash command goes in as pastes
-  of at most 500 characters and one line break each: Claude Code folds a paste over 800 characters or 4 lines into `[Pasted text]` instead of running it.
+  of at most 500 characters and one line break each: Claude Code folds a paste over 800 characters or of 4 lines or more into `[Pasted text]` instead of running it.
 - **WPF cannot draw over WebView2.** Never overlay WPF on the terminal. Collapse it and show a WPF panel in its cell, or
   put the UI in the terminal page (`wwwroot`).
 - **Child `claude` processes must not inherit a parent Claude Code session.** `ClaudeLaunch` strips its environment
