@@ -41,7 +41,8 @@
                 <TextBlock x:Name="CtxText" />
             </StackPanel>
             <Border Style="{StaticResource Sep}" />
-            <StackPanel x:Name="UsageGroup" Orientation="Horizontal" ToolTipOpening="OnUsageTip">
+            <StackPanel x:Name="UsageGroup" Orientation="Horizontal" ToolTipOpening="OnUsageTip" Cursor="Hand" Background="Transparent"
+                        MouseLeftButtonUp="OnUsageClick">
                 <TextBlock Text="5h" Style="{StaticResource Dim}" />
                 <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
                 <TextBlock x:Name="FiveHourText" MinWidth="28" />
@@ -49,6 +50,12 @@
                 <Border Style="{StaticResource MeterTrack}"><Border x:Name="WeekBar" Style="{StaticResource Bar}" /></Border>
                 <TextBlock x:Name="WeekText" MinWidth="28" />
             </StackPanel>
+            <!-- A Popup is its own window, so it may sit over the terminal's WebView2. Not inside UsageGroup: clicks in it would bubble to the toggle. -->
+            <Popup x:Name="UsagePopup" PlacementTarget="{Binding ElementName=UsageGroup}" Placement="Top" StaysOpen="False" Closed="OnUsageClosed">
+                <Border x:Name="UsagePanel" Style="{StaticResource UsagePanel}" Focusable="True" KeyDown="OnUsageKey">
+                    <StackPanel x:Name="UsageBody" />
+                </Border>
+            </Popup>
             <Border Style="{StaticResource Sep}" />
             <TextBlock x:Name="SpendText" Foreground="#AEB7C2" ToolTip="Session tokens in / out, and cost" />
             <Button x:Name="RefreshButton" Style="{StaticResource Chip}" Width="28" Padding="0" Margin="6,0,0,0" Click="OnRefresh">
