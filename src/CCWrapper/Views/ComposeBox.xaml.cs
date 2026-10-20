@@ -128,7 +128,7 @@ public partial class ComposeBox : UserControl
         SlashList.ScrollIntoView(SlashList.SelectedItem);
     }
 
-    // Completes to "/name " (the rest of the box stays); never sends.
+    // Completes to "/name " (the rest of the box stays); sending is the caller's.
     void CompleteSlash(SlashCommand command)
     {
         var insert = $"/{command.Name} ";
@@ -258,7 +258,12 @@ public partial class ComposeBox : UserControl
             e.Handled = true; // before the prompt history and sending
             if (e.Key == Key.Escape) CloseSlash();
             else if (e.Key is Key.Up or Key.Down) MoveSlash(e.Key == Key.Up ? -1 : 1);
-            else if (SlashList.SelectedItem is SlashCommand c) CompleteSlash(c);
+            else if (SlashList.SelectedItem is SlashCommand c)
+            {
+                var send = e.Key == Key.Enter && !_forced; // Enter runs the chosen command, as in the TUI; Tab, or a command put into text, only completes
+                CompleteSlash(c);
+                if (send && SendButton.IsEnabled) _ = SendAsync();
+            }
         }
         else if (e.Key == Key.Enter && (mods & ModifierKeys.Shift) == 0)
         {
@@ -401,7 +406,7 @@ public static class TuiInput
         }
     }
 
-    /// <summary>One bracketed paste, then Enter after <see cref="EnterDelay"/> (an Enter sent with the paste would be taken as
+    /// <summary>One bracketed paste (a slash command: see <see cref="Pastes"/>), then Enter after <see cref="EnterDelay"/> (an Enter sent with the paste would be taken as
     /// part of it). The registry is read again right before each. Any text is refused while the TUI's input is in bash mode
     /// (it would run as a shell command), and a slash command while it holds text. Null when it went in, else why not.</summary>
     public static async Task<string?> SubmitAsync(LiveSession? s, string text)
@@ -421,10 +426,31 @@ public static class TuiInput
             if (text.StartsWith('/') && HasPromptText(tail)) return ClearInputFirst;
         }
         if (await FreshBlockedReasonAsync(s) is { } before) return before;
-        if (!s.SendText(text)) return BlockedReason(s) ?? "Not sent";
+        foreach (var paste in Pastes(text))
+            if (!s.SendText(paste)) return BlockedReason(s) ?? "Not sent";
         await Task.Delay(EnterDelay(text.Length));
         if (await FreshBlockedReasonAsync(s) is { } after) return after + ". The text is in the terminal input, not sent.";
         return s.SendKeys("\r") ? null : BlockedReason(s) ?? "Not sent";
+    }
+
+    internal const int PasteChunk = 500;
+
+    /// <summary>The pastes <paramref name="text"/> goes in as: one, but a slash command as several of at most
+    /// <see cref="PasteChunk"/> characters and one line break each (at its start). Claude Code folds a paste over 800
+    /// characters or 3 lines into "[Pasted text #1]", and a folded slash command is sent as a plain prompt.
+    /// shortcut: a terminal under about 12 rows may fold even a one-break paste; send breaks some other way if that shows up.</summary>
+    internal static IEnumerable<string> Pastes(string text)
+    {
+        if (!text.StartsWith('/')) { yield return text; yield break; }
+        text = text.ReplaceLineEndings("\r");
+        for (var at = 0; at < text.Length;)
+        {
+            var end = Math.Min(text.Length, at + PasteChunk);
+            if (text.IndexOf('\r', at + 1, end - at - 1) is >= 0 and var line) end = line;
+            else if (end < text.Length && char.IsHighSurrogate(text[end - 1])) end--; // never split a surrogate pair
+            yield return text[at..end];
+            at = end;
+        }
     }
 
     /// <summary>A long paste takes the TUI longer to take in: 80 ms + 1 ms per 100 characters, at most 1 s.</summary>

@@ -83,7 +83,7 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 - A real multi-line editor with a round send button: Enter sends, Shift+Enter adds a line, and Up recalls earlier prompts.
 - When Claude Code suggests your next prompt, the empty box shows it greyed too, as the terminal does: Tab takes it to edit, Enter sends it, typing replaces it.
 - Pasted screenshots become image files.
-- The **+** button adds files or folders (as a drop would) and opens the slash commands. Typing `/` lists Claude Code's commands, your custom commands and skills, narrowing as you type: Up/Down choose, Enter or Tab complete it without sending.
+- The **+** button adds files or folders (as a drop would) and opens the slash commands. Typing `/` lists Claude Code's commands, your custom commands and skills, narrowing as you type: Up/Down choose, Enter runs it, Tab completes it without sending.
 - It never types into a permission prompt or a dialog. Those you always answer in the terminal.
 
 Confirmations, warnings and errors use the app's dark theme too.
