@@ -24,8 +24,8 @@ dotnet test
 | Folder | What |
 |---|---|
 | `src/CCWrapper` (root) | `Program.cs`: the Velopack hook runs before WPF starts |
-| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `AppUpdate` (auto-update), `AppPrefs` (`updateCheck`, `browserTool`) and `CompactPrefs` (`app.json`: each rewrites only its own key) |
-| `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md`; `ClaudeJson`, locked updates of `.claude.json` |
+| `src/CCWrapper/Core` | Accounts and paths, `AppState`, the `LiveSession` contract the views bind to; `DraftStore` (compose-box drafts, `drafts-<letter>.json`, saved on exit); `AppUpdate` (auto-update), `AppPrefs` (`updateCheck`, `browserTool`) and `CompactPrefs` (`app.json`: each rewrites only its own key) |
+| `src/CCWrapper/Data` | Read-only parsers for Claude Code's files (registry, transcripts, file history, `.claude.json`) and for what `claude plugin`/`mcp` print; `SlashCommands` (the `/` list, with enabled plugins' commands and skills), `UsageStats` (the usage popup's token counts); `SettingsData`, the Settings window's load-edit-save of `settings.json` and `CLAUDE.md`; `ClaudeJson`, locked updates of `.claude.json` |
 | `src/CCWrapper/Terminal` | ConPTY (`PtySession`), WebView2 + xterm.js (`TerminalHost`, `wwwroot/`), launch, paste, `UsageProbe`, `ProcessTree`, `ClaudeCli` (hidden `claude plugin`/`mcp` runs), `BrowserMcp`/`BrowserPipe` (the Browser tool: MCP handler and the window's named pipe) |
 | `src/CCWrapper/Views` | WPF windows and controls; pure logic lives in static helpers (`ShellModel`, `BarFormat`, `TuiInput`) |
 | `src/CCWrapper/Theme.xaml` | Every color and custom style; `App.xaml` recolors Fluent's own brushes |
@@ -74,7 +74,8 @@ dotnet test
   `cachedUsageUtilization` are internal and change with Claude Code releases. Parse them only in `Data/`, treat every
   field as optional, and show "—" when one is missing.
 - **Never type into a permission prompt.** Anything that sends text or keys to the TUI goes through `TuiInput`. It
-  re-reads the registry right before sending and fails closed.
+  re-reads the registry right before sending and fails closed. A slash command over 800 characters or 4 lines goes in as
+  several short pastes: Claude Code folds a bigger paste into `[Pasted text]` instead of running it.
 - **WPF cannot draw over WebView2.** Never overlay WPF on the terminal. Collapse it and show a WPF panel in its cell, or
   put the UI in the terminal page (`wwwroot`).
 - **Child `claude` processes must not inherit a parent Claude Code session.** `ClaudeLaunch` strips its environment

@@ -78,13 +78,14 @@ If the runtime is missing on your PC, the installer (`Setup.exe`) downloads it f
 | `%LOCALAPPDATA%\CCWrapper\WebView2` | Browser profiles of the terminal and of the Browser panel, one per account: cookies, cache, site data. |
 | `%LOCALAPPDATA%\CCWrapper\backups` | Earlier versions of files you saved from the app. |
 | `%LOCALAPPDATA%\CCWrapper\live` | Live status data (model, context, cost, usage) from the status-line relay, one small file per tab. |
+| `%LOCALAPPDATA%\CCWrapper\drafts-<letter>.json` | The unsent text of each session's compose box, one file per account: session id, text and cursor position, at most 100 drafts. Written only when the app exits or restarts to update, and read when a session is reopened. Not encrypted. Not removed when you delete a session. If two windows of one account are open, the one that exits last wins. |
 | `%LOCALAPPDATA%\CCWrapper\app.json` | The app's own settings: `updateCheck`, `browserTool` (whether Claude may use the Browser panel) and the bottom bar's `compact` hint (on/off, threshold, prompt). |
 
 These files stay on your computer. The publisher cannot see them.
 
 ### Claude Code's files
 
-- The app **reads** files that Claude Code already writes: each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts, session status files, file-history backups, and plugin and skill lists. It also asks `git` (and `gh`) about the folder you work in: branch, upstream, remote, your git user name and email, and your GitHub account name. It shows them in the top bar and sends them nowhere.
+- The app **reads** files that Claude Code already writes: each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts, session status files, file-history backups, and plugin and skill lists. The usage popup (click the usage meters) adds up token counts from the transcripts, and the `/` list in the compose box reads the installed plugins' commands and skills. Both stay on your computer. It also asks `git` (and `gh`) about the folder you work in: branch, upstream, remote, your git user name and email, and your GitHub account name. It shows them in the top bar and sends them nowhere.
 - The app **writes** to Claude Code's files only when you act:
   - **Save** in the Settings window writes the `settings.json` and `CLAUDE.md` files you changed.
   - A server's folder switch in Plugins & connectors changes the list of turned-off servers for that folder in `.claude.json`.
@@ -94,7 +95,7 @@ These files stay on your computer. The publisher cannot see them.
 ## Delete your data
 
 1. Uninstall from **Windows Settings > Apps > Installed apps**. This removes the program.
-2. Uninstalling does **not** remove `%LOCALAPPDATA%\CCWrapper`. To delete it, close the app, type `%LOCALAPPDATA%\CCWrapper` in File Explorer's address bar, and delete the folder. Browser cookies, pasted images and backups go with it.
+2. Uninstalling does **not** remove `%LOCALAPPDATA%\CCWrapper`. To delete it, close the app, type `%LOCALAPPDATA%\CCWrapper` in File Explorer's address bar, and delete the folder. Browser cookies, pasted images, drafts and backups go with it.
 3. Claude Code's own folders (for example `%USERPROFILE%\.claude`) belong to Claude Code. The app does not remove them.
 
 ## Children
