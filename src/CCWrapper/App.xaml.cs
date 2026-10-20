@@ -35,6 +35,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        DraftStore.SaveAll();
         AppUpdate.ApplyOnExit();
         base.OnExit(e);
     }

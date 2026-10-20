@@ -60,9 +60,16 @@ public partial class ComposeBox : UserControl
     void OnTextChanged(object sender, RoutedEventArgs e)
     {
         _forced = false;
+        Stash(_session);
         UpdateHint();
         UpdateSlash();
         UpdateColor();
+    }
+
+    // The box's text is the active session's draft, kept in the store as it changes (written to disk only on exit).
+    void Stash(LiveSession? s)
+    {
+        if (s is not null) DraftStore.For(s.Account).Set(s, Input.Text, Input.CaretIndex);
     }
 
     void OnCaretMoved(object sender, RoutedEventArgs e) => UpdateSlash();
@@ -222,12 +229,17 @@ public partial class ComposeBox : UserControl
     {
         if (session != _session)
         {
+            Stash(_session); // with the caret
             _refusal = null;
             _suggestion = null;
             UpdateHint();
             CloseSlash();
+            _session = session;
+            var draft = session is null ? null : DraftStore.For(session.Account).Get(session);
+            SetText(draft?.Text ?? "", Math.Min(draft?.Caret ?? 0, draft?.Text.Length ?? 0)); // _quiet: a restored "/cmd" does not open the list
         }
         _session = session;
+        Stash(session); // a tab that just got its session id moves its draft to it
         UpdateColor();
         var blocked = TuiInput.BlockedReason(session);
         Notice.Text = blocked ?? _refusal;
@@ -251,7 +263,8 @@ public partial class ComposeBox : UserControl
         {
             if (await TuiInput.SubmitAsync(session, text) is not null) return; // keep the text: not submitted, the notice says why
             HistoryOf(session).Add(text);
-            Input.Clear();
+            if (session == _session) Input.Clear();
+            else DraftStore.For(session.Account).Set(session, "", 0); // the box shows another session's draft by now
             _suggestion = null; // it was sent, or Claude Code dropped it when the text went in
             UpdateHint();
         }
