@@ -62,6 +62,7 @@ public partial class ComposeBox : UserControl
         _forced = false;
         UpdateHint();
         UpdateSlash();
+        UpdateColor();
     }
 
     void OnCaretMoved(object sender, RoutedEventArgs e) => UpdateSlash();
@@ -76,7 +77,7 @@ public partial class ComposeBox : UserControl
 
     (string, string?)? CommandsKey => _session is { } s ? (s.Account.Letter, s.Cwd) : null;
 
-    // Open while the text starts with "/" and the caret is in that first word (or forced from the + menu): filtered by what follows the "/".
+    // Open while the caret is in a word that starts with "/" (at the text start or after whitespace; not a path) or forced from the + menu: filtered by what follows the "/".
     void UpdateSlash()
     {
         if (_quiet) return;
@@ -84,11 +85,7 @@ public partial class ComposeBox : UserControl
         var text = Input.Text;
         string? query = null;
         if (_forced) query = "";
-        else if (text.StartsWith('/') && Input.IsKeyboardFocused)
-        {
-            var end = WordEnd(text);
-            if (Input.CaretIndex >= 1 && Input.CaretIndex <= end) query = text[1..end];
-        }
+        else if (Input.IsKeyboardFocused && SlashWord.At(text, Input.CaretIndex) is var (start, end)) query = text[(start + 1)..end];
         if (query is null) { CloseSlash(); return; }
         if (!_fresh && !_loading) _ = LoadCommandsAsync(key, _session!);
         var rows = SlashCommands.Filter(_commands.GetValueOrDefault(key) ?? [], query);
@@ -111,9 +108,23 @@ public partial class ComposeBox : UserControl
         finally { _loading = false; }
         _query = null; // the list may have grown under the same query
         UpdateSlash();
+        UpdateColor();
     }
 
-    static int WordEnd(string text) => text.AsSpan().IndexOfAny(" \t\r\n") is >= 0 and var at ? at : text.Length;
+    // shortcut: the whole text takes the color while it starts with a known command (a TextBox cannot color a range, and an overlay
+    // would lose IME composition and drift from the caret); upgrade if tokens inside the text must be told apart.
+    void UpdateColor()
+    {
+        var text = Input.Text;
+        if (CommandsKey is not { } key) { Input.ClearValue(ForegroundProperty); return; }
+        if (!_commands.TryGetValue(key, out var list))
+        {
+            if (text.StartsWith('/') && !_loading) _ = LoadCommandsAsync(key, _session!); // a recalled "/command" never opens the list
+            list = [];
+        }
+        if (SlashWord.StartsWithCommand(text, list)) Input.Foreground = (Brush)FindResource("SlashText");
+        else Input.ClearValue(ForegroundProperty);
+    }
 
     void CloseSlash()
     {
@@ -137,8 +148,9 @@ public partial class ComposeBox : UserControl
         else
         {
             var text = Input.Text;
-            var end = WordEnd(text);
-            SetText(insert + text[end..].TrimStart(' ', '\t'), insert.Length);
+            if (SlashWord.At(text, Input.CaretIndex) is var (start, end))
+                SetText(text[..start] + insert + text[end..].TrimStart(' ', '\t'), start + insert.Length);
+            else Insert(insert);
         }
         _quiet = false;
         CloseSlash();
@@ -216,6 +228,7 @@ public partial class ComposeBox : UserControl
             CloseSlash();
         }
         _session = session;
+        UpdateColor();
         var blocked = TuiInput.BlockedReason(session);
         Notice.Text = blocked ?? _refusal;
         Notice.Visibility = Notice.Text is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
@@ -260,7 +273,9 @@ public partial class ComposeBox : UserControl
             else if (e.Key is Key.Up or Key.Down) MoveSlash(e.Key == Key.Up ? -1 : 1);
             else if (SlashList.SelectedItem is SlashCommand c)
             {
-                var send = e.Key == Key.Enter && !_forced; // Enter runs the chosen command, as in the TUI; Tab, or a command put into text, only completes
+                // Enter runs the chosen command, as in the TUI, when it is the start of the text; Tab, a command put into text and a word
+                // in the middle of a prompt (sending would submit it half written) only complete
+                var send = e.Key == Key.Enter && !_forced && SlashWord.At(Input.Text, Input.CaretIndex) is { Start: 0 };
                 CompleteSlash(c);
                 if (send && SendButton.IsEnabled) _ = SendAsync();
             }
@@ -338,6 +353,35 @@ public partial class ComposeBox : UserControl
         e.Handled = true;
         if (PasteHandler.ForCompose(e.Data) is { } text) Insert(text);
         Input.Focus();
+    }
+}
+
+/// <summary>Where the compose box's "/" word is.</summary>
+public static class SlashWord
+{
+    static bool Space(char c) => c is ' ' or '\t' or '\r' or '\n';
+
+    /// <summary>The word the caret is in when it starts with "/" at the text start or right after whitespace (so not "a/b" or a URL)
+    /// and the caret is after that "/" and not past the word's end: its start (the "/") and end (exclusive). Else null.</summary>
+    public static (int Start, int End)? At(string text, int caret)
+    {
+        caret = Math.Clamp(caret, 0, text.Length);
+        var start = caret;
+        while (start > 0 && !Space(text[start - 1])) start--;
+        if (start >= text.Length || text[start] != '/' || caret <= start) return null;
+        var end = start;
+        while (end < text.Length && !Space(text[end])) end++;
+        return (start, end);
+    }
+
+    /// <summary>True when the text starts with "/name", the name being one of <paramref name="commands"/> (case-insensitive).</summary>
+    public static bool StartsWithCommand(string text, IEnumerable<SlashCommand> commands)
+    {
+        if (!text.StartsWith('/')) return false;
+        var end = 1;
+        while (end < text.Length && !Space(text[end])) end++;
+        var name = text[1..end];
+        return name.Length > 0 && commands.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 }
 

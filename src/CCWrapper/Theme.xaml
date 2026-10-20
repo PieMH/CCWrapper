@@ -18,6 +18,8 @@
     <SolidColorBrush x:Key="Bad" Color="#F08F86" />
     <SolidColorBrush x:Key="BadLine" Color="#5A3A38" />
     <SolidColorBrush x:Key="Selected" Color="#262B33" />
+    <!-- A slash command in the compose box: the known one the text starts with, and the names in the "/" list -->
+    <SolidColorBrush x:Key="SlashText" Color="#5DB0F5" />
     <SolidColorBrush x:Key="SwitchOff" Color="#4A515C" />
     <!-- A settings row with an unsaved change -->
     <SolidColorBrush x:Key="ChangedFill" Color="#1A2330" />

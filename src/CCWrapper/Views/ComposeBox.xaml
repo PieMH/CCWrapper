@@ -61,7 +61,7 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock FontWeight="SemiBold" Text="{Binding Name, StringFormat=/{0}}" />
+                                    <TextBlock FontWeight="SemiBold" Foreground="{StaticResource SlashText}" Text="{Binding Name, StringFormat=/{0}}" />
                                     <TextBlock Grid.Column="1" Margin="12,0,0,0" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Text="{Binding Description}" />
                                 </Grid>
                             </DataTemplate>
