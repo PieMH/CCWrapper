@@ -46,7 +46,7 @@ public sealed class DraftStore(string path)
         _drafts.Remove(tab);
         var key = s.SessionId ?? tab;
         // Only the draft this tab wrote: another tab may have resumed the old id and edited it since.
-        if (_lastKey.TryGetValue(s.TabId, out var old) && old.Key != key && _drafts.TryGetValue(old.Key, out var cur) && cur == old.Draft) _drafts.Remove(old.Key);
+        if (_lastKey.TryGetValue(s.TabId, out var old) && old.Key != key && _drafts.TryGetValue(old.Key, out var cur) && ReferenceEquals(cur, old.Draft)) _drafts.Remove(old.Key);
         _drafts.Remove(key);
         Draft? draft = text.Length > 0 ? new(text, caret) : null;
         if (draft is not null) _drafts[key] = draft;

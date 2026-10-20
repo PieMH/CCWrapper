@@ -130,4 +130,19 @@ public sealed class DraftStoreTests : IDisposable
         Assert.Equal("from B", store.Get(b)!.Text);
         Assert.Equal("A again", store.Get(a)!.Text);
     }
+
+    [Fact]
+    public void A_draft_another_tab_stored_with_equal_text_and_caret_is_still_not_removed()
+    {
+        var store = new DraftStore(PathOf("d.json"));
+        var a = Tab("X");
+        store.Set(a, "same", 2);
+        a.SessionId = "Y";
+        var b = Tab("X");
+        store.Set(b, "same", 2); // a new record that equals A's by value
+
+        store.Set(a, "A again", 0);
+
+        Assert.Equal("same", store.Get(b)!.Text);
+    }
 }

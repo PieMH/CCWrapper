@@ -29,7 +29,7 @@ public partial class BottomBar : UserControl
     Func<string> _usageTip = () => "";
     (double? Five, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) _usageNow;
     DateTime _usageClosedAt;
-    IInputElement? _usageFocus;
+    IInputElement? _usageFocus; // what had focus before the usage button took it, for Esc to give back
     CompactPrefs _compact = CompactPrefs.Load();
     readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
 
@@ -115,7 +115,6 @@ public partial class BottomBar : UserControl
     void OpenUsage()
     {
         if (UsagePopup.IsOpen || DateTime.UtcNow - _usageClosedAt < TimeSpan.FromMilliseconds(250)) return;
-        _usageFocus = Keyboard.FocusedElement;
         Keyboard.Focus(UsageGroup); // a no-op for a click (the Button focused itself), but it also moves Win32 focus off the WebView2 for Enter and Space
         UsagePopup.HorizontalOffset = UsageGroup.ActualWidth - UsagePanel.Width; // right edges line up; WPF keeps it on screen
         var account = AppState.Current?.Account;
@@ -131,6 +130,9 @@ public partial class BottomBar : UserControl
             if (UsagePopup.IsOpen) ShowUsage(now, t.Result, loading: false);
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
+
+    // The button takes keyboard focus on mouse-down, before the click, so the element to give focus back to is the one it took it from.
+    void OnUsageFocus(object sender, KeyboardFocusChangedEventArgs e) { if (e.OldFocus is { } old && !ReferenceEquals(old, UsageGroup)) _usageFocus = old; }
 
     void OnUsageClosed(object? sender, EventArgs e) => _usageClosedAt = DateTime.UtcNow;
 
@@ -261,7 +263,7 @@ public partial class BottomBar : UserControl
         var others = AppUpdate.OtherInstances();
         var text = $"Restart now to install {AppUpdate.ReadyVersion}?";
         if (busy > 0) text += $"\n\nThis ends {busy} busy or waiting session(s); they stay resumable.";
-        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.";
+        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.\n\nUnsent drafts in the other window(s) are lost if they have not noticed the update.";
         if (Dialog.Show(Window.GetWindow(this), text, "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             AppUpdate.RestartNow(AppState.Current?.Account.Letter);
     }
