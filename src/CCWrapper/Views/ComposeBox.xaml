@@ -42,8 +42,8 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <!-- A Popup is its own window, so it may sit over the terminal's WebView2 -->
-            <Popup x:Name="SlashPopup" PlacementTarget="{Binding ElementName=Input}" Placement="Top" StaysOpen="True">
+            <!-- A Popup is its own window, so it may sit over the terminal's WebView2. AllowsTransparency: else it paints black behind the rounded corners. -->
+            <Popup x:Name="SlashPopup" PlacementTarget="{Binding ElementName=Input}" Placement="Top" StaysOpen="True" AllowsTransparency="True">
                 <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource ControlLine}" BorderThickness="1" CornerRadius="8"
                         Width="{Binding ActualWidth, ElementName=Input}" Margin="0,0,0,4">
                     <ListBox x:Name="SlashList" MaxHeight="280" Focusable="False" Background="Transparent" BorderThickness="0"

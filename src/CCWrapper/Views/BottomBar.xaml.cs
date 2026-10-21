@@ -30,6 +30,7 @@ public partial class BottomBar : UserControl
     (double? Five, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) _usageNow;
     DateTime _usageClosedAt;
     IInputElement? _usageFocus; // what had focus before the usage button took it, for Esc to give back
+    Window? _window;
     CompactPrefs _compact = CompactPrefs.Load();
     readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
 
@@ -48,6 +49,13 @@ public partial class BottomBar : UserControl
             CompactPrefs.Saved += OnCompactPrefs;
             OnCompactPrefs();
             _usageTimer.Start();
+            if ((_window = Window.GetWindow(this)) is { } w)
+            {
+                w.PreviewMouseDown += OnWindowMouseDown;
+                w.Deactivated += CloseUsage;
+                w.LocationChanged += CloseUsage;
+                w.SizeChanged += CloseUsage;
+            }
             await ReadAccountAsync();
             await CheckUsageAsync(force: false); // skipped when the start screen just checked
         };
@@ -57,6 +65,13 @@ public partial class BottomBar : UserControl
             AppUpdate.Changed -= ShowUpdate;
             CompactPrefs.Saved -= OnCompactPrefs;
             _usageTimer.Stop();
+            if (_window is { } w)
+            {
+                w.PreviewMouseDown -= OnWindowMouseDown;
+                w.Deactivated -= CloseUsage;
+                w.LocationChanged -= CloseUsage;
+                w.SizeChanged -= CloseUsage;
+            }
         };
         _ = new SessionFollower<BarSource, BarData>(this, s => new BarSource(s), r => r.Read(), async d =>
         {
@@ -109,8 +124,16 @@ public partial class BottomBar : UserControl
     // Built when it opens: the "in 2h 10m" of the reset times is relative to now, not to the last render.
     void OnUsageTip(object sender, ToolTipEventArgs e) => UsageGroup.ToolTip = _usageTip();
 
-    // StaysOpen=false closes the popup on the mouse-down of a click on the button itself, so a click right after a close must not reopen it.
+    // OnWindowMouseDown closes the popup on the mouse-down of a click on the button itself, so a click right after a close must not reopen it.
     void OnUsageClick(object sender, RoutedEventArgs e) => OpenUsage();
+
+    // Any press in this window but in the popup closes it. The popup's own mouse events route through the window too. A click in a
+    // WebView2 (terminal, Browser panel) never reaches WPF: it takes the focus, and OnUsageFocusWithin closes the popup then.
+    void OnWindowMouseDown(object sender, MouseButtonEventArgs e) { if (!UsagePanel.IsMouseOver) CloseUsage(sender, e); }
+
+    void OnUsageFocusWithin(object sender, DependencyPropertyChangedEventArgs e) { if (!UsagePanel.IsKeyboardFocusWithin) UsagePopup.IsOpen = false; }
+
+    void CloseUsage(object? sender, EventArgs e) => UsagePopup.IsOpen = false;
 
     void OpenUsage()
     {

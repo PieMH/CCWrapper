@@ -41,7 +41,7 @@
                 <TextBlock x:Name="CtxText" />
             </StackPanel>
             <Border Style="{StaticResource Sep}" />
-            <!-- ClickMode=Press: the click that closes the StaysOpen=false popup is the same mouse-down the 250 ms guard measures. A Button: it takes Win32 focus off the terminal's WebView2 when clicked, and has an automation peer for screen readers. -->
+            <!-- ClickMode=Press: the click that closes the popup is the same mouse-down the 250 ms guard measures. A Button: it takes Win32 focus off the terminal's WebView2 when clicked, and has an automation peer for screen readers. -->
             <Button x:Name="UsageGroup" Style="{StaticResource Chip}" Padding="6,0" Margin="0" ToolTipOpening="OnUsageTip"
                     AutomationProperties.Name="Plan usage details" ClickMode="Press" GotKeyboardFocus="OnUsageFocus" Click="OnUsageClick">
                 <StackPanel Orientation="Horizontal">
@@ -53,9 +53,11 @@
                     <TextBlock x:Name="WeekText" MinWidth="28" />
                 </StackPanel>
             </Button>
-            <!-- A Popup is its own window, so it may sit over the terminal's WebView2. Not inside UsageGroup: clicks in it would bubble to the toggle. -->
-            <Popup x:Name="UsagePopup" PlacementTarget="{Binding ElementName=UsageGroup}" Placement="Top" StaysOpen="False" Closed="OnUsageClosed">
-                <Border x:Name="UsagePanel" Style="{StaticResource UsagePanel}" Focusable="True" PreviewKeyDown="OnUsageKey">
+            <!-- A Popup is its own window, so it may sit over the terminal's WebView2. Not inside UsageGroup: clicks in it would bubble to the toggle.
+                 StaysOpen=True: StaysOpen=False's mouse capture closed it only on clicks in other apps, not on clicks elsewhere in this window; the code closes it (OnWindowMouseDown, OnUsageFocusWithin).
+                 AllowsTransparency: else the popup window paints black behind the rounded corners. -->
+            <Popup x:Name="UsagePopup" PlacementTarget="{Binding ElementName=UsageGroup}" Placement="Top" StaysOpen="True" AllowsTransparency="True" Closed="OnUsageClosed">
+                <Border x:Name="UsagePanel" Style="{StaticResource UsagePanel}" Focusable="True" PreviewKeyDown="OnUsageKey" IsKeyboardFocusWithinChanged="OnUsageFocusWithin">
                     <StackPanel x:Name="UsageBody" />
                 </Border>
             </Popup>
