@@ -121,7 +121,9 @@ public static class AppUpdate
     /// <summary>Exits at once, installs and starts the new version in <paramref name="accountLetter"/>'s window. Callers confirmed first.</summary>
     public static void RestartNow(string? accountLetter)
     {
-        if (_ready is not null && AppPrefs.ReadUpdateCheck() == true) _mgr?.ApplyUpdatesAndRestart(_ready, RestartArgs(accountLetter));
+        if (_ready is null || AppPrefs.ReadUpdateCheck() != true) return;
+        DraftStore.SaveAll(); // the process ends inside the call below, without App.OnExit
+        _mgr?.ApplyUpdatesAndRestart(_ready, RestartArgs(accountLetter));
     }
 
     /// <summary>On exit: hands a downloaded update to the updater, unless another window of this install still runs.</summary>

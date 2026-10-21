@@ -14,6 +14,8 @@ public static class Smoke
     /// <summary>Returns the process exit code: 0 on success.</summary>
     public static async Task<int> RunAsync()
     {
+        // The terminal profile of the last run (see TerminalHost: no account means "smoke"); this run's can only go once the process ends, the next start takes it.
+        try { Directory.Delete(Path.Combine(ClaudeLaunch.AppDataDir, "WebView2", "smoke"), recursive: true); } catch (Exception) { }
         try
         {
             return await EchoAsync() == 0 && await BrowserAsync() && await PanelAsync() ? 0 : 1;

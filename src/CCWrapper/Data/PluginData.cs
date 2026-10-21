@@ -59,7 +59,7 @@ public sealed record PluginOption(string Key, string Title, string? Description,
 public sealed record CliOutcome(string? Message, string? FailureCode, string? Command, string? Sha256);
 
 /// <param name="Source">"user", or the plugin the skill comes with.</param>
-public sealed record SkillRow(string Name, string Description, string Source);
+public sealed record SkillRow(string Name, string Description, string Source, bool UserInvocable = true);
 
 /// <summary>Parses what <c>claude plugin …</c> prints. Pure, except <see cref="ReadSkills"/>. Every field is optional:
 /// these formats are Claude Code's own and change with its releases.</summary>
@@ -183,8 +183,9 @@ public static class PluginData
             {
                 var file = Path.Combine(skillDir, "SKILL.md");
                 if (!File.Exists(file)) continue;
-                var (name, description) = Frontmatter(File.ReadAllText(file));
-                rows.Add(new(name ?? Path.GetFileName(skillDir), description ?? "", source));
+                var text = File.ReadAllText(file);
+                var (name, description) = Frontmatter(text);
+                rows.Add(new(name ?? Path.GetFileName(skillDir), description ?? "", source, UserInvocable(text)));
             }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -211,6 +212,17 @@ public static class PluginData
             if (m.Groups[1].Value == "name") name = value; else description = value;
         }
         return (name, description);
+    }
+
+    /// <summary>False when the leading <c>---</c> block says <c>user-invocable: false</c>: Claude Code keeps such a skill or
+    /// command out of the / menu.</summary>
+    public static bool UserInvocable(string markdown)
+    {
+        var lines = markdown.ReplaceLineEndings("\n").Split('\n');
+        if (lines[0].Trim() != "---") return true;
+        for (var i = 1; i < lines.Length && lines[i].Trim() != "---"; i++)
+            if (Regex.IsMatch(lines[i], @"^user-invocable:\s*[""']?false[""']?\s*$", RegexOptions.IgnoreCase)) return false;
+        return true;
     }
 
     static DateTimeOffset? Date(JsonElement e) => e.Str() is { } s && DateTimeOffset.TryParse(s, out var d) ? d : null;

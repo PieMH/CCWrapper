@@ -53,6 +53,37 @@ public sealed class InputTests
     }
 
     [Fact]
+    public void A_prompt_is_one_paste_whatever_its_size()
+    {
+        var long_ = string.Concat(Enumerable.Repeat("line\r\n", 400));
+        Assert.Equal([long_], TuiInput.Pastes(long_));
+    }
+
+    [Fact]
+    public void A_slash_command_goes_in_as_pastes_Claude_Code_does_not_fold()
+    {
+        var args = string.Concat(Enumerable.Range(0, 400).Select(i => $"w{i} ")) + "\r\nsecond\nthird\r\n\r\nlast😀" + new string('x', 1200);
+        var text = "/agents-team:agents-team " + args;
+        var pastes = TuiInput.Pastes(text).ToList();
+        Assert.Equal(text.ReplaceLineEndings("\r"), string.Concat(pastes)); // nothing lost, newlines as CR as in a paste
+        Assert.StartsWith("/agents-team:agents-team w0 ", pastes[0]);
+        Assert.All(pastes, p => Assert.InRange(p.Length, 1, TuiInput.PasteChunk));
+        Assert.All(pastes, p => Assert.True(p.Count(c => c == '\r') <= 1 && p.IndexOf('\r') <= 0)); // at most one break, at the start
+        Assert.All(pastes, p => Assert.False(char.IsHighSurrogate(p[^1])));
+        Assert.Equal(["/help"], TuiInput.Pastes("/help"));
+        Assert.Equal(["/x", "\r", "\ry"], TuiInput.Pastes("/x\n\ny"));
+        Assert.Equal(["/" + new string('a', 498), "😀b"], TuiInput.Pastes("/" + new string('a', 498) + "😀b"));
+    }
+
+    [Fact]
+    public async Task Submit_sends_a_long_slash_command_as_several_pastes_then_one_enter()
+    {
+        var s = Session(SessionStatus.Idle);
+        Assert.Null(await TuiInput.SubmitAsync(s, "/foo " + new string('a', 1000)));
+        Assert.Equal(["text:/foo " + new string('a', 495), "text:" + new string('a', 500), "text:aaaaa", "keys:\r"], Sent(s));
+    }
+
+    [Fact]
     public async Task Submit_sends_nothing_when_blocked()
     {
         var s = Session(SessionStatus.Waiting, "dialog open");

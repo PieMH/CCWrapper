@@ -31,7 +31,7 @@ static class SessionMenu
             if (entry is null || Dialog.Show(owner, $"Delete “{title}”?\n\nIts transcript is deleted for good and the session cannot be resumed.", "Delete session",
                     MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             var error = await Task.Run(() => SessionCatalog.Delete(entry));
-            if (error is null) deleted();
+            if (error is null) { DraftStore.For(entry.Account).Remove(entry.Id); deleted(); }
             else Dialog.Show(owner, error, "Could not delete the session", MessageBoxButton.OK, MessageBoxImage.Error);
         });
         var menu = new ContextMenu { PlacementTarget = target, Items = { rename, colors, new Separator(), delete } };

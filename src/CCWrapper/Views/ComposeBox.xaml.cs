@@ -60,8 +60,16 @@ public partial class ComposeBox : UserControl
     void OnTextChanged(object sender, RoutedEventArgs e)
     {
         _forced = false;
+        Stash(_session);
         UpdateHint();
         UpdateSlash();
+        UpdateColor();
+    }
+
+    // The box's text is the active session's draft, kept in the store as it changes (written to disk only on exit).
+    void Stash(LiveSession? s)
+    {
+        if (s is not null) DraftStore.For(s.Account).Set(s, Input.Text, Input.CaretIndex);
     }
 
     void OnCaretMoved(object sender, RoutedEventArgs e) => UpdateSlash();
@@ -76,7 +84,7 @@ public partial class ComposeBox : UserControl
 
     (string, string?)? CommandsKey => _session is { } s ? (s.Account.Letter, s.Cwd) : null;
 
-    // Open while the text starts with "/" and the caret is in that first word (or forced from the + menu): filtered by what follows the "/".
+    // Open while the caret is in a word that starts with "/" (at the text start or after whitespace; not a path) or forced from the + menu: filtered by what follows the "/".
     void UpdateSlash()
     {
         if (_quiet) return;
@@ -84,11 +92,7 @@ public partial class ComposeBox : UserControl
         var text = Input.Text;
         string? query = null;
         if (_forced) query = "";
-        else if (text.StartsWith('/') && Input.IsKeyboardFocused)
-        {
-            var end = WordEnd(text);
-            if (Input.CaretIndex >= 1 && Input.CaretIndex <= end) query = text[1..end];
-        }
+        else if (Input.IsKeyboardFocused && SlashWord.At(text, Input.CaretIndex) is var (start, end)) query = text[(start + 1)..end];
         if (query is null) { CloseSlash(); return; }
         if (!_fresh && !_loading) _ = LoadCommandsAsync(key, _session!);
         var rows = SlashCommands.Filter(_commands.GetValueOrDefault(key) ?? [], query);
@@ -111,9 +115,23 @@ public partial class ComposeBox : UserControl
         finally { _loading = false; }
         _query = null; // the list may have grown under the same query
         UpdateSlash();
+        UpdateColor();
     }
 
-    static int WordEnd(string text) => text.AsSpan().IndexOfAny(" \t\r\n") is >= 0 and var at ? at : text.Length;
+    // shortcut: the whole text takes the color while it starts with a known command (a TextBox cannot color a range, and an overlay
+    // would lose IME composition and drift from the caret); upgrade if tokens inside the text must be told apart.
+    void UpdateColor()
+    {
+        var text = Input.Text;
+        if (CommandsKey is not { } key) { Input.ClearValue(ForegroundProperty); return; }
+        if (!_commands.TryGetValue(key, out var list))
+        {
+            if (text.StartsWith('/') && !_loading) _ = LoadCommandsAsync(key, _session!); // a recalled "/command" never opens the list
+            list = [];
+        }
+        if (SlashWord.StartsWithCommand(text, list)) Input.Foreground = (Brush)FindResource("SlashText");
+        else Input.ClearValue(ForegroundProperty);
+    }
 
     void CloseSlash()
     {
@@ -128,7 +146,7 @@ public partial class ComposeBox : UserControl
         SlashList.ScrollIntoView(SlashList.SelectedItem);
     }
 
-    // Completes to "/name " (the rest of the box stays); never sends.
+    // Completes to "/name " (the rest of the box stays); sending is the caller's.
     void CompleteSlash(SlashCommand command)
     {
         var insert = $"/{command.Name} ";
@@ -137,8 +155,9 @@ public partial class ComposeBox : UserControl
         else
         {
             var text = Input.Text;
-            var end = WordEnd(text);
-            SetText(insert + text[end..].TrimStart(' ', '\t'), insert.Length);
+            if (SlashWord.At(text, Input.CaretIndex) is var (start, end))
+                SetText(text[..start] + insert + text[end..].TrimStart(' ', '\t'), start + insert.Length);
+            else Insert(insert);
         }
         _quiet = false;
         CloseSlash();
@@ -210,12 +229,18 @@ public partial class ComposeBox : UserControl
     {
         if (session != _session)
         {
+            Stash(_session); // with the caret
             _refusal = null;
             _suggestion = null;
             UpdateHint();
             CloseSlash();
+            _session = session;
+            var draft = session is null ? null : DraftStore.For(session.Account).Get(session);
+            SetText(draft?.Text ?? "", Math.Min(draft?.Caret ?? 0, draft?.Text.Length ?? 0)); // _quiet: a restored "/cmd" does not open the list
         }
         _session = session;
+        Stash(session); // a tab that just got its session id moves its draft to it
+        UpdateColor();
         var blocked = TuiInput.BlockedReason(session);
         Notice.Text = blocked ?? _refusal;
         Notice.Visibility = Notice.Text is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
@@ -238,7 +263,8 @@ public partial class ComposeBox : UserControl
         {
             if (await TuiInput.SubmitAsync(session, text) is not null) return; // keep the text: not submitted, the notice says why
             HistoryOf(session).Add(text);
-            Input.Clear();
+            if (session == _session) Input.Clear();
+            else DraftStore.For(session.Account).Set(session, "", 0); // the box shows another session's draft by now
             _suggestion = null; // it was sent, or Claude Code dropped it when the text went in
             UpdateHint();
         }
@@ -258,7 +284,14 @@ public partial class ComposeBox : UserControl
             e.Handled = true; // before the prompt history and sending
             if (e.Key == Key.Escape) CloseSlash();
             else if (e.Key is Key.Up or Key.Down) MoveSlash(e.Key == Key.Up ? -1 : 1);
-            else if (SlashList.SelectedItem is SlashCommand c) CompleteSlash(c);
+            else if (SlashList.SelectedItem is SlashCommand c)
+            {
+                // Enter runs the chosen command, as in the TUI, when it is the start of the text; Tab, a command put into text and a word
+                // in the middle of a prompt (sending would submit it half written) only complete
+                var send = e.Key == Key.Enter && !_forced && SlashWord.At(Input.Text, Input.CaretIndex) is { Start: 0 };
+                CompleteSlash(c);
+                if (send && SendButton.IsEnabled) _ = SendAsync();
+            }
         }
         else if (e.Key == Key.Enter && (mods & ModifierKeys.Shift) == 0)
         {
@@ -336,6 +369,35 @@ public partial class ComposeBox : UserControl
     }
 }
 
+/// <summary>Where the compose box's "/" word is.</summary>
+public static class SlashWord
+{
+    static bool Space(char c) => c is ' ' or '\t' or '\r' or '\n';
+
+    /// <summary>The word the caret is in when it starts with "/" at the text start or right after whitespace (so not "a/b" or a URL)
+    /// and the caret is after that "/" and not past the word's end: its start (the "/") and end (exclusive). Else null.</summary>
+    public static (int Start, int End)? At(string text, int caret)
+    {
+        caret = Math.Clamp(caret, 0, text.Length);
+        var start = caret;
+        while (start > 0 && !Space(text[start - 1])) start--;
+        if (start >= text.Length || text[start] != '/' || caret <= start) return null;
+        var end = start;
+        while (end < text.Length && !Space(text[end])) end++;
+        return (start, end);
+    }
+
+    /// <summary>True when the text starts with "/name", the name being one of <paramref name="commands"/> (case-insensitive).</summary>
+    public static bool StartsWithCommand(string text, IEnumerable<SlashCommand> commands)
+    {
+        if (!text.StartsWith('/')) return false;
+        var end = 1;
+        while (end < text.Length && !Space(text[end])) end++;
+        var name = text[1..end];
+        return name.Length > 0 && commands.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+}
+
 /// <summary>What may go into the TUI input, and how it goes in. Shared by the compose box, the bottom bar and the
 /// reload button of Plugins &amp; connectors.</summary>
 public static class TuiInput
@@ -401,7 +463,7 @@ public static class TuiInput
         }
     }
 
-    /// <summary>One bracketed paste, then Enter after <see cref="EnterDelay"/> (an Enter sent with the paste would be taken as
+    /// <summary>One bracketed paste (a slash command: see <see cref="Pastes"/>), then Enter after <see cref="EnterDelay"/> (an Enter sent with the paste would be taken as
     /// part of it). The registry is read again right before each. Any text is refused while the TUI's input is in bash mode
     /// (it would run as a shell command), and a slash command while it holds text. Null when it went in, else why not.</summary>
     public static async Task<string?> SubmitAsync(LiveSession? s, string text)
@@ -421,10 +483,31 @@ public static class TuiInput
             if (text.StartsWith('/') && HasPromptText(tail)) return ClearInputFirst;
         }
         if (await FreshBlockedReasonAsync(s) is { } before) return before;
-        if (!s.SendText(text)) return BlockedReason(s) ?? "Not sent";
+        foreach (var paste in Pastes(text))
+            if (!s.SendText(paste)) return BlockedReason(s) ?? "Not sent";
         await Task.Delay(EnterDelay(text.Length));
         if (await FreshBlockedReasonAsync(s) is { } after) return after + ". The text is in the terminal input, not sent.";
         return s.SendKeys("\r") ? null : BlockedReason(s) ?? "Not sent";
+    }
+
+    internal const int PasteChunk = 500;
+
+    /// <summary>The pastes <paramref name="text"/> goes in as: one, but a slash command as several of at most
+    /// <see cref="PasteChunk"/> characters and one line break each (at its start). Claude Code folds a paste over 800
+    /// characters or of 4 lines or more into "[Pasted text #1]", and a folded slash command is sent as a plain prompt.
+    /// shortcut: a terminal under about 12 rows may fold even a one-break paste; send breaks some other way if that shows up.</summary>
+    internal static IEnumerable<string> Pastes(string text)
+    {
+        if (!text.StartsWith('/')) { yield return text; yield break; }
+        text = text.ReplaceLineEndings("\r");
+        for (var at = 0; at < text.Length;)
+        {
+            var end = Math.Min(text.Length, at + PasteChunk);
+            if (text.IndexOf('\r', at + 1, end - at - 1) is >= 0 and var line) end = line;
+            else if (end < text.Length && char.IsHighSurrogate(text[end - 1])) end--; // never split a surrogate pair
+            yield return text[at..end];
+            at = end;
+        }
     }
 
     /// <summary>A long paste takes the TUI longer to take in: 80 ms + 1 ms per 100 characters, at most 1 s.</summary>

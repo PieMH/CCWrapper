@@ -18,6 +18,8 @@
     <SolidColorBrush x:Key="Bad" Color="#F08F86" />
     <SolidColorBrush x:Key="BadLine" Color="#5A3A38" />
     <SolidColorBrush x:Key="Selected" Color="#262B33" />
+    <!-- A slash command in the compose box: the known one the text starts with, and the names in the "/" list -->
+    <SolidColorBrush x:Key="SlashText" Color="#5DB0F5" />
     <SolidColorBrush x:Key="SwitchOff" Color="#4A515C" />
     <!-- A settings row with an unsaved change -->
     <SolidColorBrush x:Key="ChangedFill" Color="#1A2330" />
@@ -511,5 +513,23 @@
         <Setter Property="Background" Value="#2F343D" />
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Margin" Value="6,0" />
+    </Style>
+
+    <!-- The usage detail popup of the bottom bar: its frame, and the bar track inside it -->
+    <Style x:Key="UsagePanel" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Panel}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ControlLine}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="14,12" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+        <Setter Property="Width" Value="330" />
+        <Setter Property="TextElement.Foreground" Value="{StaticResource Text}" />
+    </Style>
+    <Style x:Key="UsageTrack" TargetType="Border" BasedOn="{StaticResource MeterTrack}">
+        <Setter Property="Width" Value="Auto" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Margin" Value="0,4" />
     </Style>
 </ResourceDictionary>

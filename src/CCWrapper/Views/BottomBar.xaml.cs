@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using CCWrapper.Core;
@@ -26,6 +27,9 @@ public partial class BottomBar : UserControl
     AccountInfo? _account; // the window's account, read at start and after each /usage check
     bool _checkingUsage;
     Func<string> _usageTip = () => "";
+    (double? Five, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) _usageNow;
+    DateTime _usageClosedAt;
+    IInputElement? _usageFocus; // what had focus before the usage button took it, for Esc to give back
     CompactPrefs _compact = CompactPrefs.Load();
     readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
 
@@ -96,6 +100,7 @@ public partial class BottomBar : UserControl
         Meter(FiveHourBar, usage.FiveHour, warn: true);
         Meter(WeekBar, usage.Week, warn: true);
         _usageTip = () => BarFormat.Usage(sl, account).Tip;
+        _usageNow = (usage.FiveHour, usage.Week, usage.FiveReset, usage.WeekReset);
         UsageGroup.ToolTip ??= usage.Tip; // non-null so ToolTipOpening fires; OnUsageTip makes the real text
         RefreshButton.IsEnabled = !_checkingUsage;
         RefreshButton.ToolTip = _checkingUsage ? "Checking plan usage…" : "Check plan usage now (runs /usage hidden)";
@@ -103,6 +108,138 @@ public partial class BottomBar : UserControl
 
     // Built when it opens: the "in 2h 10m" of the reset times is relative to now, not to the last render.
     void OnUsageTip(object sender, ToolTipEventArgs e) => UsageGroup.ToolTip = _usageTip();
+
+    // StaysOpen=false closes the popup on the mouse-down of a click on the button itself, so a click right after a close must not reopen it.
+    void OnUsageClick(object sender, RoutedEventArgs e) => OpenUsage();
+
+    void OpenUsage()
+    {
+        if (UsagePopup.IsOpen || DateTime.UtcNow - _usageClosedAt < TimeSpan.FromMilliseconds(250)) return;
+        Keyboard.Focus(UsageGroup); // a no-op for a click (the Button focused itself), but it also moves Win32 focus off the WebView2 for Enter and Space
+        UsagePopup.HorizontalOffset = UsageGroup.ActualWidth - UsagePanel.Width; // right edges line up; WPF keeps it on screen
+        var account = AppState.Current?.Account;
+        var now = _usageNow;
+        ShowUsage(now, null, loading: account is not null);
+        UsagePopup.IsOpen = true;
+        // The popup window is WS_EX_NOACTIVATE, so Win32 focus stays in the main window, on the button: the WebView2 lost it when the button took focus. WPF focus moves into the popup once it exists.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (UsagePopup.IsOpen) Keyboard.Focus(UsagePanel); });
+        if (account is null) return;
+        // The transcripts are read off the UI thread; reopening within a minute gets the cached result at once.
+        _ = Task.Run(() => UsageStats.Get(account, now.FiveReset, now.WeekReset)).ContinueWith(t =>
+        {
+            if (UsagePopup.IsOpen) ShowUsage(now, t.Result, loading: false);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    // The button takes keyboard focus on mouse-down, before the click, so the element to give focus back to is the one it took it from.
+    void OnUsageFocus(object sender, KeyboardFocusChangedEventArgs e) { if (e.OldFocus is { } old && !ReferenceEquals(old, UsageGroup)) _usageFocus = old; }
+
+    void OnUsageClosed(object? sender, EventArgs e) => _usageClosedAt = DateTime.UtcNow;
+
+    // Esc is taken here, in the tunnelling phase. Win32 focus is on the main window (the button took it from the WebView2), so the key
+    // message reaches WPF and never the terminal's WebView2 (and the TUI behind it, where Esc interrupts a running turn).
+    void OnUsageKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape) return;
+        UsagePopup.IsOpen = false;
+        if (_usageFocus is not null) Keyboard.Focus(_usageFocus);
+        e.Handled = true;
+    }
+
+    /// <summary>The popup: per window its bar, reset and tokens (in / out / cache) by model, then the week's tokens by hour of day.</summary>
+    void ShowUsage((double? Five, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) u, UsageStatsResult? stats, bool loading)
+    {
+        UsageBody.Children.Clear();
+        var now = DateTimeOffset.Now;
+        Section("5h session", u.Five, BarFormat.ResetText(u.FiveReset, now, alwaysDay: false), stats?.FiveHour, loading, first: true);
+        Section("Weekly", u.Week, BarFormat.ResetText(u.WeekReset, now, alwaysDay: true), stats?.Week, loading, first: false);
+        if (stats is null)
+        {
+            if (!loading) Add(Label("Token counts are not available.", "Muted", top: 10));
+            return;
+        }
+        var hours = stats.Week.ByHour;
+        var max = hours.Max();
+        Add(Label("Week by hour of day (local time)" + (max > 0 ? $", peak {Array.IndexOf(hours, max):00}:00" : ""), "Muted", top: 12));
+        const double stripHeight = 36;
+        var strip = new Grid { Height = stripHeight, Margin = new Thickness(0, 4, 0, 0) };
+        for (var h = 0; h < 24; h++)
+        {
+            strip.ColumnDefinitions.Add(new ColumnDefinition());
+            var bar = new Border
+            {
+                Background = (Brush)FindResource("Accent"), CornerRadius = new CornerRadius(1), Margin = new Thickness(1, 0, 1, 0),
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Height = max > 0 ? Math.Max(hours[h] > 0 ? 2 : 0, stripHeight * hours[h] / max) : 0,
+                Opacity = max > 0 && hours[h] == max ? 1 : 0.6, // the peak hour stands out
+                ToolTip = $"{h:00}:00  {BarFormat.Tokens(hours[h])} tokens",
+            };
+            Grid.SetColumn(bar, h);
+            strip.Children.Add(bar);
+        }
+        Add(strip);
+        var axis = new Grid { Margin = new Thickness(0, 2, 0, 0) };
+        for (var h = 0; h < 24; h++)
+        {
+            axis.ColumnDefinitions.Add(new ColumnDefinition());
+            if (h % 6 != 0) continue;
+            var l = Label($"{h:00}", "Muted", top: 0);
+            l.FontSize = 10;
+            Grid.SetColumn(l, h);
+            axis.Children.Add(l);
+        }
+        Add(axis);
+        Add(Label($"Tokens = input + output + cache writes; cache reads are listed apart. Counted from {stats.Files} transcript file(s) written in the last 7 days, subagents included ({stats.Took.TotalMilliseconds:0} ms).", "Muted", top: 10, wrap: true));
+    }
+
+    void Section(string title, double? percent, string reset, WindowUsage? w, bool loading, bool first)
+    {
+        var head = new DockPanel { Margin = new Thickness(0, first ? 0 : 12, 0, 0) };
+        var pct = Label(BarFormat.Percent(percent), percent >= 80 ? "Warn" : "Text", top: 0);
+        pct.FontWeight = FontWeights.SemiBold;
+        DockPanel.SetDock(pct, Dock.Right);
+        var name = Label(title, "Text", top: 0);
+        name.FontWeight = FontWeights.SemiBold;
+        head.Children.Add(pct);
+        head.Children.Add(name);
+        Add(head);
+        // the fill is a share of the track: star columns do it without a size pass
+        var p = Math.Clamp(percent ?? 0, 0, 100);
+        var fill = new Grid();
+        fill.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(p, GridUnitType.Star) });
+        fill.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100 - p, GridUnitType.Star) });
+        fill.Children.Add(new Border { CornerRadius = new CornerRadius(3), Background = (Brush)FindResource(p >= 80 ? "Warn" : "Accent") });
+        Add(new Border { Style = (Style)FindResource("UsageTrack"), Child = fill });
+        Add(Label(reset.Length > 0 ? "Window " + reset : "Reset time unknown", "Muted", top: 0));
+        if (w is null)
+        {
+            if (loading) Add(Label("Reading transcripts…", "Muted", top: 4));
+            return;
+        }
+        var t = w.Total;
+        Add(Label(w.Messages == 0 ? "No tokens in this window"
+            : $"{BarFormat.Tokens(t.Work)} tokens  ·  in {BarFormat.Tokens(t.Input)}  out {BarFormat.Tokens(t.Output)}  cache write {BarFormat.Tokens(t.CacheWrite)}  read {BarFormat.Tokens(t.CacheRead)}",
+            "TextSoft", top: 6, wrap: true));
+        var total = w.ByModel.Sum(m => m.Work);
+        foreach (var (model, work) in w.ByModel.Take(4))
+        {
+            if (total == 0) break;
+            var row = new DockPanel { Margin = new Thickness(0, 2, 0, 0) };
+            var share = Label($"{100.0 * work / total:0}%  {BarFormat.Tokens(work)}", "Muted", top: 0);
+            DockPanel.SetDock(share, Dock.Right);
+            row.Children.Add(share);
+            row.Children.Add(Label(model is null ? BarFormat.None : model.Replace("claude-", ""), "TextSoft", top: 0));
+            Add(row);
+        }
+    }
+
+    void Add(UIElement e) => UsageBody.Children.Add(e);
+
+    TextBlock Label(string text, string brush, double top, bool wrap = false) => new()
+    {
+        Text = text, Foreground = (Brush)FindResource(brush), Margin = new Thickness(0, top, 0, 0),
+        TextWrapping = wrap ? TextWrapping.Wrap : TextWrapping.NoWrap, TextTrimming = wrap ? TextTrimming.None : TextTrimming.CharacterEllipsis,
+    };
 
     /// <summary>Fills a meter's bar to <paramref name="percent"/> of its track; plan usage turns amber from 80%.</summary>
     void Meter(Border bar, double? percent, bool warn)
@@ -126,7 +263,7 @@ public partial class BottomBar : UserControl
         var others = AppUpdate.OtherInstances();
         var text = $"Restart now to install {AppUpdate.ReadyVersion}?";
         if (busy > 0) text += $"\n\nThis ends {busy} busy or waiting session(s); they stay resumable.";
-        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.";
+        if (others > 0) text += $"\n\nThe other CCWrapper window(s) ({others}) close too, and their sessions end the same way.\n\nUnsent drafts in the other window(s) are lost if they have not noticed the update.";
         if (Dialog.Show(Window.GetWindow(this), text, "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
             AppUpdate.RestartNow(AppState.Current?.Account.Letter);
     }
@@ -336,7 +473,7 @@ public static class BarFormat
     /// <summary>"5h 58% · wk 12%", from whichever is newer: the status line's rate limits (Pro/Max, after the first reply) or
     /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its source and time, and when each
     /// window resets, go in the tooltip (relative to <paramref name="now"/>); the two percents feed the meter bars.</summary>
-    public static (string Text, string Tip, double? FiveHour, double? Week) Usage(StatusLineData? sl, AccountInfo? account, DateTimeOffset? now = null)
+    public static (string Text, string Tip, double? FiveHour, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) Usage(StatusLineData? sl, AccountInfo? account, DateTimeOffset? now = null)
     {
         var saved = account?.UsageFetchedAt;
         var live = (sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null }) && (saved is null || sl.ReceivedAt > saved);
@@ -346,20 +483,24 @@ public static class BarFormat
             : saved is { } at ? $"Plan usage from Claude Code's /usage, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data";
         var t = now ?? DateTimeOffset.Now;
         tip += Reset("5h window", fiveReset, t, alwaysDay: false) + Reset("Weekly window", weekReset, t, alwaysDay: true);
-        return ($"5h {Percent(five)} · wk {Percent(week)}", tip, five, week);
+        return ($"5h {Percent(five)} · wk {Percent(week)}", tip, five, week, fiveReset, weekReset);
     }
 
     /// <summary>"5h window resets 14:30 (in 2h 10m)", with the weekday when it is not today (always for <paramref name="alwaysDay"/>);
     /// empty when the time is unknown.</summary>
-    static string Reset(string what, DateTimeOffset? at, DateTimeOffset now, bool alwaysDay)
+    static string Reset(string what, DateTimeOffset? at, DateTimeOffset now, bool alwaysDay) =>
+        ResetText(at, now, alwaysDay) is { Length: > 0 } t ? $"\n{what} {t}" : "";
+
+    /// <summary>"resets 14:30 (in 2h 10m)" or "reset was due 14:30"; empty when the time is unknown.</summary>
+    public static string ResetText(DateTimeOffset? at, DateTimeOffset now, bool alwaysDay)
     {
         if (at is not { } r) return "";
         var local = r.ToLocalTime();
         var when = local.ToString(alwaysDay || local.Date != now.ToLocalTime().Date ? "ddd HH:mm" : "HH:mm", Inv);
         var left = r - now;
-        if (left <= TimeSpan.Zero) return $"\n{what} reset was due {when}";
+        if (left <= TimeSpan.Zero) return $"reset was due {when}";
         var span = left.TotalDays >= 1 ? $"{(int)left.TotalDays}d {left.Hours}h" : left.TotalHours >= 1 ? $"{(int)left.TotalHours}h {left.Minutes}m" : $"{Math.Max(1, left.Minutes)}m";
-        return $"\n{what} resets {when} (in {span})";
+        return $"resets {when} (in {span})";
     }
 
     /// <summary>The account read whose saved usage is newer (a null one loses).</summary>

@@ -41,14 +41,24 @@
                 <TextBlock x:Name="CtxText" />
             </StackPanel>
             <Border Style="{StaticResource Sep}" />
-            <StackPanel x:Name="UsageGroup" Orientation="Horizontal" ToolTipOpening="OnUsageTip">
-                <TextBlock Text="5h" Style="{StaticResource Dim}" />
-                <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
-                <TextBlock x:Name="FiveHourText" MinWidth="28" />
-                <TextBlock Text="wk" Style="{StaticResource Dim}" Margin="10,0,0,0" />
-                <Border Style="{StaticResource MeterTrack}"><Border x:Name="WeekBar" Style="{StaticResource Bar}" /></Border>
-                <TextBlock x:Name="WeekText" MinWidth="28" />
-            </StackPanel>
+            <!-- ClickMode=Press: the click that closes the StaysOpen=false popup is the same mouse-down the 250 ms guard measures. A Button: it takes Win32 focus off the terminal's WebView2 when clicked, and has an automation peer for screen readers. -->
+            <Button x:Name="UsageGroup" Style="{StaticResource Chip}" Padding="6,0" Margin="0" ToolTipOpening="OnUsageTip"
+                    AutomationProperties.Name="Plan usage details" ClickMode="Press" GotKeyboardFocus="OnUsageFocus" Click="OnUsageClick">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="5h" Style="{StaticResource Dim}" />
+                    <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
+                    <TextBlock x:Name="FiveHourText" MinWidth="28" />
+                    <TextBlock Text="wk" Style="{StaticResource Dim}" Margin="10,0,0,0" />
+                    <Border Style="{StaticResource MeterTrack}"><Border x:Name="WeekBar" Style="{StaticResource Bar}" /></Border>
+                    <TextBlock x:Name="WeekText" MinWidth="28" />
+                </StackPanel>
+            </Button>
+            <!-- A Popup is its own window, so it may sit over the terminal's WebView2. Not inside UsageGroup: clicks in it would bubble to the toggle. -->
+            <Popup x:Name="UsagePopup" PlacementTarget="{Binding ElementName=UsageGroup}" Placement="Top" StaysOpen="False" Closed="OnUsageClosed">
+                <Border x:Name="UsagePanel" Style="{StaticResource UsagePanel}" Focusable="True" PreviewKeyDown="OnUsageKey">
+                    <StackPanel x:Name="UsageBody" />
+                </Border>
+            </Popup>
             <Border Style="{StaticResource Sep}" />
             <TextBlock x:Name="SpendText" Foreground="#AEB7C2" ToolTip="Session tokens in / out, and cost" />
             <Button x:Name="RefreshButton" Style="{StaticResource Chip}" Width="28" Padding="0" Margin="6,0,0,0" Click="OnRefresh">
