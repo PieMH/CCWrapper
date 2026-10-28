@@ -62,10 +62,16 @@ public partial class TerminalHost : UserControl
     }
 
     /// <summary>Relaunches an exited session in its terminal with <c>--resume &lt;SessionId&gt;</c> (the overlay's Resume).</summary>
-    public Task ResumeAsync(LiveSession session) =>
-        _tabs.TryGetValue(session.TabId, out var tab) && tab.Pty is null && tab.Size is null && tab.Options is { } o && session.SessionId is { } id
-            ? OpenAsync(session, ResumeOptions(o, session.Cwd, id)) // a copy resumes as itself: its id was adopted
-            : Task.CompletedTask;
+    public Task ResumeAsync(LiveSession session)
+    {
+        if (!(_tabs.TryGetValue(session.TabId, out var tab) && tab.Pty is null && tab.Size is null && tab.Options is { } o && session.SessionId is { } id))
+            return Task.CompletedTask;
+        var options = ResumeOptions(o, session.Cwd, id); // a copy resumes as itself: its id was adopted
+        if (Directory.Exists(options.Cwd)) return OpenAsync(session, options);
+        // Claude Code may remove an exited --worktree session's folder; same message as a session-list open (MainWindow.FolderGone)
+        Views.Dialog.Show(Window.GetWindow(this), $"The session's folder does not exist any more:\n{options.Cwd}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return Task.CompletedTask;
+    }
 
     /// <summary>Resume in the folder the session runs in now (a <c>--worktree</c> tab: the worktree root, where its transcript is), else the launch folder.</summary>
     internal static LaunchOptions ResumeOptions(LaunchOptions launched, string? cwd, string id) =>

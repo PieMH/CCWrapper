@@ -49,9 +49,12 @@ public sealed class FilesPanelTests
     }
 
     [Fact]
-    public void Explorer_gets_an_argument_list()
+    public void Explorer_gets_one_quoted_token_so_commas_and_spaces_survive()
     {
-        Assert.Equal(["/select,", @"C:\a b\c.cs"], FileTree.ExplorerArgs(@"C:\a b\c.cs", false));
-        Assert.Equal([@"C:\a b"], FileTree.ExplorerArgs(@"C:\a b", true));
+        Assert.Equal("/select,\"C:\\a b\\c.cs\"", FileTree.ExplorerArgs(@"C:\a b\c.cs", false));
+        Assert.Equal("/select,\"C:\\p\\a,b.txt\"", FileTree.ExplorerArgs(@"C:\p\a,b.txt", false));
+        Assert.Equal("\"C:\\a b\"", FileTree.ExplorerArgs(@"C:\a b", true));
+        Assert.Equal("\"C:\\p\\x,y\"", FileTree.ExplorerArgs(@"C:\p\x,y", true));
+        Assert.Null(FileTree.ExplorerArgs("C:\\p\\a\"b", false));
     }
 }

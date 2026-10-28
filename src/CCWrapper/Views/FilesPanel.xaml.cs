@@ -80,8 +80,8 @@ public partial class FilesPanel : UserControl
     void OnExplorer(object sender, RoutedEventArgs e)
     {
         if (Tree.SelectedItem is not FileNode { Location: { } path } node) return;
-        var psi = new ProcessStartInfo("explorer.exe");
-        foreach (var arg in FileTree.ExplorerArgs(path, node.IsFolder)) psi.ArgumentList.Add(arg);
+        if (FileTree.ExplorerArgs(path, node.IsFolder) is not { } args) return;
+        var psi = new ProcessStartInfo("explorer.exe") { Arguments = args };
         try { Process.Start(psi)?.Dispose(); }
         catch (Win32Exception) { } // no explorer.exe: nothing sensible to show
     }
@@ -180,8 +180,8 @@ public static class FileTree
     public static IEnumerable<FileChange> Filter(IEnumerable<FileChange> changes, string query) =>
         query.Length == 0 ? changes : changes.Where(c => c.RelPath.Contains(query, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Explorer's arguments: a file is selected in its folder, a folder is opened. An argument list, never a command string.</summary>
-    public static string[] ExplorerArgs(string path, bool folder) => folder ? [path] : ["/select,", path];
+    /// <summary>Explorer's raw command line: <c>/select,"path"</c> selects a file in its folder, <c>"path"</c> opens a folder. Explorer splits on commas and does not unescape <c>\"</c>, so ArgumentList cannot carry it; the quotes are safe as a Windows path has none. Null for a path that has one.</summary>
+    public static string? ExplorerArgs(string path, bool folder) => path.Contains('"') ? null : folder ? $"\"{path}\"" : $"/select,\"{path}\"";
 
     static int ByKindThenName(FileNode a, FileNode b) =>
         a.IsFolder != b.IsFolder ? (a.IsFolder ? -1 : 1) : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
