@@ -6,7 +6,8 @@ using CCWrapper.Core;
 namespace CCWrapper.Data;
 
 /// <param name="Source">built-in, user, project or a skill's "user skill" / "project skill".</param>
-public sealed record SlashCommand(string Name, string Description, string Source);
+/// <param name="ArgumentHint">What the command takes, as Claude Code greys it after "/name " ("argument-hint:" of the frontmatter).</param>
+public sealed record SlashCommand(string Name, string Description, string Source, string? ArgumentHint = null);
 
 /// <summary>The slash commands the compose box offers: Claude Code's built-ins, custom commands (<c>commands\**\*.md</c>) and
 /// skills (<c>skills\*\SKILL.md</c>), each from the account's config folder and the project's <c>.claude</c> folder, and those
@@ -14,21 +15,21 @@ public sealed record SlashCommand(string Name, string Description, string Source
 /// Code writes lists them.</summary>
 public static class SlashCommands
 {
-    static SlashCommand B(string name, string description) => new(name, description, "built-in");
+    static SlashCommand B(string name, string description, string? hint = null) => new(name, description, "built-in", hint);
 
-    // shortcut: hand-kept, Claude Code exposes no list to read; upgrade if it does.
+    // shortcut: hand-kept, argument hints included, Claude Code exposes no list to read; upgrade if it does.
     static readonly SlashCommand[] BuiltIn =
     [
-        B("add-dir", "Add a working directory"), B("agents", "Manage subagents"), B("clear", "Clear the conversation"),
-        B("color", "Set the session color"), B("compact", "Summarize the conversation to free context"), B("config", "Open settings"),
+        B("add-dir", "Add a working directory", "<path>"), B("agents", "Manage subagents"), B("clear", "Clear the conversation"),
+        B("color", "Set the session color", "[color]"), B("compact", "Summarize the conversation to free context", "[instructions]"), B("config", "Open settings"),
         B("context", "Show context usage"), B("cost", "Show token usage and cost"), B("doctor", "Check the Claude Code installation"),
-        B("effort", "Set the effort level"), B("exit", "Exit Claude Code"), B("export", "Export the conversation"),
+        B("effort", "Set the effort level", "[low|medium|high|xhigh|max]"), B("exit", "Exit Claude Code"), B("export", "Export the conversation", "[filename]"),
         B("help", "Show help and commands"), B("hooks", "Manage hooks"), B("ide", "Manage IDE integration"),
         B("init", "Create a CLAUDE.md for this project"), B("login", "Sign in"), B("logout", "Sign out"),
-        B("mcp", "Manage MCP servers"), B("memory", "Edit memory files"), B("model", "Choose the model"),
-        B("permissions", "Manage tool permissions"), B("plugin", "Manage plugins"), B("pr-comments", "Show comments of a pull request"),
-        B("release-notes", "Show the release notes"), B("rename", "Rename the session"), B("resume", "Resume a conversation"),
-        B("review", "Review a pull request"), B("rewind", "Rewind the conversation or code"), B("security-review", "Review pending changes for security"),
+        B("mcp", "Manage MCP servers"), B("memory", "Edit memory files"), B("model", "Choose the model", "[model]"),
+        B("permissions", "Manage tool permissions"), B("plugin", "Manage plugins"), B("pr-comments", "Show comments of a pull request", "[pr number]"),
+        B("release-notes", "Show the release notes"), B("rename", "Rename the session", "[name]"), B("resume", "Resume a conversation", "[session id or search]"),
+        B("review", "Review a pull request", "[pr number]"), B("rewind", "Rewind the conversation or code"), B("security-review", "Review pending changes for security"),
         B("skills", "List skills"), B("status", "Show version, model and account"), B("statusline", "Set up the status line"),
         B("terminal-setup", "Set up terminal key bindings"), B("theme", "Change the theme"), B("todos", "Show the to-do list"),
         B("usage", "Show plan usage"), B("vim", "Toggle vim editing mode"),
@@ -63,8 +64,26 @@ public static class SlashCommands
         return [.. starts, .. rows.Where(c => !starts.Contains(c) && c.Name.Contains(query, StringComparison.OrdinalIgnoreCase))];
     }
 
-    static IEnumerable<SlashCommand> Skills(string dir, string source, string prefix) =>
-        PluginData.ReadSkills(dir, source).Where(s => s.UserInvocable).Select(s => new SlashCommand(prefix + s.Name, One(s.Description), s.Source));
+    // As PluginData.ReadSkills, which keeps no argument hint.
+    static List<SlashCommand> Skills(string dir, string source, string prefix)
+    {
+        var rows = new List<SlashCommand>();
+        try
+        {
+            if (!Directory.Exists(dir)) return rows;
+            foreach (var skillDir in Directory.EnumerateDirectories(dir))
+            {
+                var file = Path.Combine(skillDir, "SKILL.md");
+                if (!File.Exists(file)) continue;
+                var text = File.ReadAllText(file);
+                if (!PluginData.UserInvocable(text)) continue;
+                var (name, description) = PluginData.Frontmatter(text);
+                rows.Add(new(prefix + (name ?? Path.GetFileName(skillDir)), One(description ?? ""), source, Hint(text)));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // an unreadable skill folder just lists fewer skills
+        return rows;
+    }
 
     // The enabled plugins of installed_plugins.json: "enabledPlugins" of settings.json, project, then local settings, later wins.
     // Of several installs of one plugin the project one for this cwd wins, then the user one.
@@ -166,7 +185,7 @@ public static class SlashCommands
                     var text = File.ReadAllText(file);
                     if (!PluginData.UserInvocable(text)) continue;
                     var name = prefix + Path.ChangeExtension(Path.GetRelativePath(dir, file), null).Replace('\\', ':').Replace('/', ':');
-                    rows.Add(new(name, Describe(text), source));
+                    rows.Add(new(name, Describe(text), source, Hint(text)));
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // this file is just missing
             }
@@ -182,6 +201,17 @@ public static class SlashCommands
         var lines = markdown.ReplaceLineEndings("\n").Split('\n');
         var body = lines[0].Trim() == "---" ? Array.FindIndex(lines, 1, l => l.Trim() == "---") is >= 0 and var end ? end + 1 : lines.Length : 0;
         return One(lines.Skip(body).Select(l => l.Trim().TrimStart('#')).FirstOrDefault(l => l.Trim().Length > 0) ?? "");
+    }
+
+    // "argument-hint:" of the leading --- block, quotes dropped; "[file]" is kept as written (YAML would read a list).
+    static string? Hint(string markdown)
+    {
+        var lines = markdown.ReplaceLineEndings("\n").Split('\n');
+        if (lines[0].Trim() != "---") return null;
+        for (var i = 1; i < lines.Length && lines[i].Trim() != "---"; i++)
+            if (Regex.Match(lines[i], @"^argument-hint:\s*(.*)$") is { Success: true } m)
+                return One(m.Groups[1].Value.Trim().Trim('"', '\'')) is { Length: > 0 } hint ? hint : null;
+        return null;
     }
 
     static string One(string text) => string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

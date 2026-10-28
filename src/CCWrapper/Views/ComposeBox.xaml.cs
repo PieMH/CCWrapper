@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -30,6 +31,7 @@ public partial class ComposeBox : UserControl
     public ComposeBox()
     {
         InitializeComponent();
+        Overlay.Input = Input;
         _ = new SessionWatch(this, Refresh);
         _poll.Tick += OnPoll;
         _blink.Tick += (_, _) => HintCaret.Foreground = HintCaret.Foreground == Brushes.Transparent ? (Brush)FindResource("Text") : Brushes.Transparent;
@@ -63,7 +65,7 @@ public partial class ComposeBox : UserControl
         Stash(_session);
         UpdateHint();
         UpdateSlash();
-        UpdateColor();
+        UpdateOverlay();
     }
 
     // The box's text is the active session's draft, kept in the store as it changes (written to disk only on exit).
@@ -72,7 +74,13 @@ public partial class ComposeBox : UserControl
         if (s is not null) DraftStore.For(s.Account).Set(s, Input.Text, Input.CaretIndex);
     }
 
-    void OnCaretMoved(object sender, RoutedEventArgs e) => UpdateSlash();
+    void OnCaretMoved(object sender, RoutedEventArgs e)
+    {
+        UpdateSlash();
+        Redraw();
+    }
+
+    void OnInputScrolled(object sender, ScrollChangedEventArgs e) => Redraw();
 
     void OnLostFocus(object sender, RoutedEventArgs e)
     {
@@ -83,6 +91,8 @@ public partial class ComposeBox : UserControl
     // ---- the "/" list ----
 
     (string, string?)? CommandsKey => _session is { } s ? (s.Account.Letter, s.Cwd) : null;
+
+    List<SlashCommand> Known => CommandsKey is { } key ? _commands.GetValueOrDefault(key) ?? [] : [];
 
     // Open while the caret is in a word that starts with "/" (at the text start or after whitespace; not a path) or forced from the + menu: filtered by what follows the "/".
     void UpdateSlash()
@@ -115,22 +125,22 @@ public partial class ComposeBox : UserControl
         finally { _loading = false; }
         _query = null; // the list may have grown under the same query
         UpdateSlash();
-        UpdateColor();
+        UpdateOverlay();
     }
 
-    // shortcut: the whole text takes the color while it starts with a known command (a TextBox cannot color a range, and an overlay
-    // would lose IME composition and drift from the caret); upgrade if tokens inside the text must be told apart.
-    void UpdateColor()
+    void UpdateOverlay()
     {
-        var text = Input.Text;
-        if (CommandsKey is not { } key) { Input.ClearValue(ForegroundProperty); return; }
-        if (!_commands.TryGetValue(key, out var list))
-        {
-            if (text.StartsWith('/') && !_loading) _ = LoadCommandsAsync(key, _session!); // a recalled "/command" never opens the list
-            list = [];
-        }
-        if (SlashWord.StartsWithCommand(text, list)) Input.Foreground = (Brush)FindResource("SlashText");
-        else Input.ClearValue(ForegroundProperty);
+        if (CommandsKey is { } key && !_commands.ContainsKey(key) && !_loading && Input.Text.Contains('/'))
+            _ = LoadCommandsAsync(key, _session!); // a recalled "/command" never opens the list
+        Overlay.Commands = Known;
+        Redraw();
+    }
+
+    // Layout first: the overlay reads the box's character positions, which the text or caret change has not laid out yet.
+    void Redraw()
+    {
+        Input.UpdateLayout();
+        Overlay.InvalidateVisual();
     }
 
     void CloseSlash()
@@ -240,7 +250,7 @@ public partial class ComposeBox : UserControl
         }
         _session = session;
         Stash(session); // a tab that just got its session id moves its draft to it
-        UpdateColor();
+        UpdateOverlay();
         var blocked = TuiInput.BlockedReason(session);
         Notice.Text = blocked ?? _refusal;
         Notice.Visibility = Notice.Text is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
@@ -302,6 +312,11 @@ public partial class ComposeBox : UserControl
         {
             e.Handled = true; // takes the suggestion to edit, as Tab does in the TUI
             Recall(suggestion);
+        }
+        else if (e.Key == Key.Tab && mods == ModifierKeys.None && Input.SelectionLength == 0 && SlashWord.Ghost(Input.Text, Input.CaretIndex, Known) is { } ghost)
+        {
+            e.Handled = true; // writes the ghosted argument hint in, to edit
+            Insert(ghost);
         }
         else if ((e.Key == Key.V && mods == ModifierKeys.Control) || (e.Key == Key.Insert && mods == ModifierKeys.Shift))
         {
@@ -387,14 +402,74 @@ public static class SlashWord
         return (start, end);
     }
 
-    /// <summary>True when the text starts with "/name", the name being one of <paramref name="commands"/> (case-insensitive).</summary>
-    public static bool StartsWithCommand(string text, IEnumerable<SlashCommand> commands)
+    /// <summary>The "/name" words (at the text start or after whitespace, so not "a/b" or a URL) whose name is one of
+    /// <paramref name="commands"/>, case-insensitive: start (the "/"), end (exclusive) and the command.</summary>
+    public static List<(int Start, int End, SlashCommand Command)> Commands(string text, IEnumerable<SlashCommand> commands)
     {
-        if (!text.StartsWith('/')) return false;
-        var end = 1;
-        while (end < text.Length && !Space(text[end])) end++;
-        var name = text[1..end];
-        return name.Length > 0 && commands.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        var byName = commands.DistinctBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(c => c.Name, StringComparer.OrdinalIgnoreCase);
+        var found = new List<(int, int, SlashCommand)>();
+        for (var start = 0; start < text.Length; start++)
+        {
+            if (text[start] != '/' || (start > 0 && !Space(text[start - 1]))) continue;
+            var end = start + 1;
+            while (end < text.Length && !Space(text[end])) end++;
+            if (byName.TryGetValue(text[(start + 1)..end], out var command)) found.Add((start, end, command));
+            start = end;
+        }
+        return found;
+    }
+
+    /// <summary>The rest of an argument hint to show as ghost text at the caret, or null. The caret must end its line, after the
+    /// last known command of that line: the whole hint (after a space) while no argument is typed, the rest of it while the
+    /// typed arguments are its start (case-insensitive), nothing once they differ or fill it.</summary>
+    public static string? Ghost(string text, int caret, IEnumerable<SlashCommand> commands)
+    {
+        caret = Math.Clamp(caret, 0, text.Length);
+        if (caret == 0 || (caret < text.Length && text[caret] is not ('\r' or '\n'))) return null;
+        var lineStart = text.LastIndexOfAny(['\r', '\n'], caret - 1) + 1;
+        var (_, end, command) = Commands(text[lineStart..caret], commands).LastOrDefault();
+        if (command?.ArgumentHint is not { Length: > 0 } hint) return null;
+        var typed = text[(lineStart + end)..caret];
+        if (typed.Length == 0) return " " + hint;
+        var args = typed.TrimStart();
+        return args.Length < hint.Length && hint.StartsWith(args, StringComparison.OrdinalIgnoreCase) ? hint[args.Length..] : null;
+    }
+}
+
+/// <summary>Drawn over the compose box's TextBox (a TextBox cannot color a range): each character of a known "/command" again
+/// in SlashText, on the TextBox's own glyph, and <see cref="SlashWord.Ghost"/> in Muted at the caret. Positions come from
+/// the TextBox itself, so they follow wrapping and scrolling; clipped to its text viewport.</summary>
+public sealed class SlashOverlay : FrameworkElement
+{
+    public TextBox? Input { get; set; }
+    public IReadOnlyList<SlashCommand> Commands { get; set; } = [];
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        if (Input is not { } box || box.Text is not { Length: > 0 } text || Commands.Count == 0 || Viewport(box) is not { } view) return;
+        var toHere = box.TransformToVisual(this);
+        var face = new Typeface(box.FontFamily, box.FontStyle, box.FontWeight, box.FontStretch);
+        var dip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var mode = TextOptions.GetTextFormattingMode(box);
+        void Draw(string s, Rect at, Brush brush) =>
+            dc.DrawText(new FormattedText(s, CultureInfo.CurrentCulture, box.FlowDirection, face, box.FontSize, brush, null, mode, dip), toHere.Transform(at.TopLeft));
+        dc.PushClip(new RectangleGeometry(view.TransformToVisual(this).TransformBounds(new Rect(view.RenderSize))));
+        var blue = (Brush)FindResource("SlashText");
+        foreach (var (start, end, _) in SlashWord.Commands(text, Commands))
+            for (var i = start; i < end; i++) // per character: a long word may wrap, and each glyph lands where the TextBox put it
+                if (!char.IsSurrogate(text[i]) && box.GetRectFromCharacterIndex(i) is { IsEmpty: false } r) Draw(text[i].ToString(), r, blue);
+        if (box.SelectionLength == 0 && SlashWord.Ghost(text, box.CaretIndex, Commands) is { } ghost
+            && box.GetRectFromCharacterIndex(box.CaretIndex) is { IsEmpty: false } caret)
+            Draw(ghost, caret, (Brush)FindResource("Muted"));
+        dc.Pop();
+    }
+
+    // The part of the template that shows the text: lines scrolled out of it must not be drawn.
+    static ScrollContentPresenter? Viewport(DependencyObject parent)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            if (VisualTreeHelper.GetChild(parent, i) is var child && (child as ScrollContentPresenter ?? Viewport(child)) is { } found) return found;
+        return null;
     }
 }
 

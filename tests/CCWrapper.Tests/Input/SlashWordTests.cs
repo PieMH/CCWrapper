@@ -29,16 +29,37 @@ public sealed class SlashWordTests
     [InlineData("", 0)]
     public void Not_a_word(string text, int caret) => Assert.Null(SlashWord.At(text, caret));
 
+    static readonly SlashCommand[] Known = [new("compact", "", "t", "[instructions]"), new("my:cmd", "", "t"), new("model", "", "t", "[model]")];
+
     [Fact]
-    public void StartsWithCommand_wants_the_first_word_to_be_a_known_name()
+    public void Commands_finds_known_names_anywhere_but_not_paths_urls_or_unknown_words()
     {
-        SlashCommand[] known = [new("compact", "", "t"), new("my:cmd", "", "t")];
-        Assert.True(SlashWord.StartsWithCommand("/compact", known));
-        Assert.True(SlashWord.StartsWithCommand("/COMPACT now\nmore", known));
-        Assert.True(SlashWord.StartsWithCommand("/my:cmd arg", known));
-        Assert.False(SlashWord.StartsWithCommand("/compa", known));
-        Assert.False(SlashWord.StartsWithCommand("/", known));
-        Assert.False(SlashWord.StartsWithCommand(" /compact", known));
-        Assert.False(SlashWord.StartsWithCommand("run /compact", known));
+        Assert.Equal([(0, 8)], SlashWord.Commands("/COMPACT now", Known).Select(c => (c.Start, c.End)));
+        Assert.Equal([(4, 11), (16, 22)], SlashWord.Commands("run /my:cmd and\n/model x", Known).Select(c => (c.Start, c.End)));
+        Assert.Equal("compact", SlashWord.Commands("x\t/compact", Known).Single().Command.Name);
+        Assert.Empty(SlashWord.Commands("/compa /foo a/compact https://x/model /compact/x /", Known));
+        Assert.Empty(SlashWord.Commands("", Known));
     }
+
+    [Theory]
+    [InlineData("/compact", 8, " [instructions]")] // no space yet: the whole hint after one
+    [InlineData("/compact ", 9, "[instructions]")]
+    [InlineData("/compact [ins", 13, "tructions]")] // typed arguments are its start: the rest
+    [InlineData("/compact [INS", 13, "tructions]")]
+    [InlineData("run /model", 10, " [model]")] // anywhere in the prompt
+    [InlineData("a\n/model \nb", 9, "[model]")] // the caret ends its line
+    [InlineData("/compact x /model ", 18, "[model]")] // the last command of the line
+    public void Ghost_shows_the_rest_of_the_hint(string text, int caret, string ghost) => Assert.Equal(ghost, SlashWord.Ghost(text, caret, Known));
+
+    [Theory]
+    [InlineData("/compact now", 12)] // differs from the hint
+    [InlineData("/compact [instructions]", 23)] // fills it
+    [InlineData("/compact [ins more", 13)] // text after the caret on its line
+    [InlineData("/my:cmd ", 8)] // no hint
+    [InlineData("/compa", 6)] // not a known command
+    [InlineData("a/model ", 8)]
+    [InlineData("/model\nx", 8)] // the command is on another line
+    [InlineData("/model ", 0)]
+    [InlineData("", 0)]
+    public void No_ghost(string text, int caret) => Assert.Null(SlashWord.Ghost(text, caret, Known));
 }

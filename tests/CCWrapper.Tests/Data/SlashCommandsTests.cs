@@ -73,6 +73,24 @@ public sealed class SlashCommandsTests : IDisposable
         Assert.Equal("User init", list.Single(c => c.Name == "init").Description);
     }
 
+    [Fact]
+    public void List_reads_argument_hints_of_commands_and_skills_and_keeps_those_of_built_ins()
+    {
+        var account = _home.AddAccount("x");
+        FakeHome.WriteFile(Path.Combine(account.ConfigRoot, "commands", "fix.md"), "---\ndescription: Fix\nargument-hint: [issue-number] [priority]\n---\n");
+        FakeHome.WriteFile(Path.Combine(account.ConfigRoot, "commands", "plain.md"), "argument-hint: not frontmatter");
+        FakeHome.WriteFile(Path.Combine(_project, ".claude", "skills", "pdf", "SKILL.md"), "---\nname: pdf\nargument-hint: \"<file>\"\n---\n");
+
+        var list = SlashCommands.List(account, _project).ToDictionary(c => c.Name);
+
+        Assert.Equal("[issue-number] [priority]", list["fix"].ArgumentHint);
+        Assert.Null(list["plain"].ArgumentHint);
+        Assert.Equal("<file>", list["pdf"].ArgumentHint);
+        Assert.Equal("project skill", list["pdf"].Source);
+        Assert.Equal("[model]", list["model"].ArgumentHint);
+        Assert.Null(list["clear"].ArgumentHint);
+    }
+
     // A plugin folder as installed_plugins.json points at it: commands\ and skills\.
     static string Plugin(string root, string name, string version = "1.0.0")
     {
