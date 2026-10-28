@@ -532,4 +532,11 @@
         <Setter Property="CornerRadius" Value="3" />
         <Setter Property="Margin" Value="0,4" />
     </Style>
+    <!-- A row of the bottom bar's model/effort/mode popup: hover and keyboard focus come from Flat -->
+    <Style x:Key="PopupRow" TargetType="Button" BasedOn="{StaticResource Flat}">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="Margin" Value="0,0,0,1" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
 </ResourceDictionary>
