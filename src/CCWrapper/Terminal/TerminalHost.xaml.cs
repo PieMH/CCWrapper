@@ -69,7 +69,8 @@ public partial class TerminalHost : UserControl
         var options = ResumeOptions(o, session.Cwd, id); // a copy resumes as itself: its id was adopted
         if (Directory.Exists(options.Cwd)) return OpenAsync(session, options);
         // Claude Code may remove an exited --worktree session's folder; same message as a session-list open (MainWindow.FolderGone)
-        Views.Dialog.Show(Window.GetWindow(this), $"The session's folder does not exist any more:\n{options.Cwd}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning);
+        var owner = Window.GetWindow(this);
+        Dispatcher.BeginInvoke(() => Views.Dialog.Show(owner, $"The session's folder does not exist any more:\n{options.Cwd}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning)); // not inside the WebView2 message handler: its modal loop would stall the page
         return Task.CompletedTask;
     }
 

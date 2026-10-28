@@ -111,7 +111,7 @@ public sealed record AgentRow(SubagentInfo Info, string Age, string? Duration)
     public bool IsRunning => Info.IsRunning;
     public string Title => Info.Description ?? Info.AgentType ?? Info.AgentId;
     /// <summary>"Opus 5.5 · 114.1k tokens · high"; what is unknown is left out.</summary>
-    public string Subtitle => string.Join(" · ", new[] { BarFormat.ModelLabel(Info.Model),Info.Tokens is { } t ? Tokens(t) + " tokens" : null, Info.Effort }.Where(s => !string.IsNullOrEmpty(s)));
+    public string Subtitle => string.Join(" · ", new[] { BarFormat.ModelLabel(Info.Model), Info.Tokens is { } t ? Tokens(t) + " tokens" : null, Info.Effort }.Where(s => !string.IsNullOrEmpty(s)));
     /// <summary>The hover text: the agent type and the numbers behind the subtitle.</summary>
     public string Tooltip => Detail + "\n" + Stats;
     public string Detail => string.Join(" · ", new[] { Info.AgentType, ShortModel(Info.Model), Info.Effort }.Where(s => !string.IsNullOrEmpty(s)));
@@ -155,5 +155,4 @@ public sealed record AgentRow(SubagentInfo Info, string Age, string? Duration)
 
     /// <summary>"claude-opus-4-5-20251101" -> "opus-4-5".</summary>
     public static string? ShortModel(string? model) => model is null ? null : Regex.Replace(model, @"^claude-|-\d{8}$", "");
-
 }

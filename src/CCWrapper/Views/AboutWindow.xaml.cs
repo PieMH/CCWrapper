@@ -50,11 +50,15 @@ public partial class AboutWindow : Window
     async void OnBugReport(object sender, RoutedEventArgs e)
     {
         BugButton.IsEnabled = false; // one browser tab per click, however fast the clicks come
+        BugNote.Text = "Checking the Claude Code version…";
+        BugNote.Visibility = Visibility.Visible;
         try
         {
             // The version does not depend on the account: the open window's, else the default profile (~\.claude) a bare claude would use.
             var account = AppState.Current?.Account ?? new Account("a", null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json"), "");
-            var url = BugReportUrl(AppUpdate.Version, RuntimeInformation.OSDescription, await ClaudeCli.VersionAsync(account));
+            var claudeVersion = await ClaudeCli.VersionAsync(account);
+            BugNote.Visibility = Visibility.Collapsed;
+            var url = BugReportUrl(AppUpdate.Version, RuntimeInformation.OSDescription, claudeVersion);
             try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
             catch (System.ComponentModel.Win32Exception) { BugNote.Text = "Could not open the browser. Open this address yourself: " + url; BugNote.Visibility = Visibility.Visible; }
         }
