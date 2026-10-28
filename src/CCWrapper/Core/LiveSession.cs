@@ -24,6 +24,10 @@ public sealed class LiveSession(Account account) : Observable
     public string? SessionId { get; set => Set(ref field, value); }
     public string? Cwd { get; set => Set(ref field, value); }
 
+    /// <summary>Name of the git worktree the session runs in (<c>--worktree</c>); "…" while launched with the flag but not yet
+    /// seen in its folder; null when it runs in no worktree. The tab shows a mark while it is set.</summary>
+    public string? Worktree { get; set => Set(ref field, value); }
+
     /// <summary>Set at launch (<see cref="ClaudePaths.Transcript"/>), later refreshed from the status line.</summary>
     public string? TranscriptPath { get; set => Set(ref field, value); }
     public string? Title { get; set => Set(ref field, value); }

@@ -129,6 +129,19 @@
                                         <Ellipse Style="{StaticResource StatusRing}" />
                                         <Ellipse Style="{StaticResource StatusDot}" />
                                     </Grid>
+                                    <Path DockPanel.Dock="Left" Data="{StaticResource GitIcon}" Stroke="{StaticResource Muted}" StrokeThickness="1.6" Width="11" Height="11"
+                                          Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center"
+                                          ToolTip="{Binding Worktree, StringFormat='Works in its own git worktree: {0}'}">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Worktree}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
                                     <Button DockPanel.Dock="Right" Style="{StaticResource CloseCard}" ToolTip="Close this session (it stays resumable)"
                                             AutomationProperties.Name="Close session" Click="OnCloseCard">
                                         <TextBlock Style="{StaticResource Icon}" Text="&#xE711;" FontSize="9" />

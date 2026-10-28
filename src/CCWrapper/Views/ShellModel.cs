@@ -113,10 +113,39 @@ public static class ShellModel
             yield return (g.Key, g.OrderByDescending(x => x.Reg.Pid == g.Key.Pid).ThenByDescending(x => x.Reg.UpdatedAt).First().Reg);
     }
 
+    /// <summary>The worktree name and root folder when <paramref name="cwd"/> is inside <c>&lt;repo&gt;\.claude\worktrees\&lt;name&gt;</c>,
+    /// where Claude Code's <c>--worktree</c> works; else null.</summary>
+    public static (string Name, string Root)? WorktreeOf(string? cwd)
+    {
+        if (string.IsNullOrWhiteSpace(cwd)) return null;
+        for (var d = new DirectoryInfo(cwd); d.Parent?.Parent is { } claude; d = d.Parent) // a cd inside the worktree still finds its root
+            if (d.Parent.Name.Equals("worktrees", StringComparison.OrdinalIgnoreCase) && claude.Name.Equals(".claude", StringComparison.OrdinalIgnoreCase))
+                return (d.Name, Path.TrimEndingDirectorySeparator(d.FullName));
+        return null;
+    }
+
+    /// <summary>True when <paramref name="folder"/> or a parent has a <c>.git</c> (folder or file, as a worktree has).</summary>
+    public static bool InGitRepo(string folder)
+    {
+        for (var d = new DirectoryInfo(folder); d is not null; d = d.Parent)
+            if (Directory.Exists(Path.Combine(d.FullName, ".git")) || File.Exists(Path.Combine(d.FullName, ".git"))) return true;
+        return false;
+    }
+
     /// <summary>A session whose registry entry carries another id (after /clear or /resume inside the TUI) follows it:
     /// new id, its transcript and the registry name as title.</summary>
     public static void Adopt(LiveSession session, RunningSession registry)
     {
+        // --worktree: Claude Code moved into the worktree, so the transcript is under its project folder, not the launch folder's.
+        if (WorktreeOf(registry.Cwd) is var (worktree, root))
+        {
+            session.Worktree = worktree;
+            if (root != session.Cwd)
+            {
+                session.Cwd = root;
+                session.TranscriptPath = session.Account.Paths.Transcript(root, registry.SessionId);
+            }
+        }
         if (session.SessionId == registry.SessionId) return;
         session.SessionId = registry.SessionId;
         if (session.Cwd is { } cwd) session.TranscriptPath = session.Account.Paths.Transcript(cwd, registry.SessionId);
