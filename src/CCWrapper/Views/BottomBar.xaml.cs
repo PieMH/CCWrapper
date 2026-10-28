@@ -25,6 +25,7 @@ public partial class BottomBar : UserControl
     (LiveSession Session, string? Mode) _screenMode;
     string? _model, _effort, _mode;
     AccountInfo? _account; // the window's account, read at start and after each /usage check
+    IReadOnlyList<CatalogModel> _models = []; // Claude Code's cached model list, read with _account
     bool _checkingUsage;
     Func<string> _usageTip = () => "";
     (double? Five, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) _usageNow;
@@ -95,7 +96,7 @@ public partial class BottomBar : UserControl
         _effort = sl?.Effort ?? d?.Effort ?? d?.Account?.Effort;
         // The transcript's permission-mode record is written per turn, not when Shift+Tab changes the mode: the footer is the truth.
         _mode = (_screenMode.Session == s ? _screenMode.Mode : null) ?? d?.Mode;
-        ModelValue.Text = BarFormat.ModelLabel(_model) ?? BarFormat.None;
+        ModelValue.Text = BarFormat.ModelLabel(_model, _models) ?? BarFormat.None;
         EffortValue.Text = _effort ?? BarFormat.None;
         ModeValue.Text = _mode ?? BarFormat.None;
 
@@ -335,13 +336,13 @@ public partial class BottomBar : UserControl
     async Task ReadAccountAsync()
     {
         if (AppState.Current?.Account is not { } account) return;
-        _account = await Task.Run(() => AccountReader.Read(account));
+        (_account, _models) = await Task.Run(() => (AccountReader.Read(account), ModelCatalog.Read(account)));
         Render();
     }
 
     // A refusal (e.g. text already in the terminal input) shows in the compose box's notice.
     void OnModel(object sender, RoutedEventArgs e) =>
-        Open(ModelButton, BarFormat.Models.Select(m => (m.Alias, m.Label, m.Note)), v => _model?.Contains(v, StringComparison.OrdinalIgnoreCase) == true, v => TuiInput.SubmitAsync(_session, "/model " + v));
+        Open(ModelButton, BarFormat.ModelRows(_models), v => _model?.Contains(v, StringComparison.OrdinalIgnoreCase) == true, v => TuiInput.SubmitAsync(_session, "/model " + v));
 
     void OnEffort(object sender, RoutedEventArgs e) => Open(EffortButton, Plain(Efforts), v => v == _effort, v => TuiInput.SubmitAsync(_session, "/effort " + v), ultracode: true);
 
@@ -555,11 +556,12 @@ public static class BarFormat
         return (used is null && size is null && pct is null ? None : $"{Tokens(used)}/{Tokens(size)} {Percent(pct)}", pct);
     }
 
-    // shortcut: hand-kept, as Claude Code exposes no list of models and versions; upgrade if it does. Alias is the /model argument.
-    public static readonly (string Alias, string Label, string? Note)[] Models =
-    [
-        ("opus", "Opus 5.5", null), ("sonnet", "Sonnet 5.5", null), ("haiku", "Haiku 5.5", null), ("fable", "Fable 5.1", "runs on usage credits"),
-    ];
+    // No catalog cached (an API key, before the first start): the documented /model aliases, with no version to go stale.
+    static readonly CatalogModel[] Aliases = [new("opus", "opus", "Opus", null), new("sonnet", "sonnet", "Sonnet", null), new("haiku", "haiku", "Haiku", null)];
+
+    /// <summary>The model chooser's rows (alias, name, note): Claude Code's own model list, else the bare aliases.</summary>
+    public static IEnumerable<(string Alias, string Label, string? Note)> ModelRows(IReadOnlyList<CatalogModel> catalog) =>
+        (catalog.Count > 0 ? catalog : Aliases).Select(m => (m.Alias, m.Name, m.Note));
 
     static readonly Regex ModelId = new(@"^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$");
 
@@ -569,9 +571,11 @@ public static class BarFormat
             ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..]} {m.Groups[2].Value}{(m.Groups[3].Success ? "." + m.Groups[3].Value : "")}"
             : null;
 
-    /// <summary>The versioned name of a bare alias ("opus" gives "Opus 5.5") or of a full id; anything else (a display name) as it is.</summary>
-    public static string? ModelLabel(string? model) =>
-        Models.Where(m => m.Alias.Equals(model, StringComparison.OrdinalIgnoreCase)).Select(m => m.Label).FirstOrDefault() ?? ModelName(model) ?? model;
+    /// <summary>The versioned name of an alias or id in <paramref name="catalog"/> ("opus" gives "Opus 5.5"), else of a full id;
+    /// anything else (a display name) as it is.</summary>
+    public static string? ModelLabel(string? model, IReadOnlyList<CatalogModel>? catalog = null) =>
+        catalog?.FirstOrDefault(m => m.Alias.Equals(model, StringComparison.OrdinalIgnoreCase) || m.Id.Equals(model, StringComparison.OrdinalIgnoreCase))?.Name
+        ?? ModelName(model) ?? model;
 
     static readonly Dictionary<string, string> FooterModes = new()
     {

@@ -1,19 +1,29 @@
+using CCWrapper.Data;
 using CCWrapper.Views;
 
 namespace CCWrapper.Tests.Shell;
 
 public sealed class BarChoiceTests
 {
+    static readonly CatalogModel[] Catalog =
+        [new("claude-opus-9-1", "opus", "Opus 9.1", null), new("claude-fable-9", "fable", "Fable 9", "Requires usage credits")];
+
     [Theory]
-    [InlineData("opus", "Opus 5.5")]
-    [InlineData("Fable", "Fable 5.1")]
+    [InlineData("opus", "Opus 9.1")] // the catalog's version, not one kept in the app
+    [InlineData("Fable", "Fable 9")]
+    [InlineData("claude-fable-9", "Fable 9")]
     [InlineData("Opus 5.5", "Opus 5.5")] // a display name is left alone
-    [InlineData("claude-opus-5-5", "Opus 5.5")] // a full id gets its version too (was raw before F1)
-    [InlineData("claude-sonnet-5-5", "Sonnet 5.5")]
-    [InlineData("claude-fable-5-1", "Fable 5.1")]
+    [InlineData("claude-sonnet-5-5", "Sonnet 5.5")] // a full id outside the catalog gets its version from the id
+    [InlineData("haiku", "haiku")]
     [InlineData("gpt-5", "gpt-5")]
     [InlineData(null, null)]
-    public void Bare_model_aliases_and_full_ids_get_their_version(string? model, string? label) => Assert.Equal(label, BarFormat.ModelLabel(model));
+    public void Aliases_and_ids_get_the_catalog_name(string? model, string? label) => Assert.Equal(label, BarFormat.ModelLabel(model, Catalog));
+
+    [Theory]
+    [InlineData("opus", "opus")] // no catalog: no version to guess
+    [InlineData("claude-opus-5-5", "Opus 5.5")]
+    [InlineData("claude-fable-5-1", "Fable 5.1")]
+    public void Without_a_catalog_only_full_ids_get_a_version(string model, string label) => Assert.Equal(label, BarFormat.ModelLabel(model));
 
     [Theory]
     [InlineData("claude-opus-5-5-20260101", "Opus 5.5")]
@@ -24,11 +34,10 @@ public sealed class BarChoiceTests
     public void Model_name_reads_any_family_from_a_full_id(string id, string? name) => Assert.Equal(name, BarFormat.ModelName(id));
 
     [Fact]
-    public void Model_table_covers_the_aliases_and_only_fable_has_a_note()
+    public void Model_rows_are_the_catalog_else_the_bare_aliases()
     {
-        Assert.Equal(["opus", "sonnet", "haiku", "fable"], BarFormat.Models.Select(m => m.Alias));
-        Assert.Equal(["fable"], BarFormat.Models.Where(m => m.Note is not null).Select(m => m.Alias));
-        Assert.All(BarFormat.Models, m => Assert.Contains(m.Alias, m.Label, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(new (string, string, string?)[] { ("opus", "Opus 9.1", null), ("fable", "Fable 9", "Requires usage credits") }, BarFormat.ModelRows(Catalog));
+        Assert.Equal(new (string, string, string?)[] { ("opus", "Opus", null), ("sonnet", "Sonnet", null), ("haiku", "Haiku", null) }, BarFormat.ModelRows([]));
     }
 
     [Theory]
