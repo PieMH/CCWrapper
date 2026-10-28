@@ -144,6 +144,14 @@ public sealed class SessionCatalogTests : IDisposable
     }
 
     [Fact]
+    public void Running_leaves_out_a_name_claude_code_derived_itself()
+    {
+        var a = _home.AddAccount("a");
+        FakeHome.AddRegistry(a, Self, "live1", extra: ",\"nameSource\":\"derived\"");
+        Assert.Null(Assert.Single(SessionCatalog.Running(a)).Name);
+    }
+
+    [Fact]
     public void Recent_projects_merge_global_config_and_transcripts_and_drop_missing_folders()
     {
         var onlyInConfig = Directory.CreateDirectory(Path.Combine(_home.Home, "cfg-only")).FullName;

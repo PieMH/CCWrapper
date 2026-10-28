@@ -9,8 +9,9 @@ namespace CCWrapper.Terminal;
 /// <summary>How to start one claude.exe tab. Optional flags are passed only when set, so the account's own defaults apply.</summary>
 /// <param name="ResumeId">Null starts a new session with a fresh <c>--session-id</c>; otherwise <c>--resume &lt;id&gt;</c>.</param>
 /// <param name="Fork">With <paramref name="ResumeId"/>: <c>--fork-session</c>, a copy under a new id that leaves the original alone.</param>
+/// <param name="Worktree"><c>--worktree</c>: the new session works in its own git worktree. Ignored for a resume or a copy: those keep the cwd they had.</param>
 public sealed record LaunchOptions(string Cwd, string? ResumeId = null, string? Model = null, string? Effort = null,
-    string? PermissionMode = null, string? Name = null, bool Fork = false);
+    string? PermissionMode = null, string? Name = null, bool Fork = false, bool Worktree = false);
 
 /// <summary>Command line, environment and statusLine relay for claude.exe.</summary>
 public static class ClaudeLaunch
@@ -35,6 +36,7 @@ public static class ClaudeLaunch
         Add("--permission-mode", o.PermissionMode);
         Add("-n", o.Name);
         Add("--settings", relaySettings);
+        if (o.Worktree && o.ResumeId is null) args.Add("--worktree"); // last: its optional [name] would swallow a following non-flag argument
         return args;
     }
 

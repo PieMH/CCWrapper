@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -14,7 +15,6 @@ namespace CCWrapper.Views;
 
 public partial class BottomBar : UserControl
 {
-    static readonly string[] Models = ["opus", "sonnet", "haiku", "fable"];
     static readonly string[] Efforts = ["low", "medium", "high", "xhigh", "max"];
     static readonly string[] Modes = ["default", "acceptEdits", "plan", "auto"];
     const string ShiftTab = "\x1b[Z";
@@ -25,11 +25,15 @@ public partial class BottomBar : UserControl
     (LiveSession Session, string? Mode) _screenMode;
     string? _model, _effort, _mode;
     AccountInfo? _account; // the window's account, read at start and after each /usage check
+    IReadOnlyList<CatalogModel> _models = []; // Claude Code's cached model list, read with _account
     bool _checkingUsage;
     Func<string> _usageTip = () => "";
     (double? Five, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) _usageNow;
-    DateTime _usageClosedAt;
-    IInputElement? _usageFocus; // what had focus before the usage button took it, for Esc to give back
+    DateTime _usageClosedAt, _choiceClosedAt;
+    Button? _choiceFor; // the chip the model/effort/mode popup was last opened for: its own reopen guard
+    IInputElement? _popupFocus; // what had focus before a usage or chip button took it, for Esc to give back
+    (LiveSession Session, bool? On) _screenUltra;
+    readonly Dictionary<LiveSession, bool> _ultraSent = []; // shortcut: the last /effort ultracode sent per session, for when the footer does not say; lost on restart
     Window? _window;
     CompactPrefs _compact = CompactPrefs.Load();
     readonly DispatcherTimer _usageTimer = new() { Interval = TimeSpan.FromMinutes(30) };
@@ -52,9 +56,9 @@ public partial class BottomBar : UserControl
             if ((_window = Window.GetWindow(this)) is { } w)
             {
                 w.PreviewMouseDown += OnWindowMouseDown;
-                w.Deactivated += CloseUsage;
-                w.LocationChanged += CloseUsage;
-                w.SizeChanged += CloseUsage;
+                w.Deactivated += ClosePopups;
+                w.LocationChanged += ClosePopups;
+                w.SizeChanged += ClosePopups;
             }
             await ReadAccountAsync();
             await CheckUsageAsync(force: false); // skipped when the start screen just checked
@@ -68,9 +72,9 @@ public partial class BottomBar : UserControl
             if (_window is { } w)
             {
                 w.PreviewMouseDown -= OnWindowMouseDown;
-                w.Deactivated -= CloseUsage;
-                w.LocationChanged -= CloseUsage;
-                w.SizeChanged -= CloseUsage;
+                w.Deactivated -= ClosePopups;
+                w.LocationChanged -= ClosePopups;
+                w.SizeChanged -= ClosePopups;
             }
         };
         _ = new SessionFollower<BarSource, BarData>(this, s => new BarSource(s), r => r.Read(), async d =>
@@ -92,7 +96,7 @@ public partial class BottomBar : UserControl
         _effort = sl?.Effort ?? d?.Effort ?? d?.Account?.Effort;
         // The transcript's permission-mode record is written per turn, not when Shift+Tab changes the mode: the footer is the truth.
         _mode = (_screenMode.Session == s ? _screenMode.Mode : null) ?? d?.Mode;
-        ModelValue.Text = _model ?? BarFormat.None;
+        ModelValue.Text = BarFormat.ModelLabel(_model, _models) ?? BarFormat.None;
         EffortValue.Text = _effort ?? BarFormat.None;
         ModeValue.Text = _mode ?? BarFormat.None;
 
@@ -129,11 +133,16 @@ public partial class BottomBar : UserControl
 
     // Any press in this window but in the popup closes it. The popup's own mouse events route through the window too. A click in a
     // WebView2 (terminal, Browser panel) never reaches WPF: it takes the focus, and OnUsageFocusWithin closes the popup then.
-    void OnWindowMouseDown(object sender, MouseButtonEventArgs e) { if (!UsagePanel.IsMouseOver) CloseUsage(sender, e); }
+    void OnWindowMouseDown(object sender, MouseButtonEventArgs e) => ClosePopups(sender, e);
 
     void OnUsageFocusWithin(object sender, DependencyPropertyChangedEventArgs e) { if (!UsagePanel.IsKeyboardFocusWithin) UsagePopup.IsOpen = false; }
 
-    void CloseUsage(object? sender, EventArgs e) => UsagePopup.IsOpen = false;
+    // The model/effort/mode popup closes the same ways; a press on a popup's own panel leaves it open.
+    void ClosePopups(object? sender, EventArgs e)
+    {
+        if (e is not MouseButtonEventArgs || !UsagePanel.IsMouseOver) UsagePopup.IsOpen = false;
+        if (e is not MouseButtonEventArgs || !ChoicePanel.IsMouseOver) ChoicePopup.IsOpen = false;
+    }
 
     void OpenUsage()
     {
@@ -155,17 +164,19 @@ public partial class BottomBar : UserControl
     }
 
     // The button takes keyboard focus on mouse-down, before the click, so the element to give focus back to is the one it took it from.
-    void OnUsageFocus(object sender, KeyboardFocusChangedEventArgs e) { if (e.OldFocus is { } old && !ReferenceEquals(old, UsageGroup)) _usageFocus = old; }
+    void OnChipFocus(object sender, KeyboardFocusChangedEventArgs e) { if (e.OldFocus is { } old && !ReferenceEquals(old, sender)) _popupFocus = old; }
 
     void OnUsageClosed(object? sender, EventArgs e) => _usageClosedAt = DateTime.UtcNow;
 
     // Esc is taken here, in the tunnelling phase. Win32 focus is on the main window (the button took it from the WebView2), so the key
     // message reaches WPF and never the terminal's WebView2 (and the TUI behind it, where Esc interrupts a running turn).
-    void OnUsageKey(object sender, KeyEventArgs e)
+    void OnUsageKey(object sender, KeyEventArgs e) => EscClose(UsagePopup, e);
+
+    void EscClose(Popup popup, KeyEventArgs e)
     {
         if (e.Key != Key.Escape) return;
-        UsagePopup.IsOpen = false;
-        if (_usageFocus is not null) Keyboard.Focus(_usageFocus);
+        popup.IsOpen = false;
+        if (_popupFocus is not null) Keyboard.Focus(_popupFocus);
         e.Handled = true;
     }
 
@@ -325,28 +336,105 @@ public partial class BottomBar : UserControl
     async Task ReadAccountAsync()
     {
         if (AppState.Current?.Account is not { } account) return;
-        _account = await Task.Run(() => AccountReader.Read(account));
+        (_account, _models) = await Task.Run(() => (AccountReader.Read(account), ModelCatalog.Read(account)));
         Render();
     }
 
     // A refusal (e.g. text already in the terminal input) shows in the compose box's notice.
     void OnModel(object sender, RoutedEventArgs e) =>
-        Open(ModelButton, Models, v => _model?.Contains(v, StringComparison.OrdinalIgnoreCase) == true, v => TuiInput.SubmitAsync(_session, "/model " + v));
+        Open(ModelButton, BarFormat.ModelRows(_models), v => _model?.Contains(v, StringComparison.OrdinalIgnoreCase) == true, v => TuiInput.SubmitAsync(_session, "/model " + v));
 
-    void OnEffort(object sender, RoutedEventArgs e) => Open(EffortButton, Efforts, v => v == _effort, v => TuiInput.SubmitAsync(_session, "/effort " + v));
+    void OnEffort(object sender, RoutedEventArgs e) => Open(EffortButton, Plain(Efforts), v => v == _effort, v => TuiInput.SubmitAsync(_session, "/effort " + v), ultracode: true);
 
-    void OnMode(object sender, RoutedEventArgs e) => Open(ModeButton, Modes, v => v == _mode, SetModeAsync);
+    void OnMode(object sender, RoutedEventArgs e) => Open(ModeButton, Plain(Modes), v => v == _mode, SetModeAsync);
 
-    static void Open(Button button, string[] values, Func<string, bool> isCurrent, Func<string, Task> pick)
+    static IEnumerable<(string, string, string?)> Plain(string[] values) => values.Select(v => (v, v, (string?)null));
+
+    void OnChoiceFocusWithin(object sender, DependencyPropertyChangedEventArgs e) { if (!ChoicePanel.IsKeyboardFocusWithin) ChoicePopup.IsOpen = false; }
+
+    void OnChoiceKey(object sender, KeyEventArgs e) => EscClose(ChoicePopup, e);
+
+    void OnChoiceClosed(object? sender, EventArgs e) => _choiceClosedAt = DateTime.UtcNow;
+
+    /// <summary>The model, effort and mode chooser: the usage popup's look and click-away behavior (see <see cref="OpenUsage"/>), above
+    /// <paramref name="chip"/>. A row is a Button: hover, Up/Down (the body's directional navigation), Enter, an automation name. A pick
+    /// closes the popup and gives focus back; the Ultracode switch row (effort only) stays open and flips back if the send is refused.</summary>
+    void Open(Button chip, IEnumerable<(string Value, string Label, string? Note)> rows, Func<string, bool> isCurrent, Func<string, Task> pick, bool ultracode = false)
     {
-        var menu = new ContextMenu { PlacementTarget = button, Placement = PlacementMode.Top };
-        foreach (var v in values)
+        if (ReferenceEquals(_choiceFor, chip) && DateTime.UtcNow - _choiceClosedAt < TimeSpan.FromMilliseconds(250)) return; // the press that closed it
+        _choiceFor = chip;
+        Keyboard.Focus(chip); // moves Win32 focus off the WebView2, as in OpenUsage
+        ChoiceBody.Children.Clear();
+        Button? focus = null;
+        foreach (var (value, label, note) in rows)
         {
-            var item = new MenuItem { Header = v, IsCheckable = true, IsChecked = isCurrent(v) };
-            item.Click += async (_, _) => await pick(v);
-            menu.Items.Add(item);
+            var current = isCurrent(value);
+            var row = Row(note is null ? label : $"{label}, {note}", current ? "current" : null, out var dock);
+            var check = new TextBlock { Style = (Style)FindResource("Icon"), Text = "", FontSize = 12, Foreground = (Brush)FindResource("Accent"), Visibility = current ? Visibility.Visible : Visibility.Hidden };
+            DockPanel.SetDock(check, Dock.Right);
+            dock.Children.Add(check);
+            dock.Children.Add(Label(label, "Text", top: 0));
+            if (note is not null)
+            {
+                var n = Label(note, "Muted", top: 0);
+                n.FontSize = 11;
+                n.Margin = new Thickness(8, 0, 0, 0);
+                dock.Children.Add(n);
+            }
+            row.Click += async (_, _) =>
+            {
+                ChoicePopup.IsOpen = false;
+                if (_popupFocus is not null) Keyboard.Focus(_popupFocus);
+                await pick(value);
+            };
+            ChoiceBody.Children.Add(row);
+            if (current || focus is null) focus = row;
         }
-        menu.IsOpen = true;
+        if (ultracode) AddUltracode();
+        ChoicePopup.PlacementTarget = chip;
+        ChoicePopup.IsOpen = true;
+        // As in OpenUsage: WPF focus moves into the popup once it exists.
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (ChoicePopup.IsOpen) Keyboard.Focus(focus); });
+    }
+
+    Button Row(string name, string? state, out DockPanel dock)
+    {
+        dock = new DockPanel();
+        var row = new Button { Style = (Style)FindResource("PopupRow"), Content = dock };
+        AutomationProperties.SetName(row, state is null ? name : $"{name}, {state}");
+        return row;
+    }
+
+    /// <summary>A separator and the Ultracode row. The switch is only a picture: the row is the Button, so click, Enter and Space work alike.</summary>
+    void AddUltracode()
+    {
+        ChoiceBody.Children.Add(new Border { Height = 1, Background = (Brush)FindResource("Line"), Margin = new Thickness(4, 4, 4, 5) });
+        var s = _session;
+        var on = _screenUltra.Session == s && _screenUltra.On is { } seen ? seen : s is not null && _ultraSent.TryGetValue(s, out var sent) && sent;
+        var row = Row("Ultracode", on ? "on" : "off", out var dock);
+        var sw = new ToggleButton { Style = (Style)FindResource("Switch"), Width = 44, Height = 24, IsChecked = on, IsHitTestVisible = false, Focusable = false };
+        DockPanel.SetDock(sw, Dock.Right);
+        dock.Children.Add(sw);
+        dock.Children.Add(Label("Ultracode", "Text", top: 0));
+        void Show(bool v)
+        {
+            sw.IsChecked = v;
+            AutomationProperties.SetName(row, "Ultracode, " + (v ? "on" : "off"));
+        }
+        var busy = false;
+        row.Click += async (_, _) =>
+        {
+            if (busy) return;
+            busy = true;
+            var want = sw.IsChecked != true;
+            Show(want);
+            // A refusal shows in the compose box's notice, as for the other picks.
+            var refusal = await TuiInput.SubmitAsync(s, $"/effort ultracode {(want ? "on" : "off")}");
+            if (refusal is null && s is not null) _ultraSent[s] = want;
+            else Show(!want);
+            busy = false;
+        };
+        ChoiceBody.Children.Add(row);
     }
 
     /// <summary>The mode in the terminal's footer (see <see cref="BarFormat.ModeFromScreen"/>), also kept for display; null if
@@ -355,6 +443,7 @@ public partial class BottomBar : UserControl
     {
         var tail = s.Channel is IScreenChannel screen ? await screen.ReadTailAsync(BarFormat.FooterRows) : null;
         _screenMode = (s, BarFormat.ModeFromScreen(tail));
+        _screenUltra = (s, BarFormat.UltracodeFromScreen(tail));
         return _screenMode.Mode;
     }
 
@@ -467,6 +556,27 @@ public static class BarFormat
         return (used is null && size is null && pct is null ? None : $"{Tokens(used)}/{Tokens(size)} {Percent(pct)}", pct);
     }
 
+    // No catalog cached (an API key, before the first start): the documented /model aliases, with no version to go stale.
+    static readonly CatalogModel[] Aliases = [new("opus", "opus", "Opus", null), new("sonnet", "sonnet", "Sonnet", null), new("haiku", "haiku", "Haiku", null)];
+
+    /// <summary>The model chooser's rows (alias, name, note): Claude Code's own model list, else the bare aliases.</summary>
+    public static IEnumerable<(string Alias, string Label, string? Note)> ModelRows(IReadOnlyList<CatalogModel> catalog) =>
+        (catalog.Count > 0 ? catalog : Aliases).Select(m => (m.Alias, m.Name, m.Note));
+
+    static readonly Regex ModelId = new(@"^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$");
+
+    /// <summary>"claude-opus-5-5" gives "Opus 5.5", "claude-fable-5-1-20260101" gives "Fable 5.1"; null for any other shape.</summary>
+    public static string? ModelName(string? id) =>
+        id is not null && ModelId.Match(id) is { Success: true } m
+            ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..]} {m.Groups[2].Value}{(m.Groups[3].Success ? "." + m.Groups[3].Value : "")}"
+            : null;
+
+    /// <summary>The versioned name of an alias or id in <paramref name="catalog"/> ("opus" gives "Opus 5.5"), else of a full id;
+    /// anything else (a display name) as it is.</summary>
+    public static string? ModelLabel(string? model, IReadOnlyList<CatalogModel>? catalog = null) =>
+        catalog?.FirstOrDefault(m => m.Alias.Equals(model, StringComparison.OrdinalIgnoreCase) || m.Id.Equals(model, StringComparison.OrdinalIgnoreCase))?.Name
+        ?? ModelName(model) ?? model;
+
     static readonly Dictionary<string, string> FooterModes = new()
     {
         ["manual mode"] = "default", ["plan mode"] = "plan", ["accept edits"] = "acceptEdits",
@@ -476,13 +586,22 @@ public static class BarFormat
     /// <summary>How many of the screen's last non-blank rows <see cref="ModeFromScreen"/> looks at.</summary>
     public const int FooterRows = 10;
 
+    /// <summary>The last non-blank rows of the terminal text, bottom row first.</summary>
+    static List<string> FooterLines(string screen) => screen.Split('\n').Where(l => l.Trim().Length > 0).TakeLast(FooterRows).Reverse().ToList();
+
+    /// <summary>"Ultracode on" or "Ultracode off" in the footer rows (at a row's start or after a "·"), else null.
+    /// shortcut: the footer's wording is a guess, as the screen text is not documented; the caller falls back to what it last sent.</summary>
+    public static bool? UltracodeFromScreen(string? screen) =>
+        screen is not null && FooterLines(screen).Select(l => Regex.Match(l, @"(?:^\W*|·\s*)ultracode (on|off)\b", RegexOptions.IgnoreCase)).FirstOrDefault(m => m.Success) is { } m
+            ? m.Groups[1].Value.Equals("on", StringComparison.OrdinalIgnoreCase) : null;
+
     /// <summary>The permission mode named by the TUI's footer ("⏵⏵ auto mode on (shift+tab to cycle)") among the last non-blank
     /// rows of the terminal text, or null. These are Claude Code's own indicator names; the default mode shows none, only
     /// "? for shortcuts".</summary>
     public static string? ModeFromScreen(string? screen)
     {
         if (screen is null) return null;
-        var rows = screen.Split('\n').Where(l => l.Trim().Length > 0).TakeLast(FooterRows).Reverse().ToList();
+        var rows = FooterLines(screen);
         foreach (var line in rows)
             if (Regex.Match(line, @"^\W*(manual mode|plan mode|accept edits|bypass permissions|don't ask|auto mode) on\b") is { Success: true } m)
                 return FooterModes[m.Groups[1].Value];

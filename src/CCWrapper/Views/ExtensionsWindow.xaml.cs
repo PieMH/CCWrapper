@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using CCWrapper.Core;
 using CCWrapper.Data;
@@ -15,7 +17,7 @@ namespace CCWrapper.Views;
 public partial class ExtensionsWindow : Window
 {
     static readonly TimeSpan Quick = TimeSpan.FromSeconds(60), Long = TimeSpan.FromMinutes(5), Health = TimeSpan.FromMinutes(2);
-    const int CardsShown = 60;
+    const int CardsShown = 60; // cards added per "Show more"
     const string ConnectorsUrl = "https://claude.ai/settings/connectors";
     static readonly string[] Tints = ["SessionBlue", "SessionPurple", "SessionGreen", "SessionCyan", "SessionOrange", "SessionPink", "SessionYellow", "SessionRed"];
 
@@ -32,6 +34,9 @@ public partial class ExtensionsWindow : Window
     List<McpServer>? _health; // the last claude mcp list; null before the first
     Task? _healthRun;
     string? _shownPlugin;
+    int _cardCap = CardsShown;
+    bool _cardsStale; // the cards changed while a plugin page covered them
+    string? _sourceUrl;
     CancellationTokenSource? _signIn;
 
     public ExtensionsWindow(Account account, string? cwd)
@@ -374,18 +379,134 @@ public partial class ExtensionsWindow : Window
 
     void OnCatalogFilter(object sender, RoutedEventArgs e)
     {
-        if (_ready && _catalog is not null) FilterCatalog();
+        if (!_ready || _catalog is null) return;
+        _cardCap = CardsShown; // a new search or filter starts at the top results again
+        FilterCatalog(toTop: true);
     }
 
-    // shortcut: at most CardsShown cards (a wrap panel does not virtualize); add paging if people browse past the top results.
-    void FilterCatalog()
+    void OnShowMore(object sender, RoutedEventArgs e)
     {
-        var (shown, matches) = PluginData.Search(_catalog ?? [], CatalogSearch.Text, (CatalogMarket.SelectedItem as ComboBoxItem)?.Tag as string, CardsShown);
+        _cardCap += CardsShown;
+        FilterCatalog();
+    }
+
+    // A wrap panel does not virtualize, so the cards are capped at _cardCap and "Show more" raises it.
+    void FilterCatalog(bool toTop = false)
+    {
+        if (PluginPage.Visibility == Visibility.Visible) { _cardsStale = true; return; } // rebuilt on Back, where the scroll can be kept
+        var offset = toTop ? 0 : CardsScroll.VerticalOffset;
+        var (shown, matches) = PluginData.Search(_catalog ?? [], CatalogSearch.Text, (CatalogMarket.SelectedItem as ComboBoxItem)?.Tag as string, _cardCap);
         var installed = _plugins.Select(p => p.Id).ToHashSet();
         Cards.ItemsSource = shown.Select(c => new CardView(c, installed.Contains(c.Id))).ToList();
+        var more = matches - shown.Count;
+        ShowMore.Visibility = more > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ShowMore.Content = $"Show {Math.Min(CardsShown, more)} more";
         CatalogStatus.Text = matches == 0 ? "No plugin matches."
-            : matches > shown.Count ? $"Showing the {shown.Count} most installed of {matches:N0} · refine the search to see others"
+            : more > 0 ? $"Showing the {shown.Count} most installed of {matches:N0}"
             : $"{matches:N0} plugin{(matches == 1 ? "" : "s")}";
+        CardsScroll.UpdateLayout();
+        CardsScroll.ScrollToVerticalOffset(offset);
+    }
+
+    // ---- a plugin page ----
+
+    void OnCardClick(object sender, MouseButtonEventArgs e)
+    {
+        if (!e.Handled && (sender as FrameworkElement)?.DataContext is CardView card) _ = OpenPluginPageAsync(card); // a click on Install is handled by its button
+    }
+
+    void OnCardKey(object sender, KeyEventArgs e)
+    {
+        if (e.Source == sender && e.Key is Key.Enter or Key.Space && (sender as FrameworkElement)?.DataContext is CardView card)
+        {
+            e.Handled = true;
+            _ = OpenPluginPageAsync(card);
+        }
+    }
+
+    async Task OpenPluginPageAsync(CardView card)
+    {
+        PluginPage.DataContext = card;
+        CardsPage.Visibility = Visibility.Collapsed;
+        PluginPage.Visibility = Visibility.Visible;
+        foreach (var t in new[] { PageVersion, PageAuthor, PageCategory, PageLicense, PageHomepage, PageRepository, PageKeywords, PageCost }) t.Text = "—";
+        PageComponents.ItemsSource = null;
+        PageComponentsStatus.Text = "Reading…";
+        SourceButton.Visibility = Visibility.Collapsed;
+        _sourceUrl = null;
+
+        var id = card.Entry.Id;
+        var known = Path.Combine(_account.Paths.Plugins, "known_marketplaces.json");
+        var manifest = Task.Run(() =>
+        {
+            (string? Folder, string? RepoUrl) at = default;
+            try
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(known));
+                at = PluginData.ParseKnownMarketplace(doc.RootElement, card.Entry.Marketplace);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException) { } // no marketplace folder: no manifest fields
+            return PluginData.ReadManifest(at.Folder, card.Entry.Name, at.RepoUrl);
+        });
+        var details = Cli(["plugin", "details", id], Quick, show: false); // component inventory: a hidden CLI run, never the model
+        await Task.WhenAll(manifest, details);
+        if (PluginPage.DataContext is not CardView open || open.Entry.Id != id) return; // another page was opened meanwhile
+
+        string Or(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s;
+        var m = manifest.Result;
+        PageVersion.Text = Or(m.Version);
+        PageAuthor.Text = Or(m.Author);
+        PageCategory.Text = Or(m.Category);
+        PageLicense.Text = Or(m.License);
+        PageHomepage.Text = Or(m.Homepage);
+        PageRepository.Text = Or(m.Repository);
+        PageKeywords.Text = Or(string.Join(", ", m.Keywords));
+        _sourceUrl = m.SourceUrl;
+        SourceButton.Visibility = _sourceUrl is null ? Visibility.Collapsed : Visibility.Visible;
+        SourceButton.ToolTip = _sourceUrl;
+        if (details.Result.Ok)
+        {
+            var d = PluginData.ParseDetails(details.Result.Output);
+            PageCost.Text = d.AlwaysOn ?? "—";
+            PageComponents.ItemsSource = d.Components;
+            PageComponentsStatus.Text = d.Components.Count == 0 ? "—" : "";
+        }
+        else PageComponentsStatus.Text = "—";
+    }
+
+    /// <summary>Back to the cards, with their scroll and search kept. False when no plugin page is open.</summary>
+    bool ClosePluginPage()
+    {
+        if (PluginPage.Visibility != Visibility.Visible) return false;
+        PluginPage.Visibility = Visibility.Collapsed;
+        CardsPage.Visibility = Visibility.Visible;
+        if (_cardsStale)
+        {
+            _cardsStale = false;
+            FilterCatalog();
+        }
+        return true;
+    }
+
+    void OnBack(object sender, RoutedEventArgs e) => ClosePluginPage();
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if (e.Key == Key.Escape && Page == "discover" && ClosePluginPage()) e.Handled = true;
+    }
+
+    protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnPreviewMouseDown(e);
+        if (e.ChangedButton == MouseButton.XButton1 && Page == "discover" && ClosePluginPage()) e.Handled = true;
+    }
+
+    void OnViewSource(object sender, RoutedEventArgs e)
+    {
+        if (_sourceUrl is null || !Uri.TryCreate(_sourceUrl, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https")) return;
+        try { Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
+        catch (System.ComponentModel.Win32Exception ex) { SetLast("Could not open the browser: " + ex.Message, "Bad"); }
     }
 
     async void OnInstall(object sender, RoutedEventArgs e)
@@ -397,6 +518,9 @@ public partial class ExtensionsWindow : Window
         if (r.Ok) PluginsChanged();
         await RefreshInstalledAsync();
         FilterCatalog();
+        ((Button)sender).IsEnabled = true; // the plugin page's button outlives the rebuild; a card's is already gone
+        if (PluginPage.DataContext is CardView open && open.Entry.Id == card.Entry.Id)
+            PluginPage.DataContext = new CardView(open.Entry, _plugins.Any(p => p.Id == open.Entry.Id));
     }
 
     // ---- marketplaces ----

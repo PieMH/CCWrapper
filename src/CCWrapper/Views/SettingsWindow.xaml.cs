@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -117,7 +118,8 @@ public partial class SettingsWindow : Window
     string Page => SearchBox.Text.Trim().Length > 0 ? "search"
         : NavPermissions.IsChecked == true ? "permissions" : NavInterface.IsChecked == true ? "interface"
         : NavHooks.IsChecked == true ? "hooks" : NavEnv.IsChecked == true ? "env"
-        : NavMemory.IsChecked == true ? "memory" : NavJson.IsChecked == true ? "json" : NavApp.IsChecked == true ? "app" : "general";
+        : NavMemory.IsChecked == true ? "memory" : NavJson.IsChecked == true ? "json" : NavApp.IsChecked == true ? "app"
+        : NavAccount.IsChecked == true ? "account" : "general";
 
     Brush B(string key) => (Brush)FindResource(key);
 
@@ -156,7 +158,8 @@ public partial class SettingsWindow : Window
         MemoryPage.Visibility = V(page == "memory");
         JsonPage.Visibility = V(page == "json");
         AppPage.Visibility = V(page == "app");
-        ScopeArea.Visibility = V(page is not ("memory" or "app"));
+        AccountPage.Visibility = V(page == "account");
+        ScopeArea.Visibility = V(page is not ("memory" or "app" or "account"));
         MemoryNote.Visibility = V(page == "memory");
         ViewJsonLink.Visibility = V(page != "json");
         var letter = ShellModel.LetterOf(_account.Letter);
@@ -169,6 +172,7 @@ public partial class SettingsWindow : Window
             "memory" => ("CLAUDE.md", "Instructions Claude reads at the start of every session."),
             "json" => ("JSON", "The whole file, for anything the pages above do not cover."),
             "app" => ("CCWrapper", "Settings of this app, not of Claude Code."),
+            "account" => ($"Account {letter}", "Who this window is signed in as, and Claude Code's own facts. Nothing here is written."),
             "search" => ($"Settings matching \"{SearchBox.Text.Trim()}\"", "From General, Permissions and Interface."),
             _ => ("General", $"Model, look and updates for Claude Code sessions of account {letter}."),
         };
@@ -182,6 +186,7 @@ public partial class SettingsWindow : Window
             case "memory": ShowMemory(); break;
             case "json": ShowJson(); break;
             case "app": ShowApp(); break;
+            case "account": ShowAccount(); break;
             default:
                 BuildRows();
                 if (page == "permissions") ShowRules();
@@ -578,6 +583,72 @@ public partial class SettingsWindow : Window
         m.Pending = MemoryBox.Text;
         _saved = false;
         UpdateSaveBar();
+    }
+
+    // ---- Account (read-only) ----
+
+    Task<string?>? _version; // claude --version once per window: it starts a process
+
+    async void ShowAccount()
+    {
+        var account = _account;
+        var (info, facts) = await Task.Run(() => (AccountReader.Read(account), AccountReader.ReadFacts(account)));
+        _version ??= ClaudeCli.VersionAsync(account);
+        if (Page != "account") return;
+        AccountRows.Children.Clear();
+        void Add(string label, string? value) => AccountRows.Children.Add(FactRow(label, value));
+        Add("Name", info.DisplayName);
+        Add("Email", info.Email);
+        Add("Organization", info.OrganizationName);
+        Add("Organization type", info.OrganizationType);
+        Add("Billing type", info.BillingType);
+        Add("Account ID", facts.AccountUuid);
+        Add("Organization ID", facts.OrganizationUuid);
+        Add("Profile", ShellModel.LetterOf(account.Letter));
+        Add("Config folder", account.ConfigRoot);
+        Add("Install method", facts.InstallMethod);
+        Add("Auto-update", facts.AutoUpdates);
+        var versionRow = FactRow("Claude Code", "…");
+        AccountRows.Children.Add(versionRow);
+        AccountButtons.Children.Clear();
+        AccountButtons.Children.Add(LinkButton("Open folder", () => Process.Start(new ProcessStartInfo(account.ConfigRoot) { UseShellExecute = true })));
+        foreach (var (label, url) in AccountLinks.For(info))
+            AccountButtons.Children.Add(LinkButton(label, () => OpenUrl(url)));
+        OtherRows.Children.Clear();
+        foreach (var row in facts.Other) OtherRows.Children.Add(FactRow(row.Key, row.Value, row.Source));
+        if (facts.Other.Count == 0) OtherRows.Children.Add(FactRow("—", null));
+        ((TextBlock)versionRow.Children[1]).Text = await _version ?? "—";
+    }
+
+    static void OpenUrl(string url)
+    {
+        // Only http(s) leave for the shell: the URLs are ours, but ShellExecute would run anything.
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https")
+            Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    Button LinkButton(string text, Action open)
+    {
+        var button = new Button { Content = text, Style = (Style)FindResource("Outlined"), Height = 32, Padding = new(14, 0, 14, 0), Margin = new(0, 0, 8, 0) };
+        button.Click += (_, _) =>
+        {
+            try { open(); }
+            catch (Exception ex) when (ex is Win32Exception or InvalidOperationException) { SaveText.Text = "Could not open it: " + ex.Message; }
+        };
+        return button;
+    }
+
+    Grid FactRow(string label, string? value, string? source = null)
+    {
+        var grid = new Grid { Margin = new(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new() { Width = new(190) });
+        grid.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
+        var name = new TextBlock { Text = label, Style = (Style)FindResource("Dim"), VerticalAlignment = VerticalAlignment.Top, ToolTip = source };
+        var text = new TextBlock { Text = string.IsNullOrEmpty(value) ? "—" : value, TextWrapping = TextWrapping.Wrap, FontFamily = (FontFamily)FindResource("MonoFont"), FontSize = 12.5 };
+        Grid.SetColumn(text, 1);
+        grid.Children.Add(name);
+        grid.Children.Add(text);
+        return grid;
     }
 
     // ---- CCWrapper ----

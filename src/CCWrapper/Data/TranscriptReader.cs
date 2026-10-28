@@ -37,6 +37,8 @@ public sealed class TranscriptReader(string path)
     /// <summary>stop_reason of the last assistant record; null while streaming or before any.</summary>
     public string? LastStopReason { get; private set; }
     public int ToolUseCount { get; private set; }
+    /// <summary>Timestamp of the first record that has one.</summary>
+    public DateTimeOffset? FirstActivity { get; private set; }
     /// <summary>Timestamp of the last record that has one.</summary>
     public DateTimeOffset? LastActivity { get; private set; }
     public IReadOnlyList<TranscriptMessage> Messages => _messages;
@@ -64,6 +66,7 @@ public sealed class TranscriptReader(string path)
     bool Apply(JsonElement rec)
     {
         if (TimeOf(rec) is { } when) LastActivity = when;
+        FirstActivity ??= LastActivity;
 
         switch (Str(rec, "type"))
         {

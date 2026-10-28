@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-497%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-602%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -36,6 +36,7 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 - Each window runs one account with that account's own settings. To run accounts side by side, open more windows.
 - **Switch** in the top bar restarts the window as another account. Its sessions stay resumable.
 - The top bar also shows the repo's git state: the GitHub account it pushes as, the branch, and the commits to push (↑) and pull (↓) as of the last fetch.
+- **Worktree** in the top bar, off by default, per window and not saved: while it is on, new sessions in a git repo start with `claude --worktree`, in a worktree of their own. Open tabs, resumes and copies are not affected. A worktree tab carries a mark, and the switch is disabled outside a git repo.
 - `CCWrapper.exe --account b` skips the picker, so you can make one shortcut per account.
 - The taskbar badge shows each window's account letter and color.
 
@@ -46,18 +47,20 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
   - Click a session to open it: if it already has a tab, that tab comes forward; otherwise it is resumed in its original folder in a new tab. Nothing open is closed.
   - Right-click a session, here or on its tab, for **Name…** (sends `/rename`), **Color** (sends `/color`) and **Delete…**. Name and Color need the session open in this window. Delete asks first, then removes the session's transcript and its folder for good, so it cannot be resumed; it is refused while any claude process has the session open.
   - A session open in another terminal gets a read-only tab that says where it is open, e.g. "PowerShell (pid 51708, since 15:07)". **Resume here** offers to close it there (the conversation is saved) and turns the tab into a live one; **Continue here as a copy** forks it instead.
-- **About:** version, the update switch and links to the policies (privacy, terms, code signing, security, third-party notices). When an update is downloaded, a chip "Update X ready" in the bottom bar restarts into it.
+- **About:** version, the update switch and links to the policies (privacy, terms, code signing, security, third-party notices). **Report a bug** opens GitHub's bug form in your browser, with the CCWrapper, Windows and Claude Code versions filled in (it runs `claude --version` for the last); nothing is sent until you submit the form. When an update is downloaded, a chip "Update X ready" in the bottom bar restarts into it.
 - **Settings:** a window for the account's `settings.json` and the project folder's shared and local ones, without opening the files.
   - **General:** model, effort (also per model), output style, language, theme, time format, update channel, commit trailer and claude.ai connectors.
   - **Permissions:** the default mode and the allow, ask and deny rules. **Hooks** and **Environment** variables can be added, edited and removed; values that look like keys or tokens stay hidden until clicked.
   - **Interface:** the switches of `/config`: auto-compact, rewind checkpoints, verbose output, turn duration, tips, reduced motion, terminal progress bar, `.gitignore` in the file picker, editor mode and notifications.
   - Each setting says where its value comes from: set in this file, taken from a broader one, or overridden by a more specific one (*Project overrides this*).
+  - **Account:** the name, email, organization, plan and IDs from the account's `.claude.json` (never `.credentials.json`), the config folder, the Claude Code version, and the other preferences that no page edits, read-only, with anything that looks like a key or token left out. Buttons open the config folder, and the account, usage and billing pages in your browser.
   - **CLAUDE.md:** edit the user, project and local `CLAUDE.md` files. **JSON** shows a whole file for anything else.
   - Changes wait for **Save**, which writes only the files you changed and keeps every key the window doesn't show. Open sessions pick settings up as soon as they are saved.
   - **CCWrapper:** the app's own settings, saved in `%LOCALAPPDATA%\CCWrapper\app.json` (not a Claude Code file): the compact hint on or off, its threshold and its prompt, and whether Claude may use the Browser panel.
 - **Plugins & connectors:** a window of its own for everything `/plugin` and `/mcp` do, without touching your open sessions.
-  - **Plugins:** turn installed plugins on and off; see each one's skills, MCP servers, context cost and notes; update, configure or uninstall it. Plugins synced from your claude.ai account are listed too.
-  - **Discover and Marketplaces:** search the marketplaces' catalogs and install to the user, project or local scope; add, update and remove marketplaces.
+  - **Plugins:** turn installed plugins on and off; see each one's skills, MCP servers, context cost and notes; update, configure or uninstall it. Plugins synced from your claude.ai account are listed too. The list scrolls with the mouse wheel.
+  - **Discover and Marketplaces:** search the marketplaces' catalogs (**Show 60 more** pages through them, from the local copies, with no network) and install to the user, project or local scope; add, update and remove marketplaces.
+  - **Plugin page:** click a card in Discover for what the marketplace's `marketplace.json` says about the plugin (version, author, license, keywords), its components from a hidden `claude plugin details`, **Install**, and **View source**, which opens the source in your browser (http and https only).
   - **MCP servers and connectors:** every server with its health (connected, needs sign-in, failed), your own and those of plugins; add or remove your own, and sign in to servers and claude.ai connectors. A switch on each one turns it off for one project folder only, as `/mcp disable` does.
   - Every change runs Claude Code's own `claude plugin` or `claude mcp` command in the background, shown in the window's status strip. New sessions get the change; **Reload idle sessions** sends `/reload-plugins` to the open ones that are idle.
 - **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
@@ -83,19 +86,19 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
 - A real multi-line editor with a round send button: Enter sends, Shift+Enter adds a line, and Up recalls earlier prompts.
 - When Claude Code suggests your next prompt, the empty box shows it greyed too, as the terminal does: Tab takes it to edit, Enter sends it, typing replaces it.
 - Pasted screenshots become image files in `%LOCALAPPDATA%\CCWrapper\paste`; those older than 7 days are deleted when the app starts.
-- The **+** button adds files or folders (as a drop would) and opens the slash commands. Typing `/` (or a `/` word after a space or line break) lists Claude Code's commands, your custom commands and skills, and those of your enabled plugins and claude.ai synced plugins (not MCP prompts), narrowing as you type: Up/Down choose, Enter runs it, Tab completes it without sending (after a space or line break, Enter only completes). Text that starts with a known command shows in blue. A slash command goes in as short pastes (at most 500 characters and one line break each), so Claude Code runs it instead of folding it into `[Pasted text]`.
+- The **+** button adds files or folders (as a drop would) and opens the slash commands. Typing `/` (or a `/` word after a space or line break) lists Claude Code's commands, your custom commands and skills, and those of your enabled plugins and claude.ai synced plugins (not MCP prompts), narrowing as you type: Up/Down choose, Enter runs it, Tab completes it without sending (after a space or line break, Enter only completes). A known command shows in blue anywhere in the text. While the caret is at the end of the line, its argument hint (the one Claude Code shows) appears as grey ghost text after it, and Tab writes it in; the hint hides once the typed arguments differ from it and returns when they are empty again. A slash command goes in as short pastes (at most 500 characters and one line break each), so Claude Code runs it instead of folding it into `[Pasted text]`.
 - Each session keeps its own draft: switching tabs leaves it as it is, and drafts are saved when the app exits, restarts to update, or loses focus once it knows an update is ready to install, and come back when the session is reopened; a draft nobody changed for 14 days, or whose session you delete, is dropped. An update restart started from another window can still lose the drafts of a window that has not noticed the update.
 - It never types into a permission prompt or a dialog. Those you always answer in the terminal.
 
 Confirmations, warnings and errors use the app's dark theme too.
 
 **Right panel**
-- **Files:** a tree of every file Claude changed this session, with `+/−` lines in green and red, or the size change for binaries. Click a file to see all of it with the changes highlighted.
-- **Agents:** this session's subagents, running or finished, with model, effort, context and tokens. Click one to see its live transcript.
+- **Files:** a tree of every file Claude changed this session, with `+/−` lines in green and red, or the size change for binaries. Click a file to see all of it with the changes highlighted. A search box filters by name. Right-click a file for **Open with…** (the Windows dialog) and **Show in File Explorer**; on a folder, **Open in File Explorer**.
+- **Agents:** a list of this session's subagents, running or finished, each with its title, duration, model, tokens (the last turn's context plus output) and effort, and a search box. Click one to read its log, read-only, in the tab; the back arrow, Esc or the mouse's back button returns to the list.
 - **Browser:** a built-in WebView2 browser for your dev server, with tabs (the **+** button opens one, up to 20; tabs are not restored after a restart). A pop-up a click opens appears in a new tab; pop-ups a page opens on its own are dropped (a page can still open one in the few seconds after a click, Claude's clicks included, as in any browser), and a page's `window.close()` closes only pop-up tabs. Claude browses in it too: every session can navigate, read the page, click, type, take screenshots, run scripts, use DevTools, and list, open, switch and close tabs there, and is told to prefer it over another browser. Ask for Chrome by name and it uses Chrome. Scripts and DevTools act with the page's own logins in that profile; DevTools refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag, so it cannot paste your clipboard), the page history and scripts that persist across pages. Claude opens only http, https, blob, about:blank and data addresses, never local files (a pop-up to any other address is dropped), and its tools refuse to work on a page that is not a web address (for example a `file:` page you opened yourself). Its tools act on the tab in front. To turn this off, clear **Let Claude use the Browser panel** in Settings → CCWrapper.
 
 **Bottom bar**
-- Model, effort and permission-mode switches that drive Claude Code's own `/model`, `/effort` and Shift+Tab.
+- Model, effort and permission-mode choosers that drive Claude Code's own `/model`, `/effort` and Shift+Tab. Each opens as a popup like the usage one and closes on a click elsewhere or Esc. The model list is the one Claude Code caches for the account, with its versions and notes (Fable: "Requires usage credits"); with none cached yet it offers the bare aliases. The effort popup also has an **Ultracode** switch, off by default, that sends `/effort ultracode on` or `off`.
 - Meters with small bars for the context window and the 5-hour and weekly plan usage (amber from 80%), plus session tokens and cost. Usage shows even with no session open, is checked when the window opens and every 30 minutes, and the ↻ button checks it now. Hover the usage meters for when the 5-hour and weekly windows reset; click them for a popup with both windows' bars and resets, and the tokens (in, out, cache) by model and by hour of day, counted from the account's transcripts.
 - **Compact hint:** once the context passes a threshold (50% by default; set it in Settings), a *Compact* button appears left of the context meter. It puts `/compact` and your keep/drop prompt in the message box and focuses it, but never sends it, and leaves text you already typed alone.
 
@@ -172,7 +175,7 @@ A few tips:
 - On a tab, ● means Claude is working, a pulsing ◎ means it's waiting for you and ○ means it's done. When a session needs you while the window is in the background, the taskbar button flashes.
 - Running the same session in two places at once isn't possible: open it here with **Resume here**, which can close the other terminal's copy for you. Note that `claude --continue` in a folder reopens that folder's latest session, wherever else it is open.
 - When a session's process exits, the terminal offers **Resume** or **Close**.
-- The model and effort switches send Claude Code's own `/model` and `/effort`, which **save the choice as that account's default**. That's Claude Code's behavior, not the app's.
+- The model and effort choosers send Claude Code's own `/model` and `/effort`, which **save the choice as that account's default**. That's Claude Code's behavior, not the app's.
 - Accounts using Claude Code's fullscreen renderer (`"tui": "fullscreen"`) stay fullscreen. Ctrl+F then searches the visible screen, and "Search full transcript" searches the whole session.
 
 ## Privacy and safety
@@ -180,8 +183,8 @@ A few tips:
 CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 
 - **It ends a `claude` process only when you confirm it:** Resume here's "Close it there and resume it here?" ends that terminal's `claude`, as closing the terminal would. Nothing else is ever stopped for you.
-- **It reads only files Claude Code already writes:** each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts (also for the usage popup), session status files, file-history backups, and plugin and skill lists (also for the `/` list).
-- **It never reads** `.credentials.json` and never calls Anthropic APIs. Plugin and MCP changes you make in Plugins & connectors are done by Claude Code's own `claude plugin` and `claude mcp` commands.
+- **It reads only files Claude Code already writes:** each account's `.claude.json` (email, plan, cached usage), `settings.json`, transcripts (also for the usage popup), session status files, file-history backups, and plugin and skill lists (also for the `/` list), plus the marketplaces' `known_marketplaces.json` and `marketplace.json` (for the plugin page).
+- **It never reads** `.credentials.json` and never calls Anthropic APIs. Plugin and MCP changes you make in Plugins & connectors are done by Claude Code's own `claude plugin` and `claude mcp` commands; a plugin page also runs `claude plugin details`. The Account page in Settings and **Report a bug** in About run `claude --version`.
 - **It edits Claude Code's files only from the Settings window, when you click Save:** the `settings.json` and `CLAUDE.md` files you changed there. A file that changed on disk since the window read it is not overwritten, and the previous version of each saved file is kept in `%LOCALAPPDATA%\CCWrapper\backups`.
 - **It deletes a session's files only when you pick Delete on its right-click menu and confirm:** the transcript `projects\<folder>\<id>.jsonl` and its `<id>\` folder, for good. A session that is open anywhere is refused, and nothing outside those two paths is touched.
 - **It edits `.claude.json` only when you flip a server's folder switch** in Plugins & connectors, the one change there that no `claude` command makes. Like Claude Code itself, it takes the file's lock, reads the file as it is at that moment, changes that folder's list of servers turned off and writes it back; the previous version goes to the same backups folder.
@@ -189,6 +192,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images (deleted after 7 days), the browser profiles (a Browser cache over 100 MB is cleared at start; cookies stay until you clear them), settings backups, `app.json` (CCWrapper's own settings: your update choice, the compact hint and the browser choice), and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
 - **The Browser tool:** each session also gets that relay as a local MCP server (`ccwrapper-browser`, through `--mcp-config`), and a line in its system prompt (`--append-system-prompt`) to prefer it. The server talks only to its own CCWrapper window, through a local pipe that only your Windows user can open. Pages Claude opens load in the Browser panel's profile for the account (all tabs share it), with your logins, and Claude Code asks permission per tool as it does for any MCP tool. Its scripts and DevTools act with those logins, but DevTools refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag), the page history and scripts that persist across pages. Claude opens only http, https, blob, about:blank and data addresses, not local files, and its tools refuse to work on a page that is not a web address. The same holds for every tab. Turn it off in Settings → CCWrapper.
+- **Links it opens in your browser, on your click only:** the account, usage and billing pages (Settings → Account), a plugin's source (View source) and GitHub's bug form (Report a bug), whose address carries the three versions. The app sends nothing itself.
 - **Its only network call is the update check,** and only in an installed copy, only after you said yes on first start; the switch is in **About**. It asks GitHub for the latest release and downloads it; GitHub sees your IP address and the app version, nothing else is sent. The Browser panel loads only what you or Claude open in it. Details in [PRIVACY.md](PRIVACY.md).
 - **Plan usage is checked with Claude Code's own `/usage`:** a hidden `claude "/usage"` (MCP servers off) runs in the folder of the account's most recent session, and Claude Code saves the result in `.claude.json`. Each check takes a few seconds, adds `/usage` to that folder's prompt history (Up arrow), and runs your startup hooks like any `claude` start, so automatic checks are skipped when the last one is under 10 minutes old. A check that can't finish in 30 seconds (not logged in, a trust question) is stopped and the last numbers stay.
 - Every session is the unmodified `claude.exe`, run under your own login.
@@ -196,6 +200,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 ## Known limits
 
 - **Undocumented files.** Session status files, transcript records and file-history backups are internal to Claude Code and can change with any update. If they do, the affected field shows "—" instead of the app crashing.
+- **Model names and the Ultracode state.** The model list with its versions is kept by hand in the app, so a new model or a new version shows up after an update of CCWrapper. Ultracode's state is read from Claude Code's footer when it shows it, else it is the last value sent from the popup, and it is forgotten on restart.
 - **Files panel** only sees edits made with Claude's Edit and Write tools, not files changed by shell commands.
 - **Plan usage between checks** is as fresh as the last hidden `/usage`. On Pro and Max the live status line also updates it after each reply in a session open in the app; Team accounts get no live updates.
 - **Memory:** each open session is a full `claude.exe` (about 200–300 MB), so close the ones you don't need.
@@ -223,7 +228,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 497 tests on synthetic fixtures.
+- xUnit, with 602 tests on synthetic fixtures.
 
 ## Development
 
@@ -242,7 +247,7 @@ src/CCWrapper/             WPF app (Theme.xaml: colors and styles, App.xaml: Flu
 src/CCWrapper.StatusRelay/ silent relay: the statusLine → %LOCALAPPDATA%\CCWrapper\live, and the Browser tool's MCP server (--browser)
 tests/CCWrapper.Tests/     xUnit tests (one builds every view with the theme loaded)
 docs/                      the screenshot
-scripts/pack.ps1           builds the Velopack installer (CI: .github/workflows)
+scripts/pack.ps1           builds the Velopack installer (CI: .github/workflows; the bug form: .github/ISSUE_TEMPLATE)
 ```
 
 **Contributing.** Issues and pull requests are welcome; `main` only takes pull requests.

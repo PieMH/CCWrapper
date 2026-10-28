@@ -62,10 +62,21 @@ public partial class TerminalHost : UserControl
     }
 
     /// <summary>Relaunches an exited session in its terminal with <c>--resume &lt;SessionId&gt;</c> (the overlay's Resume).</summary>
-    public Task ResumeAsync(LiveSession session) =>
-        _tabs.TryGetValue(session.TabId, out var tab) && tab.Pty is null && tab.Size is null && tab.Options is { } o && session.SessionId is { } id
-            ? OpenAsync(session, o with { ResumeId = id, Name = null, Fork = false }) // a copy resumes as itself: its id was adopted
-            : Task.CompletedTask;
+    public Task ResumeAsync(LiveSession session)
+    {
+        if (!(_tabs.TryGetValue(session.TabId, out var tab) && tab.Pty is null && tab.Size is null && tab.Options is { } o && session.SessionId is { } id))
+            return Task.CompletedTask;
+        var options = ResumeOptions(o, session.Cwd, id); // a copy resumes as itself: its id was adopted
+        if (Directory.Exists(options.Cwd)) return OpenAsync(session, options);
+        // Claude Code may remove an exited --worktree session's folder; same message as a session-list open (MainWindow.FolderGone)
+        var owner = Window.GetWindow(this);
+        Dispatcher.BeginInvoke(() => Views.Dialog.Show(owner, $"The session's folder does not exist any more:\n{options.Cwd}", "Cannot resume", MessageBoxButton.OK, MessageBoxImage.Warning)); // not inside the WebView2 message handler: its modal loop would stall the page
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Resume in the folder the session runs in now (a <c>--worktree</c> tab: the worktree root, where its transcript is), else the launch folder.</summary>
+    internal static LaunchOptions ResumeOptions(LaunchOptions launched, string? cwd, string id) =>
+        launched with { Cwd = cwd ?? launched.Cwd, ResumeId = id, Name = null, Fork = false };
 
     /// <summary>Brings the session's terminal forward; the others keep running hidden.</summary>
     public void Show(LiveSession session)

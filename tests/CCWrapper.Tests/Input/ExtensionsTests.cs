@@ -85,6 +85,93 @@ public sealed class ExtensionsTests
     }
 
     [Fact]
+    public void Show_more_raises_the_cap_with_the_same_query_filter_and_order()
+    {
+        var catalog = Enumerable.Range(1, 150).Select(i => new CatalogEntry($"p{i}@m", $"plug{i}", "", i % 2 == 0 ? "m" : "x", i)).ToList();
+
+        var (first, matches) = PluginData.Search(catalog, "plug", "m", 60);
+        var (second, again) = PluginData.Search(catalog, "plug", "m", 120);
+
+        Assert.Equal((60, 75, 75), (first.Count, matches, again));
+        Assert.Equal(75, second.Count); // everything shown: the button is hidden when matches == shown
+        Assert.Equal(first.Select(c => c.Id), second.Take(60).Select(c => c.Id)); // same order, the top results stay first
+        Assert.Equal("p150@m", second[0].Id);
+    }
+
+    const string MarketplaceJson = """
+        { "name": "mk", "plugins": [
+          { "name": "other", "source": "./plugins/other" },
+          { "name": "alpha", "version": "1.2.0", "author": { "name": "Ann", "email": "a@x.test" }, "homepage": "https://alpha.test",
+            "repository": { "url": "https://github.com/ann/alpha" }, "license": "MIT", "keywords": ["k1", "k2"], "tags": ["k2", "k3"],
+            "category": "tools", "source": "./plugins/alpha" } ] }
+        """;
+
+    [Fact]
+    public void The_marketplace_manifest_gives_every_field_and_the_missing_ones_stay_empty()
+    {
+        var m = PluginData.ParseManifest(Parse(MarketplaceJson), "alpha", "https://github.com/owner/market");
+
+        Assert.Equal(("1.2.0", "Ann", "https://alpha.test", "https://github.com/ann/alpha", "MIT", "tools"),
+            (m.Version, m.Author, m.Homepage, m.Repository, m.License, m.Category));
+        Assert.Equal(["k1", "k2", "k3"], m.Keywords);
+        Assert.Equal("https://github.com/owner/market/tree/HEAD/plugins/alpha", m.SourceUrl);
+
+        var none = PluginData.ParseManifest(Parse(MarketplaceJson), "missing", "https://github.com/owner/market");
+        Assert.Equal((null, null, null, null, null, null, 0), (none.Version, none.Author, none.Homepage, none.Repository, none.License, none.Category, none.Keywords.Count));
+        Assert.Null(none.SourceUrl);
+        Assert.Null(PluginData.ParseManifest(default, "alpha", null).SourceUrl);
+        Assert.Equal("Ann", PluginData.ParseManifest(Parse("""{ "plugins": [ { "name": "a", "author": "Ann" } ] }"""), "a", null).Author);
+    }
+
+    [Theory]
+    [InlineData("""{ "source": "github", "repo": "o/r" }""", "https://github.com/o/r")]
+    [InlineData("""{ "source": "github", "repo": "o/r", "ref": "v1", "path": "sub/dir" }""", "https://github.com/o/r/tree/v1/sub/dir")]
+    [InlineData("""{ "source": "url", "url": "https://github.com/o/r.git", "sha": "abc" }""", "https://github.com/o/r")]
+    [InlineData("""{ "source": "git-subdir", "url": "https://github.com/o/r.git", "path": "plugins/x", "ref": "v1.5" }""", "https://github.com/o/r/tree/v1.5/plugins/x")]
+    [InlineData("""{ "source": "git", "url": "git@github.com:o/r.git" }""", "https://github.com/o/r")]
+    [InlineData("""{ "source": "url", "url": "https://git.example.test/o/r.git", "path": "p" }""", "https://git.example.test/o/r")]
+    [InlineData("""{ "source": "url", "url": "file:///C:/repo" }""", null)]
+    [InlineData("""{ "source": "url", "url": "ssh://git@host/o/r" }""", null)]
+    [InlineData("""{ "source": "npm", "package": "x" }""", null)]
+    [InlineData("""{ "source": "github", "repo": "javascript:alert(1)" }""", null)]
+    [InlineData("""42""", null)]
+    public void The_source_url_comes_from_the_source_entry_and_only_http_s(string source, string? expected) =>
+        Assert.Equal(expected, PluginData.SourceUrl(Parse(source), "https://github.com/m/market"));
+
+    [Fact]
+    public void A_relative_source_needs_a_github_marketplace()
+    {
+        var rel = Parse("\"./plugins/x\"");
+        Assert.Equal("https://github.com/m/market/tree/HEAD/plugins/x", PluginData.SourceUrl(rel, "https://github.com/m/market"));
+        Assert.Equal("https://github.com/m/market", PluginData.SourceUrl(Parse("\"./\""), "https://github.com/m/market"));
+        Assert.Equal("https://git.example.test/m", PluginData.SourceUrl(rel, "https://git.example.test/m"));
+        Assert.Null(PluginData.SourceUrl(rel, null));
+    }
+
+    [Fact]
+    public void A_known_marketplace_gives_its_folder_and_repo_and_the_manifest_is_read_from_the_folder()
+    {
+        var known = Parse("""
+            { "a": { "source": { "source": "github", "repo": "o/r" }, "installLocation": "C:\\m\\a" },
+              "b": { "source": { "source": "directory", "path": "C:\\Local" }, "installLocation": "C:\\m\\b" } }
+            """);
+        Assert.Equal(("C:\\m\\a", "https://github.com/o/r"), PluginData.ParseKnownMarketplace(known, "a"));
+        Assert.Equal(("C:\\m\\b", null), PluginData.ParseKnownMarketplace(known, "b"));
+        Assert.Equal((null, null), PluginData.ParseKnownMarketplace(known, "none"));
+
+        var dir = Directory.CreateTempSubdirectory("mk");
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(dir.FullName, ".claude-plugin"));
+            File.WriteAllText(Path.Combine(dir.FullName, ".claude-plugin", "marketplace.json"), MarketplaceJson);
+            Assert.Equal("MIT", PluginData.ReadManifest(dir.FullName, "alpha", null).License);
+            Assert.Null(PluginData.ReadManifest(Path.Combine(dir.FullName, "nope"), "alpha", null).License);
+            Assert.Null(PluginData.ReadManifest(null, "alpha", null).License);
+        }
+        finally { dir.Delete(true); }
+    }
+
+    [Fact]
     public void Marketplaces_name_where_they_come_from()
     {
         var markets = PluginData.ParseMarketplaces(Parse("""

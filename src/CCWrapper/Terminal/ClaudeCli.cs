@@ -69,6 +69,14 @@ public static class ClaudeCli
         return new CliResult(process.ExitCode, Plain(await stdout), Plain(await stderr));
     }
 
+    /// <summary>The first line of <c>claude --version</c>, or null when claude is missing, fails or takes over 10 s. Starts the
+    /// process off the calling (UI) thread. The version does not depend on the account.</summary>
+    public static async Task<string?> VersionAsync(Account account)
+    {
+        try { return await Task.Run(() => RunAsync(account, null, ["--version"], TimeSpan.FromSeconds(10))) is { Ok: true, Line.Length: > 0 } r ? r.Line : null; }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or IOException) { return null; } // no claude.exe
+    }
+
     static string Plain(string text) => Regex.Replace(text, @"\x1b\[[0-9;?]*[A-Za-z]", "").Trim();
 
     /// <summary>How a command reads in the status strip: <c>claude plugin disable x --scope user</c>, arguments with spaces quoted.</summary>

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CCWrapper.Core;
 
 namespace CCWrapper.Data;
@@ -18,8 +19,86 @@ public sealed record AccountInfo(
     DateTimeOffset? UsageFetchedAt, UsageWindow? FiveHour, UsageWindow? SevenDay,
     string? Model, string? Effort, string? DefaultMode);
 
+/// <summary>One read-only row of the Account page's "other configuration": <paramref name="Source"/> is the file it came from.</summary>
+public sealed record ConfigRow(string Source, string Key, string Value);
+
+/// <summary>What the Account page shows beyond <see cref="AccountInfo"/>. Every field is optional.</summary>
+public sealed record AccountFacts(string? AccountUuid, string? OrganizationUuid, string? InstallMethod, string? AutoUpdates,
+    IReadOnlyList<ConfigRow> Other);
+
+/// <summary>The browser pages of an account's own settings, chosen from its billing and organization type. One place for every URL.</summary>
+public static class AccountLinks
+{
+    const string Claude = "https://claude.ai/settings/", ConsoleHome = "https://platform.claude.com/";
+
+    /// <summary>Manage account, Usage and Billing as (label, https url). The Claude Console for API/console accounts, claude.ai
+    /// for subscriptions and for any account of unknown kind (the fallback). Billing only when an account is signed in.</summary>
+    public static List<(string Label, string Url)> For(AccountInfo info)
+    {
+        // organizationType of a subscription is "claude_pro", "claude_max", "claude_team", "claude_enterprise".
+        var console = info.OrganizationType is { Length: > 0 } t ? !t.StartsWith("claude", StringComparison.OrdinalIgnoreCase)
+            : info.BillingType is { } b && (b.Contains("api", StringComparison.OrdinalIgnoreCase) || b.Contains("prepaid", StringComparison.OrdinalIgnoreCase));
+        // Console: /usage and /settings/billing are in Anthropic's help center (support.claude.com articles 9534590 and 8977456). It has
+        // no documented profile page, so "Manage account" opens the Console home rather than a guessed path.
+        var links = console
+            ? new List<(string, string)> { ("Manage account", ConsoleHome), ("Usage", ConsoleHome + "usage") }
+            : new List<(string, string)> { ("Manage account", Claude + "account"), ("Usage", Claude + "usage") };
+        if (info.Email is not null || info.BillingType is not null) links.Add(("Billing", (console ? ConsoleHome + "settings/" : Claude) + "billing"));
+        return links;
+    }
+}
+
 public static class AccountReader
 {
+    // Keys another Settings page edits (settings.json, or the leftovers of older versions in .claude.json), or that are noise.
+    static readonly HashSet<string> Handled = new(StringComparer.Ordinal)
+    {
+        "model", "modelSettings", "effortLevel", "outputStyle", "language", "theme", "timeFormat", "autoUpdatesChannel", "attribution",
+        "disableClaudeAiConnectors", "permissions", "hooks", "env", "autoCompactEnabled", "fileCheckpointingEnabled", "verbose",
+        "showTurnDuration", "spinnerTipsEnabled", "prefersReducedMotion", "terminalProgressBarEnabled", "respectGitignore", "editorMode",
+        "preferredNotifChannel", "installMethod", "autoUpdates", "userID", "anonymousId",
+    };
+
+    // Anything secret-like stays out, whatever the file or value.
+    static readonly Regex Secret = new("key|token|secret|auth|credential|password", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>The scalar preferences of .claude.json and the settings.json keys no other Settings page edits, secret-looking
+    /// keys, caches and everything nested (projects, history, oauthAccount) left out. settings.json objects and arrays show as a size.</summary>
+    public static List<ConfigRow> OtherConfig(JsonElement global, JsonElement settings) =>
+        Rows(".claude.json", global, false).Concat(Rows("settings.json", settings, true)).ToList();
+
+    static IEnumerable<ConfigRow> Rows(string source, JsonElement root, bool summarize)
+    {
+        if (root.ValueKind != JsonValueKind.Object) yield break;
+        foreach (var p in root.EnumerateObject().OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            if (Handled.Contains(p.Name) || Secret.IsMatch(p.Name) || p.Name.StartsWith("cached", StringComparison.Ordinal)) continue;
+            var v = p.Value;
+            var text = v.ValueKind switch
+            {
+                JsonValueKind.String => v.GetString() is { Length: > 120 } l ? l[..120] + "…" : v.GetString(),
+                JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => v.GetRawText(),
+                JsonValueKind.Object when summarize => $"{{{v.EnumerateObject().Count()} keys}}",
+                JsonValueKind.Array when summarize => $"[{v.GetArrayLength()} items]",
+                _ => null,
+            };
+            if (text is not null) yield return new(source, p.Name, text);
+        }
+    }
+
+    /// <summary>The Account page's facts; off the UI thread like <see cref="Read"/>.</summary>
+    public static AccountFacts ReadFacts(Account account)
+    {
+        using var global = JsonUtil.Load(account.GlobalConfigPath);
+        using var settings = JsonUtil.Load(account.Paths.Settings);
+        var g = global?.RootElement ?? default;
+        var oauth = g.Prop("oauthAccount");
+        var auto = g.Prop("autoUpdates");
+        return new(oauth.Prop("accountUuid").Str(), oauth.Prop("organizationUuid").Str(), g.Prop("installMethod").Str(),
+            auto.ValueKind is JsonValueKind.True or JsonValueKind.False ? auto.GetRawText() : null,
+            OtherConfig(g, settings?.RootElement ?? default));
+    }
+
     /// <summary>Reads .claude.json and settings.json; a missing or unparsable file just leaves its fields null.
     /// Blocks up to ~120 ms if a file is being rewritten, so call it off the UI thread.</summary>
     public static AccountInfo Read(Account account)

@@ -41,6 +41,11 @@ public sealed record MarketplaceInfo(string Name, string Source, string? Where)
     };
 }
 
+/// <summary>What a marketplace's own manifest says about one plugin; every field optional. <see cref="SourceUrl"/> is an
+/// http(s) address of the plugin's source, or null when none can be derived.</summary>
+public sealed record PluginManifest(string? Version, string? Author, string? Homepage, string? Repository, string? License,
+    IReadOnlyList<string> Keywords, string? Category, string? SourceUrl);
+
 /// <param name="Kind">Skills, Agents, Hooks, MCP servers, LSP servers…</param>
 public sealed record PluginComponent(string Kind, int Count, string Names);
 
@@ -104,6 +109,71 @@ public static class PluginData
             .OrderByDescending(c => c.Installs).ToList();
         return (hits.Take(take).ToList(), hits.Count);
     }
+
+    /// <summary>Where <paramref name="marketplace"/> is cloned and the web address of its repo (null when it has none), from
+    /// <c>plugins\known_marketplaces.json</c>.</summary>
+    public static (string? Folder, string? RepoUrl) ParseKnownMarketplace(JsonElement root, string marketplace)
+    {
+        var m = root.Prop(marketplace);
+        return (m.Prop("installLocation").Str(), RepoUrl(m.Prop("source")));
+    }
+
+    /// <summary>The manifest entry of <paramref name="plugin"/> in the marketplace's <c>marketplace.json</c>. <paramref name="repoUrl"/>
+    /// is the marketplace's own repo, which a relative plugin source lives in.</summary>
+    public static PluginManifest ParseManifest(JsonElement marketplaceJson, string plugin, string? repoUrl)
+    {
+        var e = marketplaceJson.Prop("plugins") is { ValueKind: JsonValueKind.Array } list
+            ? list.EnumerateArray().FirstOrDefault(p => p.Prop("name").Str() == plugin) : default;
+        var author = e.Prop("author");
+        var repository = e.Prop("repository");
+        return new(e.Prop("version").Str(), author.Str() ?? author.Prop("name").Str(), e.Prop("homepage").Str(),
+            repository.Str() ?? repository.Prop("url").Str(), e.Prop("license").Str(),
+            Strings(e.Prop("keywords")).Concat(Strings(e.Prop("tags"))).Distinct().ToList(), e.Prop("category").Str(),
+            SourceUrl(e.Prop("source"), repoUrl));
+    }
+
+    /// <summary>The plugin's <c>marketplace.json</c> entry read from its cloned marketplace folder; all-empty when the file is
+    /// missing or unreadable.</summary>
+    public static PluginManifest ReadManifest(string? folder, string plugin, string? repoUrl)
+    {
+        try
+        {
+            if (folder is not null)
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(folder, ".claude-plugin", "marketplace.json")));
+                return ParseManifest(doc.RootElement, plugin, repoUrl);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // a marketplace without a readable manifest just shows fewer fields
+        }
+        return ParseManifest(default, plugin, repoUrl);
+    }
+
+    /// <summary>Web address of a plugin's source: a relative path inside a GitHub marketplace, a github repo, or a git/url source
+    /// with its optional path and ref. Only http and https come out.</summary>
+    public static string? SourceUrl(JsonElement source, string? marketplaceRepoUrl)
+    {
+        if (source.Str() is { } rel) // "./plugins/x": inside the marketplace's repo
+            return marketplaceRepoUrl is null ? null : InRepo(marketplaceRepoUrl, rel.Trim().TrimStart('.', '/'), null);
+        return RepoUrl(source) is { } repo ? InRepo(repo, source.Prop("path").Str()?.Trim().TrimStart('.', '/'), source.Prop("ref").Str() ?? source.Prop("sha").Str()) : null;
+    }
+
+    /// <summary>The repo behind a {"source": "github", "repo"} or git/url source, as an http(s) address.</summary>
+    static string? RepoUrl(JsonElement source)
+    {
+        var url = source.Prop("repo").Str() is { Length: > 0 } repo && !repo.Contains(':') ? "https://github.com/" + repo : source.Prop("url").Str();
+        if (url is null) return null;
+        var scp = Regex.Match(url, @"^git@(?<host>[^:]+):(?<path>.+)$"); // git@github.com:owner/repo.git
+        if (scp.Success) url = $"https://{scp.Groups["host"].Value}/{scp.Groups["path"].Value}";
+        if (url.EndsWith(".git")) url = url[..^4];
+        return Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme is "http" or "https" ? u.AbsoluteUri.TrimEnd('/') : null;
+    }
+
+    // shortcut: a /tree/ link only for github.com; other hosts get the repo root.
+    static string InRepo(string repo, string? path, string? gitRef) =>
+        string.IsNullOrEmpty(path) || !repo.StartsWith("https://github.com/") ? repo : $"{repo}/tree/{gitRef ?? "HEAD"}/{path.Replace('\\', '/')}";
 
     /// <summary><c>claude plugin marketplace list --json</c>, ordered by name.</summary>
     public static List<MarketplaceInfo> ParseMarketplaces(JsonElement root) =>

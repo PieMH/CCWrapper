@@ -10,6 +10,7 @@
     <SolidColorBrush x:Key="Text" Color="#E4E8EE" />
     <SolidColorBrush x:Key="TextSoft" Color="#C9D0D9" />
     <SolidColorBrush x:Key="Muted" Color="#8A94A1" />
+    <SolidColorBrush x:Key="TextDim" Color="#AEB7C2" />
     <SolidColorBrush x:Key="TerminalBg" Color="#101215" />
     <SolidColorBrush x:Key="Accent" Color="#4A9BE8" />
     <SolidColorBrush x:Key="AccentFill" Color="#2B74C2" />
@@ -18,7 +19,7 @@
     <SolidColorBrush x:Key="Bad" Color="#F08F86" />
     <SolidColorBrush x:Key="BadLine" Color="#5A3A38" />
     <SolidColorBrush x:Key="Selected" Color="#262B33" />
-    <!-- A slash command in the compose box: the known one the text starts with, and the names in the "/" list -->
+    <!-- A slash command in the compose box: a known one anywhere in the text, and the names in the "/" list -->
     <SolidColorBrush x:Key="SlashText" Color="#5DB0F5" />
     <SolidColorBrush x:Key="SwitchOff" Color="#4A515C" />
     <!-- A settings row with an unsaved change -->
@@ -531,5 +532,12 @@
         <Setter Property="Height" Value="6" />
         <Setter Property="CornerRadius" Value="3" />
         <Setter Property="Margin" Value="0,4" />
+    </Style>
+    <!-- A row of the bottom bar's model/effort/mode popup: hover and keyboard focus come from Flat -->
+    <Style x:Key="PopupRow" TargetType="Button" BasedOn="{StaticResource Flat}">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="8,0" />
+        <Setter Property="Margin" Value="0,0,0,1" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     </Style>
 </ResourceDictionary>

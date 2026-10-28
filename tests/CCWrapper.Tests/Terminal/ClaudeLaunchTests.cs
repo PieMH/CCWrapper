@@ -34,6 +34,15 @@ public sealed class ClaudeLaunchTests : IDisposable
     }
 
     [Fact]
+    public void Args_worktree_flag_is_for_new_sessions_only_and_comes_last()
+    {
+        Assert.Equal(["--session-id", "s1", "--model", "opus", "--worktree"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", Model: "opus", Worktree: true), "s1", null));
+        Assert.Equal(["--resume", "old"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", ResumeId: "old", Worktree: true), "x", null));
+        Assert.Equal(["--resume", "old", "--fork-session"], ClaudeLaunch.Args(new LaunchOptions(@"C:\p", ResumeId: "old", Fork: true, Worktree: true), "x", null));
+        Assert.DoesNotContain("--worktree", ClaudeLaunch.Args(new LaunchOptions(@"C:\p"), "s1", null));
+    }
+
+    [Fact]
     public void Args_with_the_browser_tool_keep_mcp_config_followed_by_a_flag()
     {
         var args = ClaudeLaunch.Args(new LaunchOptions(@"C:\p", Model: "opus"), "s1", @"{""statusLine"":1}", "{\"mcpServers\":{}}");

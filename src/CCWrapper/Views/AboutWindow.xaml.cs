@@ -1,11 +1,15 @@
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using CCWrapper.Core;
+using CCWrapper.Terminal;
 
 namespace CCWrapper.Views;
 
-/// <summary>Version, the update switch (applies at once, saved in app.json) and the project's documents on GitHub.</summary>
+/// <summary>Version, the update switch (applies at once, saved in app.json), the project's documents on GitHub and the bug
+/// report button, which only opens the prefilled issue form in the browser.</summary>
 public partial class AboutWindow : Window
 {
     static readonly (string Label, string File)[] Documents =
@@ -33,4 +37,31 @@ public partial class AboutWindow : Window
     }
 
     void OnSwitch(object sender, RoutedEventArgs e) => AppUpdate.SetEnabled(UpdateSwitch.IsChecked == true);
+
+    /// <summary>The GitHub issue form with the versions filled in. Nothing leaves the PC until the user submits it there; the
+    /// Claude Code field is left out when it is unknown.</summary>
+    public static string BugReportUrl(string appVersion, string windows, string? claudeVersion)
+    {
+        var url = $"{AppUpdate.Repo}/issues/new?template=bug_report.yml&app-version={Uri.EscapeDataString(appVersion)}&windows={Uri.EscapeDataString(windows)}";
+        if (!string.IsNullOrWhiteSpace(claudeVersion)) url += "&claude-version=" + Uri.EscapeDataString(claudeVersion);
+        return url;
+    }
+
+    async void OnBugReport(object sender, RoutedEventArgs e)
+    {
+        BugButton.IsEnabled = false; // one browser tab per click, however fast the clicks come
+        BugNote.Text = "Checking the Claude Code version…";
+        BugNote.Visibility = Visibility.Visible;
+        try
+        {
+            // The version does not depend on the account: the open window's, else the default profile (~\.claude) a bare claude would use.
+            var account = AppState.Current?.Account ?? new Account("a", null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json"), "");
+            var claudeVersion = await ClaudeCli.VersionAsync(account);
+            BugNote.Visibility = Visibility.Collapsed;
+            var url = BugReportUrl(AppUpdate.Version, RuntimeInformation.OSDescription, claudeVersion);
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (System.ComponentModel.Win32Exception) { BugNote.Text = "Could not open the browser. Open this address yourself: " + url; BugNote.Visibility = Visibility.Visible; }
+        }
+        finally { BugButton.IsEnabled = true; }
+    }
 }

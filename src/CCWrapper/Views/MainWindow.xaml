@@ -14,13 +14,17 @@
                 <Border x:Name="GitChip" DockPanel.Dock="Right" Height="26" Padding="10,0" CornerRadius="6" Background="{StaticResource Raised}" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{StaticResource GitIcon}" Stroke="{StaticResource Muted}" StrokeThickness="1.6" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
-                        <TextBlock x:Name="GitAccount" Text="git: none" Foreground="#AEB7C2" Margin="7,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock x:Name="GitAccount" Text="git: none" Foreground="{StaticResource TextDim}" Margin="7,0,0,0" VerticalAlignment="Center" />
                         <TextBlock x:Name="GitBranchSep" Text="·" Foreground="#4A525D" Margin="6,0" VerticalAlignment="Center" Visibility="Collapsed" />
                         <TextBlock x:Name="GitBranch" FontWeight="SemiBold" VerticalAlignment="Center" />
                         <TextBlock x:Name="GitAhead" Foreground="{StaticResource Accent}" Margin="6,0,0,0" VerticalAlignment="Center" />
                         <TextBlock x:Name="GitBehind" Foreground="{StaticResource Warn}" Margin="4,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
+                <StackPanel x:Name="WorktreeBox" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0" Background="Transparent">
+                    <TextBlock Text="Worktree" Foreground="{StaticResource TextDim}" VerticalAlignment="Center" />
+                    <ToggleButton x:Name="WorktreeSwitch" Style="{StaticResource Switch}" Margin="4,0,0,0" AutomationProperties.Name="Start new sessions in a git worktree" />
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Image Source="/logo.png" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="CCWrapper" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />

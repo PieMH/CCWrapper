@@ -44,6 +44,8 @@ public sealed class SubagentReaderTests : IDisposable
         Assert.Equal(5 + 8, run.OutputTokens);
         Assert.Equal(2, run.ToolUseCount);
         Assert.Equal(DateTimeOffset.Parse("2026-01-01T10:00:03Z"), run.LastActivity);
+        Assert.Equal(DateTimeOffset.Parse("2026-01-01T10:00:01Z"), run.FirstActivity);
+        Assert.Equal(203 + 13, run.Tokens);
         Assert.Equal(runPath, run.TranscriptPath);
 
         Assert.Equal("done", done.AgentId);

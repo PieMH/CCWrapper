@@ -43,7 +43,7 @@
             <Border Style="{StaticResource Sep}" />
             <!-- ClickMode=Press: the click that closes the popup is the same mouse-down the 250 ms guard measures. A Button: it takes Win32 focus off the terminal's WebView2 when clicked, and has an automation peer for screen readers. -->
             <Button x:Name="UsageGroup" Style="{StaticResource Chip}" Padding="6,0" Margin="0" ToolTipOpening="OnUsageTip"
-                    AutomationProperties.Name="Plan usage details" ClickMode="Press" GotKeyboardFocus="OnUsageFocus" Click="OnUsageClick">
+                    AutomationProperties.Name="Plan usage details" ClickMode="Press" GotKeyboardFocus="OnChipFocus" Click="OnUsageClick">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="5h" Style="{StaticResource Dim}" />
                     <Border Style="{StaticResource MeterTrack}"><Border x:Name="FiveHourBar" Style="{StaticResource Bar}" /></Border>
@@ -68,27 +68,34 @@
             </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal">
-            <Button x:Name="ModelButton" Style="{StaticResource Chip}" Click="OnModel">
+            <Button x:Name="ModelButton" Style="{StaticResource Chip}" ClickMode="Press" GotKeyboardFocus="OnChipFocus" Click="OnModel">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="model " Style="{StaticResource Dim}" />
                     <TextBlock x:Name="ModelValue" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="8" Margin="6,1,0,0" />
                 </StackPanel>
             </Button>
-            <Button x:Name="EffortButton" Style="{StaticResource Chip}" Click="OnEffort">
+            <Button x:Name="EffortButton" Style="{StaticResource Chip}" ClickMode="Press" GotKeyboardFocus="OnChipFocus" Click="OnEffort">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="effort " Style="{StaticResource Dim}" />
                     <TextBlock x:Name="EffortValue" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="8" Margin="6,1,0,0" />
                 </StackPanel>
             </Button>
-            <Button x:Name="ModeButton" Style="{StaticResource Chip}" Click="OnMode">
+            <Button x:Name="ModeButton" Style="{StaticResource Chip}" ClickMode="Press" GotKeyboardFocus="OnChipFocus" Click="OnMode">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="mode " Style="{StaticResource Dim}" />
                     <TextBlock x:Name="ModeValue" FontWeight="SemiBold" />
                     <TextBlock Style="{StaticResource Icon}" Text="&#xE70D;" FontSize="8" Margin="6,1,0,0" />
                 </StackPanel>
             </Button>
+            <!-- The model/effort/mode chooser: the usage popup's frame and the same close rules (OnWindowMouseDown, OnChoiceFocusWithin, Esc), see the comment on UsagePopup.
+                 ClickMode=Press on the chips, for the same reason as on UsageGroup. The rows are built in code (Open). -->
+            <Popup x:Name="ChoicePopup" Placement="Top" StaysOpen="True" AllowsTransparency="True" Closed="OnChoiceClosed">
+                <Border x:Name="ChoicePanel" Style="{StaticResource UsagePanel}" Width="260" Padding="6" Focusable="True" PreviewKeyDown="OnChoiceKey" IsKeyboardFocusWithinChanged="OnChoiceFocusWithin">
+                    <StackPanel x:Name="ChoiceBody" KeyboardNavigation.DirectionalNavigation="Cycle" KeyboardNavigation.TabNavigation="Cycle" />
+                </Border>
+            </Popup>
             <Button x:Name="UpdateButton" Style="{StaticResource Chip}" Visibility="Collapsed" Margin="8,0,0,0" Click="OnUpdate"
                     ToolTip="Restart CCWrapper to install it. Otherwise it installs when CCWrapper closes.">
                 <StackPanel Orientation="Horizontal">
