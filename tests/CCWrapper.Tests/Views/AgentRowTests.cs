@@ -13,10 +13,12 @@ public sealed class AgentRowTests
     [InlineData("claude-opus-4-20250514", "Opus 4")]
     [InlineData("gpt-5", "gpt-5")]
     [InlineData("claude-opus-5-5[1m]", "claude-opus-5-5[1m]")]
-    public void Model_id_becomes_a_display_name(string id, string expected) => Assert.Equal(expected, AgentRow.ModelName(id));
+    [InlineData("claude-fable-5-1", "Fable 5.1")]
+    [InlineData("claude-opus-5-5-20260101", "Opus 5.5")]
+    public void Model_id_becomes_a_display_name(string id, string expected) => Assert.Equal(expected, BarFormat.ModelLabel(id));
 
     [Fact]
-    public void Missing_model_stays_missing() => Assert.Null(AgentRow.ModelName(null));
+    public void Missing_model_stays_missing() => Assert.Null(BarFormat.ModelLabel(null));
 
     [Fact]
     public void Duration_is_first_to_last_activity_or_to_now_while_running()
@@ -50,6 +52,8 @@ public sealed class AgentRowTests
         Assert.True(AgentRow.Matches(info, ""));
         Assert.True(AgentRow.Matches(info, "scan the repo"));
         Assert.True(AgentRow.Matches(info, "PURPOSE"));
+        Assert.True(AgentRow.Matches(info, "  scan the repo "));
+        Assert.True(AgentRow.Matches(info, "   "));
         Assert.False(AgentRow.Matches(info, "zzz"));
         Assert.False(AgentRow.Matches(info with { Description = null, AgentType = null }, "scan"));
     }

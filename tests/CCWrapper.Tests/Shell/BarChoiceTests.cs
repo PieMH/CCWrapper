@@ -8,9 +8,20 @@ public sealed class BarChoiceTests
     [InlineData("opus", "Opus 5.5")]
     [InlineData("Fable", "Fable 5.1")]
     [InlineData("Opus 5.5", "Opus 5.5")] // a display name is left alone
-    [InlineData("claude-opus-5-5", "claude-opus-5-5")]
+    [InlineData("claude-opus-5-5", "Opus 5.5")] // a full id gets its version too (was raw before F1)
+    [InlineData("claude-sonnet-5-5", "Sonnet 5.5")]
+    [InlineData("claude-fable-5-1", "Fable 5.1")]
+    [InlineData("gpt-5", "gpt-5")]
     [InlineData(null, null)]
-    public void Bare_model_aliases_get_their_version(string? model, string? label) => Assert.Equal(label, BarFormat.ModelLabel(model));
+    public void Bare_model_aliases_and_full_ids_get_their_version(string? model, string? label) => Assert.Equal(label, BarFormat.ModelLabel(model));
+
+    [Theory]
+    [InlineData("claude-opus-5-5-20260101", "Opus 5.5")]
+    [InlineData("claude-haiku-4-5-20251001", "Haiku 4.5")]
+    [InlineData("claude-sonnet-5", "Sonnet 5")]
+    [InlineData("claude-opus-5-5[1m]", null)]
+    [InlineData("Opus 5.5", null)]
+    public void Model_name_reads_any_family_from_a_full_id(string id, string? name) => Assert.Equal(name, BarFormat.ModelName(id));
 
     [Fact]
     public void Model_table_covers_the_aliases_and_only_fable_has_a_note()

@@ -561,9 +561,17 @@ public static class BarFormat
         ("opus", "Opus 5.5", null), ("sonnet", "Sonnet 5.5", null), ("haiku", "Haiku 5.5", null), ("fable", "Fable 5.1", "runs on usage credits"),
     ];
 
-    /// <summary>The versioned name of a bare alias ("opus" gives "Opus 5.5"); anything else (a display name, an id) as it is.</summary>
+    static readonly Regex ModelId = new(@"^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$");
+
+    /// <summary>"claude-opus-5-5" gives "Opus 5.5", "claude-fable-5-1-20260101" gives "Fable 5.1"; null for any other shape.</summary>
+    public static string? ModelName(string? id) =>
+        id is not null && ModelId.Match(id) is { Success: true } m
+            ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..]} {m.Groups[2].Value}{(m.Groups[3].Success ? "." + m.Groups[3].Value : "")}"
+            : null;
+
+    /// <summary>The versioned name of a bare alias ("opus" gives "Opus 5.5") or of a full id; anything else (a display name) as it is.</summary>
     public static string? ModelLabel(string? model) =>
-        Models.Where(m => m.Alias.Equals(model, StringComparison.OrdinalIgnoreCase)).Select(m => m.Label).FirstOrDefault() ?? model;
+        Models.Where(m => m.Alias.Equals(model, StringComparison.OrdinalIgnoreCase)).Select(m => m.Label).FirstOrDefault() ?? ModelName(model) ?? model;
 
     static readonly Dictionary<string, string> FooterModes = new()
     {

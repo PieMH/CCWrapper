@@ -108,12 +108,10 @@ public partial class AgentsPanel : UserControl
 /// <summary>One row of the Agents list. Record equality lets <see cref="AgentsPanel"/> skip rows that did not change.</summary>
 public sealed record AgentRow(SubagentInfo Info, string Age, string? Duration)
 {
-    static readonly Regex ModelId = new(@"^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$");
-
     public bool IsRunning => Info.IsRunning;
     public string Title => Info.Description ?? Info.AgentType ?? Info.AgentId;
     /// <summary>"Opus 5.5 · 114.1k tokens · high"; what is unknown is left out.</summary>
-    public string Subtitle => string.Join(" · ", new[] { ModelName(Info.Model), Info.Tokens is { } t ? Tokens(t) + " tokens" : null, Info.Effort }.Where(s => !string.IsNullOrEmpty(s)));
+    public string Subtitle => string.Join(" · ", new[] { BarFormat.ModelLabel(Info.Model),Info.Tokens is { } t ? Tokens(t) + " tokens" : null, Info.Effort }.Where(s => !string.IsNullOrEmpty(s)));
     /// <summary>The hover text: the agent type and the numbers behind the subtitle.</summary>
     public string Tooltip => Detail + "\n" + Stats;
     public string Detail => string.Join(" · ", new[] { Info.AgentType, ShortModel(Info.Model), Info.Effort }.Where(s => !string.IsNullOrEmpty(s)));
@@ -123,10 +121,13 @@ public sealed record AgentRow(SubagentInfo Info, string Age, string? Duration)
         new(info, info.LastActivity is { } t ? FormatAge(now - t) : "—",
             info.FirstActivity is { } first && (info.IsRunning ? now : info.LastActivity) is { } end ? FormatDuration(end - first) : null);
 
-    /// <summary>Case-insensitive match of the search text in the description or agent type; empty text matches all.</summary>
-    public static bool Matches(SubagentInfo info, string query) =>
-        query.Length == 0 || (info.Description?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)
-        || (info.AgentType?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false);
+    /// <summary>Case-insensitive match of the trimmed search text in the description or agent type; blank text matches all.</summary>
+    public static bool Matches(SubagentInfo info, string query)
+    {
+        var q = query.Trim();
+        return q.Length == 0 || (info.Description?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false)
+            || (info.AgentType?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
 
     public static string Tokens(long? n) => n switch
     {
@@ -155,9 +156,4 @@ public sealed record AgentRow(SubagentInfo Info, string Age, string? Duration)
     /// <summary>"claude-opus-4-5-20251101" -> "opus-4-5".</summary>
     public static string? ShortModel(string? model) => model is null ? null : Regex.Replace(model, @"^claude-|-\d{8}$", "");
 
-    /// <summary>"claude-opus-5-5" -> "Opus 5.5", "claude-sonnet-5" -> "Sonnet 5"; an id of another shape is returned as is.</summary>
-    public static string? ModelName(string? model) =>
-        model is not null && ModelId.Match(model) is { Success: true } m
-            ? $"{char.ToUpperInvariant(m.Groups[1].Value[0])}{m.Groups[1].Value[1..]} {m.Groups[2].Value}{(m.Groups[3].Success ? "." + m.Groups[3].Value : "")}"
-            : model;
 }
