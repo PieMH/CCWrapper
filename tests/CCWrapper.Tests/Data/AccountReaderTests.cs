@@ -58,6 +58,35 @@ public sealed class AccountReaderTests : IDisposable
     }
 
     [Fact]
+    public void Facts_list_other_config_without_secrets_or_edited_keys()
+    {
+        var a = _home.AddAccount("x", """
+            {"oauthAccount":{"accountUuid":"acc-1","organizationUuid":"org-1","emailAddress":"x@example.com"},
+             "installMethod":"native","autoUpdates":false,"numStartups":7,"primaryApiKey":"sk-ant-secret","customApiKeyResponses":{"approved":["x"]},
+             "userToken":"t","oauthToken":"t","projects":{"C:\\p":{}},"cachedUsageUtilization":{},"theme":"dark","hasCompletedOnboarding":true}
+            """);
+        FakeHome.WriteFile(a.Paths.Settings, """{"model":"opus","cleanupPeriodDays":14,"apiKeyHelper":"cmd","awsAuthRefresh":"x","statusLine":{"type":"command"},"permissions":{"allow":[]}}""");
+
+        var facts = AccountReader.ReadFacts(a);
+
+        Assert.Equal(("acc-1", "org-1", "native", "false"), (facts.AccountUuid, facts.OrganizationUuid, facts.InstallMethod, facts.AutoUpdates));
+        Assert.Equal(
+            [".claude.json hasCompletedOnboarding=true", ".claude.json numStartups=7", "settings.json cleanupPeriodDays=14", "settings.json statusLine={1 keys}"],
+            facts.Other.Select(r => $"{r.Source} {r.Key}={r.Value}"));
+    }
+
+    [Fact]
+    public void Links_follow_the_billing_kind()
+    {
+        static string[] Urls(string? org, string? billing, string? email = "x@example.com") =>
+            AccountLinks.For(new(email, null, null, org, billing, null, null, null, null, null, null)).Select(l => l.Url).ToArray();
+
+        Assert.Equal(["https://claude.ai/settings/account", "https://claude.ai/settings/usage", "https://claude.ai/settings/billing"], Urls("claude_max", "stripe"));
+        Assert.Equal(["https://console.anthropic.com/settings/profile", "https://console.anthropic.com/settings/usage", "https://console.anthropic.com/settings/billing"], Urls("api", "prepaid"));
+        Assert.Equal(["https://claude.ai/settings/account", "https://claude.ai/settings/usage"], Urls(null, null, null)); // nothing known: claude.ai, no Billing
+    }
+
+    [Fact]
     public void Tolerates_a_file_rewritten_mid_read()
     {
         var a = _home.AddAccount("x", """{"oauthAccount":{"emailAdd""");
