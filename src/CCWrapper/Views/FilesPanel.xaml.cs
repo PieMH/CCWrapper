@@ -1,9 +1,13 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CCWrapper.Core;
 using CCWrapper.Data;
@@ -15,6 +19,10 @@ public partial class FilesPanel : UserControl
     readonly SessionFollower<FileChanges, IReadOnlyList<FileChange>> _follower;
     IReadOnlyList<FileChange> _shown = [];
     List<FileNode> _roots = [];
+    string _none = "";
+    // folders the user collapsed in the full tree; kept while a search shows its own, fully expanded tree
+    HashSet<string> _collapsed = [];
+    bool _filtered;
 
     public FilesPanel()
     {
@@ -25,14 +33,66 @@ public partial class FilesPanel : UserControl
     /// <summary>Null = no session. Rebuilds the tree only when the list changed, so expansion survives the 2 s polls.</summary>
     void Show(IReadOnlyList<FileChange>? changes)
     {
-        Empty.Text = changes is null ? "No active session" : "No files changed yet";
+        _none = changes is null ? "No active session" : "No files changed yet";
         changes ??= [];
-        Empty.Visibility = changes.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        if (changes.SequenceEqual(_shown)) return;
-        var collapsed = FileTree.Walk(_roots).Where(n => n.IsFolder && !n.IsExpanded).Select(n => n.Key).ToHashSet();
+        if (changes.SequenceEqual(_shown)) { ShowEmpty(); return; }
         _shown = changes;
-        Tree.ItemsSource = _roots = FileTree.Build(changes, collapsed);
+        Rebuild();
     }
+
+    void OnSearch(object sender, TextChangedEventArgs e) => Rebuild();
+
+    void Rebuild()
+    {
+        var query = SearchBox.Text.Trim();
+        if (!_filtered) _collapsed = FileTree.Walk(_roots).Where(n => n.IsFolder && !n.IsExpanded).Select(n => n.Key).ToHashSet();
+        Tree.ItemsSource = _roots = FileTree.Build(FileTree.Filter(_shown, query), query.Length == 0 ? _collapsed : null);
+        _filtered = query.Length > 0;
+        ShowEmpty();
+    }
+
+    void ShowEmpty()
+    {
+        Empty.Text = _shown.Count > 0 ? "No files match" : _none;
+        Empty.Visibility = _roots.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Right-click (or the menu key) acts on the row it hit: select it, then show the entries that fit it.</summary>
+    void OnMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var d = e.OriginalSource as DependencyObject;
+        while (d is not null and not TreeViewItem) d = d is Visual ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+        if (d is not TreeViewItem { DataContext: FileNode { Location: { } path, IsFolder: var folder } } item) { e.Handled = true; return; }
+        item.IsSelected = true;
+        OpenWithItem.Visibility = folder ? Visibility.Collapsed : Visibility.Visible;
+        ExplorerItem.Header = folder ? "Open in File Explorer" : "Show in File Explorer";
+        // a deleted file is gone from disk, and Explorer would only open its folder
+        OpenWithItem.IsEnabled = ExplorerItem.IsEnabled = folder ? Directory.Exists(path) : File.Exists(path);
+    }
+
+    void OnOpenWith(object sender, RoutedEventArgs e)
+    {
+        if (Tree.SelectedItem is not FileNode { Location: { } path }) return;
+        var info = new OpenAsInfo { File = path, Flags = OaifAllowRegistration | OaifExec };
+        SHOpenWithDialog(Window.GetWindow(this) is { } w ? new WindowInteropHelper(w).Handle : IntPtr.Zero, ref info); // cancel is an error code too: nothing to report
+    }
+
+    void OnExplorer(object sender, RoutedEventArgs e)
+    {
+        if (Tree.SelectedItem is not FileNode { Location: { } path } node) return;
+        var psi = new ProcessStartInfo("explorer.exe");
+        foreach (var arg in FileTree.ExplorerArgs(path, node.IsFolder)) psi.ArgumentList.Add(arg);
+        try { Process.Start(psi)?.Dispose(); }
+        catch (Win32Exception) { } // no explorer.exe: nothing sensible to show
+    }
+
+    const uint OaifAllowRegistration = 1, OaifExec = 4;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct OpenAsInfo { public string File; public string? Class; public uint Flags; }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    static extern int SHOpenWithDialog(IntPtr parent, ref OpenAsInfo info);
 
     void OnDoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -55,6 +115,8 @@ public sealed class FileNode(string name, string key, FileChange? change = null)
     /// <summary>Identifies a folder across rebuilds, to keep it collapsed.</summary>
     public string Key { get; } = key;
     public FileChange? Change { get; } = change;
+    /// <summary>The path on disk; null for the "outside project" node, which stands for no folder.</summary>
+    public string? Location { get; init; } = change?.FullPath;
     public bool IsFolder => Change is null;
     public string Tip => Change?.FullPath ?? Name;
     public bool IsExpanded { get; set; } = true;
@@ -82,13 +144,18 @@ public static class FileTree
         {
             var dir = Path.GetDirectoryName(c.RelPath) ?? "";
             List<FileNode> list;
-            if (Path.IsPathRooted(c.RelPath)) list = Folder(outside.Children, dir, OutsideName + "\\" + dir).Children;
+            if (Path.IsPathRooted(c.RelPath)) list = Folder(outside.Children, dir, OutsideName + "\\" + dir, dir).Children;
             else
             {
                 list = roots;
                 var key = "";
-                foreach (var part in dir.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries))
-                    list = Folder(list, part, key += part + "\\").Children;
+                var parts = dir.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries);
+                for (var i = 0; i < parts.Length; i++)
+                {
+                    var folder = Path.GetDirectoryName(c.FullPath); // each folder is this many levels above the file's own
+                    for (var up = parts.Length - 1 - i; up > 0 && folder is not null; up--) folder = Path.GetDirectoryName(folder);
+                    list = Folder(list, parts[i], key += parts[i] + "\\", folder).Children;
+                }
             }
             list.Add(new FileNode(Path.GetFileName(c.RelPath), c.RelPath, c));
         }
@@ -101,13 +168,20 @@ public static class FileTree
         if (outside.Children.Count > 0) roots.Add(outside); // always last
         return roots;
 
-        FileNode Folder(List<FileNode> siblings, string name, string key)
+        FileNode Folder(List<FileNode> siblings, string name, string key, string? location)
         {
             var node = siblings.Find(n => n.IsFolder && n.Key == key);
-            if (node is null) siblings.Add(node = new FileNode(name, key));
+            if (node is null) siblings.Add(node = new FileNode(name, key) { Location = location });
             return node;
         }
     }
+
+    /// <summary>The changes whose relative path (so also the file name) contains <paramref name="query"/>, ignoring case; all of them for an empty query.</summary>
+    public static IEnumerable<FileChange> Filter(IEnumerable<FileChange> changes, string query) =>
+        query.Length == 0 ? changes : changes.Where(c => c.RelPath.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Explorer's arguments: a file is selected in its folder, a folder is opened. An argument list, never a command string.</summary>
+    public static string[] ExplorerArgs(string path, bool folder) => folder ? [path] : ["/select,", path];
 
     static int ByKindThenName(FileNode a, FileNode b) =>
         a.IsFolder != b.IsFolder ? (a.IsFolder ? -1 : 1) : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
