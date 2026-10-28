@@ -29,7 +29,7 @@ public sealed record AccountFacts(string? AccountUuid, string? OrganizationUuid,
 /// <summary>The browser pages of an account's own settings, chosen from its billing and organization type. One place for every URL.</summary>
 public static class AccountLinks
 {
-    const string Claude = "https://claude.ai/settings/", ConsoleSite = "https://console.anthropic.com/settings/";
+    const string Claude = "https://claude.ai/settings/", ConsoleHome = "https://platform.claude.com/";
 
     /// <summary>Manage account, Usage and Billing as (label, https url). The Claude Console for API/console accounts, claude.ai
     /// for subscriptions and for any account of unknown kind (the fallback). Billing only when an account is signed in.</summary>
@@ -38,9 +38,12 @@ public static class AccountLinks
         // organizationType of a subscription is "claude_pro", "claude_max", "claude_team", "claude_enterprise".
         var console = info.OrganizationType is { Length: > 0 } t ? !t.StartsWith("claude", StringComparison.OrdinalIgnoreCase)
             : info.BillingType is { } b && (b.Contains("api", StringComparison.OrdinalIgnoreCase) || b.Contains("prepaid", StringComparison.OrdinalIgnoreCase));
-        var site = console ? ConsoleSite : Claude;
-        var links = new List<(string, string)> { ("Manage account", console ? site + "profile" : site + "account"), ("Usage", site + "usage") };
-        if (info.Email is not null || info.BillingType is not null) links.Add(("Billing", site + "billing"));
+        // Console: /usage and /settings/billing are in Anthropic's help center (support.claude.com articles 9534590 and 8977456). It has
+        // no documented profile page, so "Manage account" opens the Console home rather than a guessed path.
+        var links = console
+            ? new List<(string, string)> { ("Manage account", ConsoleHome), ("Usage", ConsoleHome + "usage") }
+            : new List<(string, string)> { ("Manage account", Claude + "account"), ("Usage", Claude + "usage") };
+        if (info.Email is not null || info.BillingType is not null) links.Add(("Billing", (console ? ConsoleHome + "settings/" : Claude) + "billing"));
         return links;
     }
 }

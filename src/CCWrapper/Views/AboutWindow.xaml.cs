@@ -47,26 +47,16 @@ public partial class AboutWindow : Window
         return url;
     }
 
-    /// <summary>The first line of <c>claude --version</c>, or null when it fails or takes over 5 s. Run on a worker thread.</summary>
-    static async Task<string?> ClaudeVersionAsync()
-    {
-        // The default profile (~\.claude), as a bare claude in a shell would run; the version does not depend on the account.
-        var account = new Account("a", null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json"), "");
-        try
-        {
-            var r = await Task.Run(() => ClaudeCli.RunAsync(account, null, ["--version"], TimeSpan.FromSeconds(5)));
-            return r.Ok && r.Line.Length > 0 ? r.Line : null;
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException) { return null; } // claude not installed
-    }
-
     async void OnBugReport(object sender, RoutedEventArgs e)
     {
         BugButton.IsEnabled = false; // one browser tab per click, however fast the clicks come
         try
         {
-            var url = BugReportUrl(AppUpdate.Version, RuntimeInformation.OSDescription, await ClaudeVersionAsync());
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            // The version does not depend on the account: the open window's, else the default profile (~\.claude) a bare claude would use.
+            var account = AppState.Current?.Account ?? new Account("a", null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json"), "");
+            var url = BugReportUrl(AppUpdate.Version, RuntimeInformation.OSDescription, await ClaudeCli.VersionAsync(account));
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (System.ComponentModel.Win32Exception) { BugNote.Text = "Could not open the browser. Open this address yourself: " + url; BugNote.Visibility = Visibility.Visible; }
         }
         finally { BugButton.IsEnabled = true; }
     }

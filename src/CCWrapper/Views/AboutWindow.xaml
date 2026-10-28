@@ -33,5 +33,7 @@
                 <TextBlock Text="Report a bug" VerticalAlignment="Center" />
             </StackPanel>
         </Button>
+        <TextBox x:Name="BugNote" IsReadOnly="True" TextWrapping="Wrap" Visibility="Collapsed" Background="Transparent" BorderThickness="0" Padding="0"
+                 FontSize="12" Foreground="{StaticResource Muted}" Margin="4,8,0,0" /> <!-- a TextBox so the address can be selected and copied -->
     </StackPanel>
 </Window>

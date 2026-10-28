@@ -593,7 +593,7 @@ public partial class SettingsWindow : Window
     {
         var account = _account;
         var (info, facts) = await Task.Run(() => (AccountReader.Read(account), AccountReader.ReadFacts(account)));
-        _version ??= ClaudeVersionAsync(account);
+        _version ??= ClaudeCli.VersionAsync(account);
         if (Page != "account") return;
         AccountRows.Children.Clear();
         void Add(string label, string? value) => AccountRows.Children.Add(FactRow(label, value));
@@ -618,12 +618,6 @@ public partial class SettingsWindow : Window
         foreach (var row in facts.Other) OtherRows.Children.Add(FactRow(row.Key, row.Value, row.Source));
         if (facts.Other.Count == 0) OtherRows.Children.Add(FactRow("—", null));
         ((TextBlock)versionRow.Children[1]).Text = await _version ?? "—";
-    }
-
-    static async Task<string?> ClaudeVersionAsync(Account account)
-    {
-        try { return await ClaudeCli.RunAsync(account, null, ["--version"], TimeSpan.FromSeconds(10)) is { Ok: true } r ? r.Line : null; }
-        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException) { return null; } // no claude.exe on PATH
     }
 
     static void OpenUrl(string url)

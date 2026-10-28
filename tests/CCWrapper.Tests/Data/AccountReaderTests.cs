@@ -82,7 +82,7 @@ public sealed class AccountReaderTests : IDisposable
             AccountLinks.For(new(email, null, null, org, billing, null, null, null, null, null, null)).Select(l => l.Url).ToArray();
 
         Assert.Equal(["https://claude.ai/settings/account", "https://claude.ai/settings/usage", "https://claude.ai/settings/billing"], Urls("claude_max", "stripe"));
-        Assert.Equal(["https://console.anthropic.com/settings/profile", "https://console.anthropic.com/settings/usage", "https://console.anthropic.com/settings/billing"], Urls("api", "prepaid"));
+        Assert.Equal(["https://platform.claude.com/", "https://platform.claude.com/usage", "https://platform.claude.com/settings/billing"], Urls("api", "prepaid"));
         Assert.Equal(["https://claude.ai/settings/account", "https://claude.ai/settings/usage"], Urls(null, null, null)); // nothing known: claude.ai, no Billing
     }
 
