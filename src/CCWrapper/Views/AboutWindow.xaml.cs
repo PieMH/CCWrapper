@@ -1,11 +1,15 @@
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using CCWrapper.Core;
+using CCWrapper.Terminal;
 
 namespace CCWrapper.Views;
 
-/// <summary>Version, the update switch (applies at once, saved in app.json) and the project's documents on GitHub.</summary>
+/// <summary>Version, the update switch (applies at once, saved in app.json), the project's documents on GitHub and the bug
+/// report button, which only opens the prefilled issue form in the browser.</summary>
 public partial class AboutWindow : Window
 {
     static readonly (string Label, string File)[] Documents =
@@ -33,4 +37,37 @@ public partial class AboutWindow : Window
     }
 
     void OnSwitch(object sender, RoutedEventArgs e) => AppUpdate.SetEnabled(UpdateSwitch.IsChecked == true);
+
+    /// <summary>The GitHub issue form with the versions filled in. Nothing leaves the PC until the user submits it there; the
+    /// Claude Code field is left out when it is unknown.</summary>
+    public static string BugReportUrl(string appVersion, string windows, string? claudeVersion)
+    {
+        var url = $"{AppUpdate.Repo}/issues/new?template=bug_report.yml&app-version={Uri.EscapeDataString(appVersion)}&windows={Uri.EscapeDataString(windows)}";
+        if (!string.IsNullOrWhiteSpace(claudeVersion)) url += "&claude-version=" + Uri.EscapeDataString(claudeVersion);
+        return url;
+    }
+
+    /// <summary>The first line of <c>claude --version</c>, or null when it fails or takes over 5 s. Run on a worker thread.</summary>
+    static async Task<string?> ClaudeVersionAsync()
+    {
+        // The default profile (~\.claude), as a bare claude in a shell would run; the version does not depend on the account.
+        var account = new Account("a", null, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude.json"), "");
+        try
+        {
+            var r = await Task.Run(() => ClaudeCli.RunAsync(account, null, ["--version"], TimeSpan.FromSeconds(5)));
+            return r.Ok && r.Line.Length > 0 ? r.Line : null;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException) { return null; } // claude not installed
+    }
+
+    async void OnBugReport(object sender, RoutedEventArgs e)
+    {
+        BugButton.IsEnabled = false; // one browser tab per click, however fast the clicks come
+        try
+        {
+            var url = BugReportUrl(AppUpdate.Version, RuntimeInformation.OSDescription, await ClaudeVersionAsync());
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        finally { BugButton.IsEnabled = true; }
+    }
 }
