@@ -1,6 +1,7 @@
 using System.IO;
 using CCWrapper.Core;
 using CCWrapper.Data;
+using CCWrapper.Terminal;
 using CCWrapper.Views;
 
 namespace CCWrapper.Tests.Shell;
@@ -27,7 +28,7 @@ public sealed class WorktreeTests
     [Fact]
     public void Adopt_follows_a_session_into_its_worktree_and_stays_there_after_a_cd()
     {
-        var tab = new LiveSession(C) { SessionId = "s1", Cwd = @"C:\repo", Worktree = "…" };
+        var tab = new LiveSession(C) { SessionId = "s1", Cwd = @"C:\repo", Worktree = "…", WorktreeLaunch = true };
         var inWorktree = new RunningSession(10, "s1", @"C:\repo\.claude\worktrees\w1", null, SessionStatus.Idle, null, "interactive", null);
 
         ShellModel.Adopt(tab, inWorktree);
@@ -38,6 +39,26 @@ public sealed class WorktreeTests
 
         ShellModel.Adopt(tab, inWorktree with { SessionId = "s2" }); // /clear: the new transcript is in the worktree's project folder
         Assert.Equal(C.Paths.Transcript(@"C:\repo\.claude\worktrees\w1", "s2"), tab.TranscriptPath);
+    }
+
+    [Fact]
+    public void Adopt_marks_a_normal_session_in_a_worktree_but_leaves_its_folder_and_transcript()
+    {
+        var launch = @"C:\repo\.claude\worktrees\foo\sub";
+        var tab = new LiveSession(C) { SessionId = "s1", Cwd = launch, TranscriptPath = C.Paths.Transcript(launch, "s1") };
+        var reg = new RunningSession(10, "s1", launch, null, SessionStatus.Idle, null, "interactive", null);
+
+        ShellModel.Adopt(tab, reg with { Cwd = @"C:\repo\.claude\worktrees\foo\other" }); // a cd inside
+        ShellModel.Adopt(tab, reg with { SessionId = "s2" });
+        Assert.Equal(("foo", launch, C.Paths.Transcript(launch, "s2")), (tab.Worktree, tab.Cwd, tab.TranscriptPath));
+    }
+
+    [Fact]
+    public void ResumeOptions_use_the_current_folder_else_the_launch_folder()
+    {
+        var o = new LaunchOptions(@"C:\repo", Worktree: true, Name: "n", Fork: true);
+        Assert.Equal(new LaunchOptions(@"C:\repo\.claude\worktrees\w1", "s1", Worktree: true), TerminalHost.ResumeOptions(o, @"C:\repo\.claude\worktrees\w1", "s1"));
+        Assert.Equal(@"C:\repo", TerminalHost.ResumeOptions(o, null, "s1").Cwd);
     }
 
     [Fact]

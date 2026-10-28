@@ -28,6 +28,10 @@ public sealed class LiveSession(Account account) : Observable
     /// seen in its folder; null when it runs in no worktree. The tab shows a mark while it is set.</summary>
     public string? Worktree { get; set => Set(ref field, value); }
 
+    /// <summary>Launched as a new session with <c>--worktree</c>: Claude Code moved it into the worktree, so its folder
+    /// (and transcript project) is the worktree root. A session that only runs inside a worktree keeps its launch folder.</summary>
+    public bool WorktreeLaunch { get; set; }
+
     /// <summary>Set at launch (<see cref="ClaudePaths.Transcript"/>), later refreshed from the status line.</summary>
     public string? TranscriptPath { get; set => Set(ref field, value); }
     public string? Title { get; set => Set(ref field, value); }

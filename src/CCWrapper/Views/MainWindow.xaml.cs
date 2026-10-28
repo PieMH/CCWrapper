@@ -84,7 +84,8 @@ public partial class MainWindow : Window, IAppCommands
     async Task OpenSessionAsync(LiveSession session, LaunchOptions options)
     {
         TerminalView.Visibility = Visibility.Visible; // the page sizes a new terminal while it is visible
-        session.Worktree = ShellModel.WorktreeOf(options.Cwd)?.Name ?? (options.Worktree && options.ResumeId is null ? "…" : null);
+        session.WorktreeLaunch = options.Worktree && options.ResumeId is null;
+        session.Worktree = ShellModel.WorktreeOf(options.Cwd)?.Name ?? (session.WorktreeLaunch ? "…" : null);
         try
         {
             var started = TerminalView.OpenAsync(session, options); // sets SessionId, Cwd and TranscriptPath before its first await

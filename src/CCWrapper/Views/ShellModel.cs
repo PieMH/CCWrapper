@@ -137,10 +137,11 @@ public static class ShellModel
     public static void Adopt(LiveSession session, RunningSession registry)
     {
         // --worktree: Claude Code moved into the worktree, so the transcript is under its project folder, not the launch folder's.
+        // Any other session in a worktree keeps its launch folder (and transcript); it only gets the mark.
         if (WorktreeOf(registry.Cwd) is var (worktree, root))
         {
             session.Worktree = worktree;
-            if (root != session.Cwd)
+            if (session.WorktreeLaunch && root != session.Cwd)
             {
                 session.Cwd = root;
                 session.TranscriptPath = session.Account.Paths.Transcript(root, registry.SessionId);
