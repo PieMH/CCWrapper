@@ -7,9 +7,14 @@ namespace CCWrapper.Data;
 
 /// <summary>One subagent of a session. Meta fields come from agent-*.meta.json, the numbers from its transcript.</summary>
 /// <param name="ContextTokens">Last turn's input + cache creation + cache read tokens.</param>
+/// <param name="FirstActivity">Timestamp of its first transcript record; with <paramref name="LastActivity"/> it gives the duration.</param>
 public sealed record SubagentInfo(string AgentId, string? AgentType, string? Description, string? ToolUseId, string? RequestShape,
     string? Model, string? Effort, long? ContextTokens, long OutputTokens, int ToolUseCount, DateTimeOffset? LastActivity,
-    string TranscriptPath, bool IsRunning);
+    string TranscriptPath, bool IsRunning, DateTimeOffset? FirstActivity = null)
+{
+    /// <summary>The "tokens" of the Agents list: the last turn's context (<see cref="ContextTokens"/>) plus all output tokens. Null until a turn reports usage.</summary>
+    public long? Tokens => ContextTokens + OutputTokens;
+}
 
 /// <summary>The subagents of one session, from <c>&lt;session dir&gt;\subagents</c>. Call <see cref="Poll"/> on a timer.</summary>
 public sealed class SubagentReader(string transcriptPath)
@@ -75,6 +80,6 @@ public sealed class SubagentReader(string transcriptPath)
         var running = age < RecentWrite || (r.LastStopReason != "end_turn" && age < StaleAfter);
         return new SubagentInfo(id, Str(meta, "agentType"), Str(meta, "description"), Str(meta, "toolUseId"), Str(meta, "requestShape"),
             r.Model ?? Str(meta, "model"), r.Effort ?? Str(meta, "effort"), r.ContextTokens, r.OutputTokens, r.ToolUseCount,
-            r.LastActivity, r.Path, running);
+            r.LastActivity, r.Path, running, r.FirstActivity);
     }
 }

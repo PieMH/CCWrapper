@@ -1,39 +1,72 @@
 <UserControl x:Class="CCWrapper.Views.AgentsPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:CCWrapper.Views">
+             xmlns:local="clr-namespace:CCWrapper.Views"
+             PreviewKeyDown="OnPreviewKeyDown" PreviewMouseDown="OnPreviewMouseDown">
     <Grid>
-        <ListBox x:Name="List" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel">
-            <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
-                    <EventSetter Event="MouseDoubleClick" Handler="OnDoubleClick" />
-                </Style>
-            </ListBox.ItemContainerStyle>
-            <ListBox.ItemTemplate>
-                <DataTemplate DataType="{x:Type local:AgentRow}">
-                    <StackPanel Margin="0,3">
-                        <DockPanel>
-                            <TextBlock Text="●" Margin="0,0,6,0">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Foreground" Value="#6E7884" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                <Setter Property="Foreground" Value="{StaticResource Good}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        </DockPanel>
-                        <TextBlock Text="{Binding Detail}" Foreground="#AEB7C2" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding Stats}" Foreground="{StaticResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-        <TextBlock x:Name="Empty" Margin="12" Foreground="{StaticResource Muted}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Top" />
+        <DockPanel x:Name="ListPane">
+            <Grid DockPanel.Dock="Top" Margin="6,6,6,4">
+                <TextBox x:Name="SearchBox" Padding="30,6,8,6" TextChanged="OnSearch" AutomationProperties.Name="Search agents" />
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE721;" FontSize="13" Foreground="{StaticResource Muted}" Margin="10,0,0,0" HorizontalAlignment="Left" IsHitTestVisible="False" />
+                <TextBlock Text="Search agents" Margin="31,0,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource Hint}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+            <Grid>
+                <ListBox x:Name="List" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.ScrollUnit="Pixel">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row}">
+                            <EventSetter Event="PreviewMouseLeftButtonUp" Handler="OnRowClick" />
+                            <EventSetter Event="KeyDown" Handler="OnRowKeyDown" />
+                            <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type local:AgentRow}">
+                            <StackPanel Margin="0,3">
+                                <DockPanel>
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE76C;" DockPanel.Dock="Right" FontSize="11" Foreground="{StaticResource Muted}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Duration}" DockPanel.Dock="Right" Foreground="{StaticResource Muted}" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="●" Foreground="{StaticResource Good}" Margin="0,0,6,0" ToolTip="Running">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding Subtitle}" Foreground="{StaticResource Muted}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock x:Name="Empty" Margin="12" Foreground="{StaticResource Muted}" TextWrapping="Wrap" HorizontalAlignment="Center" VerticalAlignment="Top" />
+            </Grid>
+        </DockPanel>
+        <DockPanel x:Name="DetailPane" Visibility="Collapsed">
+            <DockPanel DockPanel.Dock="Top" Margin="6,6,6,0">
+                <Button x:Name="BackButton" DockPanel.Dock="Left" Style="{StaticResource Flat}" Width="30" Padding="0" Margin="0,0,6,0" ToolTip="Back to agents (Esc)"
+                        AutomationProperties.Name="Back to agents" Click="OnBack">
+                    <TextBlock Style="{StaticResource Icon}" Text="&#xE72B;" FontSize="13" />
+                </Button>
+                <TextBlock x:Name="DetailTitle" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+            <ContentControl x:Name="Detail" IsTabStop="False" />
+        </DockPanel>
     </Grid>
 </UserControl>
