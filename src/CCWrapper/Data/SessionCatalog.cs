@@ -9,6 +9,7 @@ using CCWrapper.Core;
 namespace CCWrapper.Data;
 
 /// <summary>One live claude process from <c>sessions\&lt;pid&gt;.json</c> (alive pids only).</summary>
+/// <param name="Name">The name given with -n or /rename; one Claude Code derived itself ("ccwrapper-2a") is left out.</param>
 public sealed record RunningSession(
     int Pid, string SessionId, string? Cwd, string? Name, SessionStatus Status, string? WaitingFor, string? Kind,
     DateTimeOffset? UpdatedAt);
@@ -70,7 +71,7 @@ public static class SessionCatalog
             if (!Alive((int)pid, r.Prop("procStart").Str())) continue;
             var waiting = r.Prop("waitingFor");
             result.Add(new RunningSession(
-                (int)pid, sessionId, r.Prop("cwd").Str(), r.Prop("name").Str(),
+                (int)pid, sessionId, r.Prop("cwd").Str(), r.Prop("nameSource").Str() == "derived" ? null : r.Prop("name").Str(),
                 Enum.TryParse<SessionStatus>(r.Prop("status").Str(), ignoreCase: true, out var status) ? status : SessionStatus.Unknown,
                 waiting.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null ? null : waiting.Str() ?? waiting.GetRawText(),
                 r.Prop("kind").Str(), JsonUtil.Ms(r.Prop("updatedAt"))));

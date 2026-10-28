@@ -150,12 +150,14 @@ public sealed class ShellTests
     }
 
     [Fact]
-    public void Adopt_leaves_a_session_with_the_same_id_alone()
+    public void Adopt_takes_a_rename_but_leaves_the_id_and_transcript_of_the_same_session()
     {
         var tab = Live("s1", pid: 10);
         tab.Title = "Mine";
-        ShellModel.Adopt(tab, Reg("s1", SessionStatus.Idle, pid: 10, name: "Registry name"));
-        Assert.Equal(("s1", "Mine", null), (tab.SessionId, tab.Title, tab.TranscriptPath));
+        ShellModel.Adopt(tab, Reg("s1", SessionStatus.Idle, pid: 10));
+        Assert.Equal("Mine", tab.Title); // no name in the registry: the tab keeps its own
+        ShellModel.Adopt(tab, Reg("s1", SessionStatus.Idle, pid: 10, name: "Renamed")); // /rename in the TUI
+        Assert.Equal(("s1", "Renamed", null), (tab.SessionId, tab.Title, tab.TranscriptPath));
     }
 
     [Fact]

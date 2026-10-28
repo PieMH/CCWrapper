@@ -132,10 +132,11 @@ public static class ShellModel
         return false;
     }
 
-    /// <summary>A session whose registry entry carries another id (after /clear or /resume inside the TUI) follows it:
-    /// new id, its transcript and the registry name as title.</summary>
+    /// <summary>A session follows its registry entry: the name as title (a /rename in the TUI included) and, when the entry carries
+    /// another id (after /clear or /resume inside the TUI), that id and its transcript.</summary>
     public static void Adopt(LiveSession session, RunningSession registry)
     {
+        if (registry.Name is { Length: > 0 } name) session.Title = name;
         // --worktree: Claude Code moved into the worktree, so the transcript is under its project folder, not the launch folder's.
         // Any other session in a worktree keeps its launch folder (and transcript); it only gets the mark.
         if (WorktreeOf(registry.Cwd) is var (worktree, root))
@@ -150,7 +151,6 @@ public static class ShellModel
         if (session.SessionId == registry.SessionId) return;
         session.SessionId = registry.SessionId;
         if (session.Cwd is { } cwd) session.TranscriptPath = session.Account.Paths.Transcript(cwd, registry.SessionId);
-        if (registry.Name is { Length: > 0 } name) session.Title = name;
     }
 }
 
