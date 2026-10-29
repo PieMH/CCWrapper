@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
@@ -428,13 +429,30 @@ public partial class BottomBar : UserControl
             busy = true;
             var want = sw.IsChecked != true;
             Show(want);
-            // A refusal shows in the compose box's notice, as for the other picks.
+            var transcript = s?.TranscriptPath;
+            var from = transcript is not null && File.Exists(transcript) ? new FileInfo(transcript).Length : 0;
+            // A refusal, the app's or Claude Code's own, shows in the compose box's notice, as for the other picks.
             var refusal = await TuiInput.SubmitAsync(s, $"/effort ultracode {(want ? "on" : "off")}");
+            if (refusal is null && s is not null && await UltracodeRefusalAsync(transcript, from) is { } refused)
+                TuiInput.Refused(s, refusal = refused);
             if (refusal is null && s is not null) _ultraSent[s] = want;
             else Show(!want);
             busy = false;
         };
         ChoiceBody.Children.Add(row);
+    }
+
+    /// <summary>Claude Code's refusal of the /effort ultracode just sent, from the transcript written after byte <paramref name="from"/>;
+    /// null when it took it, or when no reply came within ~3 s (it may be queued behind a turn: then the switch trusts the send).</summary>
+    static async Task<string?> UltracodeRefusalAsync(string? transcript, long from)
+    {
+        for (var i = 0; i < 20 && transcript is not null; i++)
+        {
+            await Task.Delay(150);
+            var outputs = await Task.Run(() => TranscriptReader.LocalCommandOutputs(transcript, from));
+            if (outputs.Select(BarFormat.UltracodeReply).FirstOrDefault(r => r is not null) is { } reply) return reply.Refusal;
+        }
+        return null;
     }
 
     /// <summary>The mode in the terminal's footer (see <see cref="BarFormat.ModeFromScreen"/>), also kept for display; null if
@@ -594,6 +612,14 @@ public static class BarFormat
     public static bool? UltracodeFromScreen(string? screen) =>
         screen is not null && FooterLines(screen).Select(l => Regex.Match(l, @"(?:^\W*|·\s*)ultracode (on|off)\b", RegexOptions.IgnoreCase)).FirstOrDefault(m => m.Success) is { } m
             ? m.Groups[1].Value.Equals("on", StringComparison.OrdinalIgnoreCase) : null;
+
+    /// <summary>Claude Code's reply to /effort ultracode: null for any other output; else whether it took it and, when not, the reason it
+    /// gave ("Ultracode needs dynamic workflows enabled (see /config).", "Ultracode isn't available on …").</summary>
+    public static (bool Taken, string? Refusal)? UltracodeReply(string output) =>
+        output.StartsWith("Ultracode on", StringComparison.Ordinal) || output.StartsWith("Ultracode off", StringComparison.Ordinal) ? (true, null)
+        : output.StartsWith("Ultracode ", StringComparison.Ordinal) && output.IndexOf(" Valid options are:", StringComparison.Ordinal) is > 0 and var end
+            ? (false, output[..end])
+        : null;
 
     /// <summary>The permission mode named by the TUI's footer ("⏵⏵ auto mode on (shift+tab to cycle)") among the last non-blank
     /// rows of the terminal text, or null. These are Claude Code's own indicator names; the default mode shows none, only

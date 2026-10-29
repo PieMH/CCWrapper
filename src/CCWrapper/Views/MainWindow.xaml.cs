@@ -105,9 +105,7 @@ public partial class MainWindow : Window, IAppCommands
     {
         var dialog = new NewSessionDialog { Owner = this };
         if (dialog.ShowDialog() == true && dialog.Result is { } options)
-            // Only a new session: a resume or a copy keeps the folder it had. A folder outside any repo cannot have a worktree.
-            await OpenSessionAsync(new LiveSession(_state.Account) { Title = options.Name },
-                options with { Worktree = WorktreeSwitch.IsChecked == true && ShellModel.InGitRepo(options.Cwd) });
+            await OpenSessionAsync(new LiveSession(_state.Account) { Title = options.Name }, options);
     }
 
     /// <summary>Shows the live read-only transcript of a session open in another claude process, as the read-only card.</summary>
@@ -322,11 +320,6 @@ public partial class MainWindow : Window, IAppCommands
         GitAhead.Text = info.Ahead is > 0 ? $"↑{info.Ahead}" : "";
         GitBehind.Text = info.Behind is > 0 ? $"↓{info.Behind}" : "";
         GitChip.ToolTip = ShellModel.GitTip(info);
-        var canWorktree = _watched is null || info.InRepo;
-        WorktreeSwitch.IsEnabled = canWorktree;
-        WorktreeBox.ToolTip = canWorktree
-            ? "New sessions in this window start in their own git worktree (claude --worktree). Open tabs and resumed sessions stay where they are."
-            : "Off for now: the current tab's folder is not a git repository.";
     }
 
     /// <summary>The letter on a color circle, the taskbar overlay that tells the windows of different accounts apart.</summary>

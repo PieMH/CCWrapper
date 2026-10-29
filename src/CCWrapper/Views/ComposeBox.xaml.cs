@@ -503,6 +503,9 @@ public static class TuiInput
     static string WaitingText(string? waitingFor) =>
         $"Claude is waiting ({(string.IsNullOrEmpty(waitingFor) ? "dialog open" : waitingFor)}): answer it in the terminal";
 
+    /// <summary>Claude Code itself refused a command that went in (<paramref name="reason"/> is its reply): shown like a refused submit.</summary>
+    public static void Refused(LiveSession s, string reason) => Changed?.Invoke(s, reason);
+
     /// <summary>The bottom bar's Shift+Tab loop runs: <see cref="BlockedReason"/> says so until it ends.</summary>
     public static void SetSwitching(LiveSession s, bool on)
     {

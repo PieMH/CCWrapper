@@ -19,6 +19,21 @@ public sealed class TranscriptReaderTests : IDisposable
     }
 
     [Fact]
+    public void Local_command_outputs_after_an_offset_in_both_record_shapes()
+    {
+        var path = Path.Combine(_dir, "cmd.jsonl");
+        const string Old = """{"type":"system","subtype":"local_command","content":"<local-command-stdout>old</local-command-stdout>"}""" + "\n";
+        File.WriteAllText(path, Old
+            + """{"type":"system","subtype":"local_command","content":"<command-name>/effort</command-name>"}""" + "\n"
+            + """{"type":"system","subtype":"local_command","content":"<local-command-stdout>Ultracode off. Effort stays high.</local-command-stdout>"}""" + "\n"
+            + """{"type":"user","message":{"role":"user","content":"<local-command-stdout>Session color set to: green</local-command-stdout>"}}""" + "\n"
+            + """{"type":"user","message":{"role":"user","content":"plain prompt"}}""" + "\n");
+
+        Assert.Equal(["Ultracode off. Effort stays high.", "Session color set to: green"], TranscriptReader.LocalCommandOutputs(path, Old.Length));
+        Assert.Empty(TranscriptReader.LocalCommandOutputs(Path.Combine(_dir, "missing.jsonl"), 0));
+    }
+
+    [Fact]
     public void Poll_reads_state_from_the_records_and_skips_malformed_and_unknown_lines()
     {
         var r = new TranscriptReader(Copy());

@@ -7,7 +7,7 @@ body:
     attributes:
       label: CCWrapper version
       description: Shown under the name in the About window.
-      placeholder: "0.1.0"
+      placeholder: "1.2.0"
     validations:
       required: true
   - type: input
