@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <Version>0.1.0</Version>
+    <Version>1.2.0</Version>
     <!-- Program.Main starts Velopack first; the Main that App.xaml generates stays unused. -->
     <StartupObject>CCWrapper.Program</StartupObject>
     <!-- Embedded in the exe: Explorer, Start, taskbar; WPF windows without an Icon take it from the exe too. -->

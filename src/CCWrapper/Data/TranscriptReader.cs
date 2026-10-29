@@ -179,6 +179,23 @@ public sealed class TranscriptReader(string path)
         return $"{name}: {(line.Length > 120 ? line[..120] + "…" : line)}";
     }
 
+    /// <summary>What local commands (/effort, /color…) printed, recorded from byte <paramref name="from"/> on, oldest first. Claude Code
+    /// wraps it in &lt;local-command-stdout&gt;, as a "local_command" system record's content or as a user message. A missing file gives none.</summary>
+    public static List<string> LocalCommandOutputs(string path, long from)
+    {
+        const string Open = "<local-command-stdout>", Close = "</local-command-stdout>";
+        var outputs = new List<string>();
+        try
+        {
+            foreach (var (rec, _) in JsonlReader.Read(path, from))
+                if ((Str(rec, "content") ?? Str(Prop(rec, "message"), "content")) is { } text && text.StartsWith(Open, StringComparison.Ordinal)
+                    && text.IndexOf(Close, StringComparison.Ordinal) is > 0 and var end)
+                    outputs.Add(text[Open.Length..end].Trim());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // not written yet, or being replaced
+        return outputs;
+    }
+
     /// <summary>Null-safe reads of Claude Code's undocumented JSON: a wrong or missing shape is just null.
     /// Plain static methods on purpose: extension methods here would clash with other Data helpers.</summary>
     internal static class Get

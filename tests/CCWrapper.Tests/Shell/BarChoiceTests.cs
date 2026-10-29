@@ -49,6 +49,20 @@ public sealed class BarChoiceTests
     public void Ultracode_is_read_from_the_footer_rows(string footer, bool? on) =>
         Assert.Equal(on, BarFormat.UltracodeFromScreen("Claude Code\n\n❯ \n──────\n" + footer + "\n"));
 
+    [Theory]
+    [InlineData("Ultracode on (this session only): longer, deeper work. Effort stays xhigh.", true, null)]
+    [InlineData("Ultracode off. Effort stays xhigh.", true, null)]
+    [InlineData("Ultracode needs dynamic workflows enabled (see /config). Valid options are: low, medium, high, xhigh, max, auto", false,
+        "Ultracode needs dynamic workflows enabled (see /config).")]
+    [InlineData("Ultracode isn't available on claude-haiku-5-5. Valid options are: low, medium", false, "Ultracode isn't available on claude-haiku-5-5.")]
+    public void Ultracode_reply_tells_taken_from_refused(string output, bool taken, string? refusal) =>
+        Assert.Equal((taken, refusal), BarFormat.UltracodeReply(output));
+
+    [Theory]
+    [InlineData("Effort level set to high · Ultracode off")]
+    [InlineData("Session color set to: green")]
+    public void Other_command_output_is_no_ultracode_reply(string output) => Assert.Null(BarFormat.UltracodeReply(output));
+
     [Fact]
     public void Ultracode_ignores_older_rows_and_missing_screens()
     {

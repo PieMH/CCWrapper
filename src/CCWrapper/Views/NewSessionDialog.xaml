@@ -33,6 +33,15 @@
         <TextBlock Text="Name (optional)" Margin="0,14,0,4" />
         <TextBox x:Name="SessionName" />
 
+        <DockPanel Margin="0,14,0,0">
+            <ToggleButton x:Name="WorktreeSwitch" DockPanel.Dock="Right" Style="{StaticResource Switch}" VerticalAlignment="Center" IsEnabled="False"
+                          AutomationProperties.Name="Start in a git worktree" />
+            <StackPanel Margin="0,0,12,0">
+                <TextBlock Text="Worktree" />
+                <TextBlock x:Name="WorktreeNote" Text="Only for a folder in a git repository." Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
+            </StackPanel>
+        </DockPanel>
+
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button Content="Cancel" IsCancel="True" Padding="16,4" Margin="0,0,8,0" />
             <Button x:Name="StartButton" Style="{StaticResource Primary}" Content="Start" IsDefault="True" IsEnabled="False" Click="OnStart" />

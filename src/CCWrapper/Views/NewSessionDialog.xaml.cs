@@ -7,7 +7,7 @@ using CCWrapper.Terminal;
 
 namespace CCWrapper.Views;
 
-/// <summary>Folder, model, effort, permission mode and name of a new session. A combo left on "(account default…)"
+/// <summary>Folder, model, effort, permission mode, name and worktree (off by default) of a new session. A combo left on "(account default…)"
 /// gives null, so claude.exe gets no flag and the account's own setting applies.</summary>
 public partial class NewSessionDialog : Window
 {
@@ -50,7 +50,17 @@ public partial class NewSessionDialog : Window
 
     string FolderPath => ShellModel.NormalizeFolder(Folder.Text);
 
-    void OnFolderChanged(object sender, TextChangedEventArgs e) => StartButton.IsEnabled = Directory.Exists(FolderPath);
+    void OnFolderChanged(object sender, TextChangedEventArgs e)
+    {
+        StartButton.IsEnabled = Directory.Exists(FolderPath);
+        // A worktree needs a git repo; claude --worktree works only at launch, hence here and not on open tabs.
+        var repo = StartButton.IsEnabled && ShellModel.InGitRepo(FolderPath);
+        WorktreeSwitch.IsEnabled = repo;
+        if (!repo) WorktreeSwitch.IsChecked = false;
+        WorktreeNote.Text = repo
+            ? @"Claude works in a worktree of its own (claude --worktree, under .claude\worktrees), so this folder's checkout is left alone."
+            : "Only for a folder in a git repository.";
+    }
 
     void OnBrowse(object sender, RoutedEventArgs e)
     {
@@ -62,7 +72,7 @@ public partial class NewSessionDialog : Window
     void OnStart(object sender, RoutedEventArgs e)
     {
         Result = new LaunchOptions(FolderPath, null, Pick(Model), Pick(Effort), Pick(Mode),
-            string.IsNullOrWhiteSpace(SessionName.Text) ? null : SessionName.Text.Trim());
+            string.IsNullOrWhiteSpace(SessionName.Text) ? null : SessionName.Text.Trim(), Worktree: WorktreeSwitch.IsChecked == true);
         DialogResult = true;
     }
 }
