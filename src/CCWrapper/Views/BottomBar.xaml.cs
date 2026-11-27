@@ -119,7 +119,8 @@ public partial class BottomBar : UserControl
         WeekText.Text = BarFormat.Percent(usage.Week);
         Meter(FiveHourBar, usage.FiveHour, warn: true);
         Meter(WeekBar, usage.Week, warn: true);
-        _usageTip = () => BarFormat.Usage(sl, account).Tip;
+        _usageTip = () => BarFormat.Usage(sl, account).Tip
+            + (AppState.Current?.Account is { } me && UsageProbe.FailedRecently(me) ? "\n\n" + UsageProbe.FailedHint : "");
         _usageNow = (usage.FiveHour, usage.Week, usage.FiveReset, usage.WeekReset);
         UsageGroup.ToolTip ??= usage.Tip; // non-null so ToolTipOpening fires; OnUsageTip makes the real text
         RefreshButton.IsEnabled = !_checkingUsage;
@@ -640,8 +641,9 @@ public static class BarFormat
 
     /// <summary>"5h 58% · wk 12%", from whichever is newer: the status line's rate limits (Pro/Max, after the first reply) or
     /// the usage Claude Code saved in .claude.json on its last /usage (see UsageProbe). Its source and time, and when each
-    /// window resets, go in the tooltip (relative to <paramref name="now"/>); the two percents feed the meter bars.</summary>
-    public static (string Text, string Tip, double? FiveHour, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset) Usage(StatusLineData? sl, AccountInfo? account, DateTimeOffset? now = null)
+    /// window resets, go in the tooltip (relative to <paramref name="now"/>); the two percents feed the meter bars. A window
+    /// whose reset has passed shows null: it started over after the number was taken. <c>At</c> is when the numbers were taken.</summary>
+    public static (string Text, string Tip, double? FiveHour, double? Week, DateTimeOffset? FiveReset, DateTimeOffset? WeekReset, DateTimeOffset? At) Usage(StatusLineData? sl, AccountInfo? account, DateTimeOffset? now = null)
     {
         var saved = account?.UsageFetchedAt;
         var live = (sl is { FiveHourUsedPercent: not null } or { SevenDayUsedPercent: not null }) && (saved is null || sl.ReceivedAt > saved);
@@ -650,8 +652,10 @@ public static class BarFormat
         var tip = live ? $"Plan usage from Claude Code's status line, as of {sl!.ReceivedAt.ToLocalTime():HH:mm}"
             : saved is { } at ? $"Plan usage from Claude Code's /usage, as of {at.ToLocalTime():yyyy-MM-dd HH:mm}" : "No usage data";
         var t = now ?? DateTimeOffset.Now;
+        if (fiveReset <= t) five = null;
+        if (weekReset <= t) week = null;
         tip += Reset("5h window", fiveReset, t, alwaysDay: false) + Reset("Weekly window", weekReset, t, alwaysDay: true);
-        return ($"5h {Percent(five)} · wk {Percent(week)}", tip, five, week, fiveReset, weekReset);
+        return ($"5h {Percent(five)} · wk {Percent(week)}", tip, five, week, fiveReset, weekReset, live ? sl!.ReceivedAt : saved);
     }
 
     /// <summary>"5h window resets 14:30 (in 2h 10m)", with the weekday when it is not today (always for <paramref name="alwaysDay"/>);

@@ -54,6 +54,29 @@ public sealed class StatusLineFeed : IDisposable
         if (data.TranscriptPath is { } path) _session.TranscriptPath = path;
     }
 
+    /// <summary>The newest status line among the open tabs of every CCWrapper window that belongs to <paramref name="account"/>
+    /// (its transcript is under the account's projects folder), dated by the file's last write; null when there is none.</summary>
+    public static StatusLineData? Newest(Account account, string? dir = null)
+    {
+        var projects = Path.GetFullPath(account.Paths.Projects) + Path.DirectorySeparatorChar;
+        StatusLineData? newest = null;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(dir ?? LiveDir, "*.json"))
+                try
+                {
+                    using var reader = new StreamReader(JsonlReader.OpenShared(file));
+                    if (StatusLineData.Parse(reader.ReadToEnd()) is not { TranscriptPath: { } t } data
+                        || !Path.GetFullPath(t).StartsWith(projects, StringComparison.OrdinalIgnoreCase)) continue;
+                    data = data with { ReceivedAt = File.GetLastWriteTime(file) };
+                    if (newest is null || data.ReceivedAt > newest.ReceivedAt) newest = data;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { } // gone mid-read, or a bad path
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { } // no live folder yet
+        return newest;
+    }
+
     public void Dispose()
     {
         _watcher.Dispose();

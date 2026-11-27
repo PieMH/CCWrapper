@@ -1,18 +1,22 @@
-/* The app theme (Theme.xaml): slate grays, the logo's blue */
+/* Default theme (Theme.xaml) until the host sends the chosen one (TerminalHost.ThemeMessage) */
 :root {
+  --scheme: dark;
   --bg: #101215;
+  --field: #15171b;
   --panel: #1b1e23;
   --border: #2a2f37;
   --text: #e4e8ee;
   --muted: #8a94a1;
   --accent: #4a9be8;
   --accent-fill: #2b74c2;
+  --hover: #2a2f37;
+  --on-accent: #fff;
 }
 
 [hidden] { display: none !important; }
 
 html, body {
-  color-scheme: dark; /* dark native scrollbar on the terminal viewport */
+  color-scheme: var(--scheme); /* native scrollbar on the terminal viewport */
   margin: 0;
   height: 100%;
   overflow: hidden;
@@ -42,7 +46,7 @@ html, body {
   width: 220px;
   padding: 4px 6px;
   color: var(--text);
-  background: var(--bg);
+  background: var(--field);
   border: 1px solid var(--border);
   border-radius: 6px;
   font: inherit;
@@ -59,7 +63,7 @@ button {
   font: inherit;
   cursor: pointer;
 }
-button:hover { background: #2a2f37; }
+button:hover { background: var(--hover); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .exit {
@@ -83,4 +87,4 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 }
 .exit .actions { display: flex; gap: 8px; }
 .exit button { padding: 6px 16px; border-color: var(--border); border-radius: 6px; }
-.exit button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
+.exit button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--on-accent); font-weight: 600; }

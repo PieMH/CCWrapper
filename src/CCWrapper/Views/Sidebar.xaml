@@ -137,13 +137,13 @@
                             <Border CornerRadius="4" Padding="6,1">
                                 <Border.Style>
                                     <Style TargetType="Border">
-                                        <Setter Property="Background" Value="#262B33" />
+                                        <Setter Property="Background" Value="{StaticResource Selected}" />
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding Badge}" Value="working">
-                                                <Setter Property="Background" Value="#20352B" />
+                                                <Setter Property="Background" Value="{StaticResource GoodFill}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Badge}" Value="needs you">
-                                                <Setter Property="Background" Value="#3A3122" />
+                                                <Setter Property="Background" Value="{StaticResource WarnFill}" />
                                             </DataTrigger>
                                             <DataTrigger Binding="{Binding Badge}" Value="">
                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -154,10 +154,10 @@
                                 <TextBlock Text="{Binding Badge}" FontSize="11">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="#AEB7C2" />
+                                            <Setter Property="Foreground" Value="{StaticResource TextDim}" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding Badge}" Value="working">
-                                                    <Setter Property="Foreground" Value="#8FDCAF" />
+                                                    <Setter Property="Foreground" Value="{StaticResource GoodText}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding Badge}" Value="needs you">
                                                     <Setter Property="Foreground" Value="{StaticResource Warn}" />

@@ -15,7 +15,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{StaticResource GitIcon}" Stroke="{StaticResource Muted}" StrokeThickness="1.6" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
                         <TextBlock x:Name="GitAccount" Text="git: none" Foreground="{StaticResource TextDim}" Margin="7,0,0,0" VerticalAlignment="Center" />
-                        <TextBlock x:Name="GitBranchSep" Text="·" Foreground="#4A525D" Margin="6,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                        <TextBlock x:Name="GitBranchSep" Text="·" Foreground="{StaticResource SwitchOff}" Margin="6,0" VerticalAlignment="Center" Visibility="Collapsed" />
                         <TextBlock x:Name="GitBranch" FontWeight="SemiBold" VerticalAlignment="Center" />
                         <TextBlock x:Name="GitAhead" Foreground="{StaticResource Accent}" Margin="6,0,0,0" VerticalAlignment="Center" />
                         <TextBlock x:Name="GitBehind" Foreground="{StaticResource Warn}" Margin="4,0,0,0" VerticalAlignment="Center" />
@@ -24,7 +24,7 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Image Source="/logo.png" Width="20" Height="20" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="CCWrapper" FontWeight="SemiBold" Margin="8,0,0,0" VerticalAlignment="Center" />
-                    <TextBlock Text="/" Foreground="#4A525D" Margin="10,0" VerticalAlignment="Center" />
+                    <TextBlock Text="/" Foreground="{StaticResource SwitchOff}" Margin="10,0" VerticalAlignment="Center" />
                     <Border x:Name="Badge" Width="22" Height="22" CornerRadius="6" VerticalAlignment="Center">
                         <TextBlock x:Name="BadgeText" Foreground="#1E1E1E" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -89,14 +89,8 @@
                                 <!-- While it works: a gradient sweeps along the bottom edge (see SetResumeBusy) -->
                                 <Grid Margin="-10,0" Height="24" ClipToBounds="True">
                                     <TextBlock x:Name="ResumeLabel" Text="Resume here" Margin="10,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <!-- Fill: the theme's Accent fading out at both ends, set in code (a GradientStop takes a Color, not a brush key) -->
                                     <Rectangle x:Name="ResumeSweepBar" Width="56" Height="2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Visibility="Collapsed">
-                                        <Rectangle.Fill>
-                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                                <GradientStop Color="#004A9BE8" Offset="0" />
-                                                <GradientStop Color="#FF4A9BE8" Offset="0.5" />
-                                                <GradientStop Color="#004A9BE8" Offset="1" />
-                                            </LinearGradientBrush>
-                                        </Rectangle.Fill>
                                         <Rectangle.RenderTransform>
                                             <TranslateTransform x:Name="ResumeSweep" />
                                         </Rectangle.RenderTransform>

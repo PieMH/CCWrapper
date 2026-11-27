@@ -62,9 +62,9 @@
                 </Border>
             </Popup>
             <Border Style="{StaticResource Sep}" />
-            <TextBlock x:Name="SpendText" Foreground="#AEB7C2" ToolTip="Session tokens in / out, and cost" />
+            <TextBlock x:Name="SpendText" Foreground="{StaticResource TextDim}" ToolTip="Session tokens in / out, and cost" />
             <Button x:Name="RefreshButton" Style="{StaticResource Chip}" Width="28" Padding="0" Margin="6,0,0,0" Click="OnRefresh">
-                <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="12" Foreground="#AEB7C2" />
+                <TextBlock Style="{StaticResource Icon}" Text="&#xE72C;" FontSize="12" Foreground="{StaticResource TextDim}" />
             </Button>
         </StackPanel>
         <StackPanel Orientation="Horizontal">

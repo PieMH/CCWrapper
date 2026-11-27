@@ -193,9 +193,6 @@ public sealed class MessageRow(TranscriptMessage message) : Observable
 /// <summary>A TextBlock that paints every <see cref="Query"/> match of <see cref="FullText"/>; the one at offset <see cref="Current"/> stands out.</summary>
 public sealed class MatchTextBlock : TextBlock
 {
-    static readonly Brush MatchBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x6B, 0x5B, 0x00)));
-    static readonly Brush CurrentBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xC2, 0x6A, 0x00)));
-
     public static readonly DependencyProperty FullTextProperty = Register(nameof(FullText), typeof(string), "");
     public static readonly DependencyProperty QueryProperty = Register(nameof(Query), typeof(string), "");
     public static readonly DependencyProperty CurrentProperty = Register(nameof(Current), typeof(int), -1);
@@ -205,8 +202,6 @@ public sealed class MatchTextBlock : TextBlock
     public int Current { get => (int)GetValue(CurrentProperty); set => SetValue(CurrentProperty, value); }
 
     Run? _current;
-
-    static Brush Freeze(Brush b) { b.Freeze(); return b; }
 
     static DependencyProperty Register(string name, Type type, object defaultValue) =>
         DependencyProperty.Register(name, type, typeof(MatchTextBlock), new PropertyMetadata(defaultValue, (d, _) => ((MatchTextBlock)d).Rebuild()));
@@ -219,7 +214,7 @@ public sealed class MatchTextBlock : TextBlock
         foreach (var start in TranscriptSearch.Offsets(text, Query ?? ""))
         {
             Inlines.Add(new Run(text[pos..start]));
-            var run = new Run(text.Substring(start, Query!.Length)) { Background = start == Current ? CurrentBrush : MatchBrush };
+            var run = new Run(text.Substring(start, Query!.Length)) { Background = (Brush)FindResource(start == Current ? "SearchCurrent" : "SearchMatch") };
             if (start == Current) _current = run;
             Inlines.Add(run);
             pos = start + Query.Length;

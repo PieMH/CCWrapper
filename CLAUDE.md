@@ -89,7 +89,10 @@ dotnet test
 - **Ending a user's `claude` needs their yes.** Only "Resume here" does it, after a confirm (`ProcessTree.End`).
 - **Hidden `/usage` checks are a side effect to keep small.** Each one adds a line to that project's prompt history, so
   respect `UsageProbe`'s minimum gap.
-- **Colors only through `Theme.xaml` keys,** and only the Segoe Fluent Icons font for icons. Keep it light: hover and
+- **Colors only through `Theme.xaml` keys,** and only the Segoe Fluent Icons font for icons. Each theme in `Views/Themes.cs` sets every
+  color key (a test checks the set and the contrast), and `Program.Main` swaps it in before the first window: views may use
+  `StaticResource`, but styles inside `Theme.xaml` read colors as `DynamicResource` (their `StaticResource` would keep the frozen
+  Default brushes). A new color key goes in `Theme.xaml` and in every column of the `Themes.cs` table. Keep it light: hover and
   pressed states, no heavy animation, and every animation respects `SystemParameters.ClientAreaAnimation`.
 
 ## Workflow
@@ -97,3 +100,8 @@ dotnet test
 - `main` is protected: work on a branch and open a pull request. Never push to `main` or force-push.
 - Commit messages: no `Co-Authored-By` or other AI attribution trailers.
 - Keep README's feature list and test badge in step with behavior changes, and the policy files in step with what the app sends.
+
+<!-- skillmanager:start -->
+## SkillManager
+This project's skills, plugins, MCP servers and agents are tiered in `SKILLMANAGER.md`: essential loads every session, useful is pulled in on demand, informative is installed but off here. Read it before saying a capability is missing, and change tiers with `/skillmanager-update` rather than by installing things again.
+<!-- skillmanager:end -->

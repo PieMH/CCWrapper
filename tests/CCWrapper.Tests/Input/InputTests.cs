@@ -298,6 +298,30 @@ public sealed class InputTests
         Assert.Equal("two", h.Previous("")); // empty box starts from the newest again
     }
 
+    [Theory]
+    [InlineData(true, 5, 10, false, true)]   // Up on the first line, mid-text: to the start
+    [InlineData(true, 0, 10, false, false)]  // already at the start: history
+    [InlineData(true, 10, 10, true, false)]  // a recalled prompt: Up keeps browsing
+    [InlineData(false, 5, 10, false, true)]  // Down on the last line, mid-text: to the end
+    [InlineData(false, 10, 10, false, false)] // already at the end: history
+    [InlineData(false, 3, 10, true, false)]  // a recalled prompt: Down keeps browsing
+    [InlineData(true, 0, 0, false, false)]   // empty box: history
+    public void Arrows_jump_to_the_text_edge_before_the_history(bool up, int caret, int length, bool recalled, bool jumps) =>
+        Assert.Equal(jumps, ComposeBox.ArrowJumps(up, caret, length, recalled));
+
+    [Fact]
+    public void History_shows_only_an_unedited_recalled_prompt()
+    {
+        var h = new PromptHistory();
+        h.Add("one");
+        Assert.False(h.Shows("one")); // sent, not recalled
+        Assert.Equal("one", h.Previous(""));
+        Assert.True(h.Shows("one"));
+        Assert.False(h.Shows("one, edited"));
+        Assert.Equal("", h.Next("one"));
+        Assert.False(h.Shows(""));
+    }
+
     [Fact]
     public void History_does_not_repeat_the_last_prompt()
     {

@@ -154,17 +154,21 @@ public static class ShellModel
     }
 }
 
-/// <summary>One picker card. Utilization values are percents; 0 with a "—" text when unknown.</summary>
+/// <summary>One picker card. Utilization values are percents; 0 with a "—" text when unknown (also when the window has
+/// reset since the number was taken). <paramref name="AsOfTip"/>: why the usage could not be refreshed, when it could not.</summary>
 public sealed record AccountCard(Account Account, string Letter, string Color, string Title, string Subtitle,
-    double FiveHour, string FiveHourText, double Week, string WeekText, string AsOf, string Running)
+    double FiveHour, string FiveHourText, double Week, string WeekText, string AsOf, string Running, string? AsOfTip = null)
 {
-    public static AccountCard From(Account account, AccountInfo info, int running, DateTimeOffset now) => new(
-        account, ShellModel.LetterOf(account.Letter), ShellModel.ColorOf(account.Letter),
-        info.Email ?? account.Label,
-        string.Join(" · ", new[] { info.DisplayName, ShellModel.PlanOf(info.OrganizationType) }.Where(s => !string.IsNullOrEmpty(s))),
-        info.FiveHour?.Utilization ?? 0, ShellModel.Percent(info.FiveHour?.Utilization),
-        info.SevenDay?.Utilization ?? 0, ShellModel.Percent(info.SevenDay?.Utilization),
-        ShellModel.AsOf(info.UsageFetchedAt, now), running == 0 ? "none running" : $"{running} running");
+    /// <param name="live">The account's newest status line (<see cref="StatusLineFeed.Newest"/>): used when newer than the saved usage.</param>
+    public static AccountCard From(Account account, AccountInfo info, int running, DateTimeOffset now, StatusLineData? live = null)
+    {
+        var usage = BarFormat.Usage(live, info, now);
+        return new(account, ShellModel.LetterOf(account.Letter), ShellModel.ColorOf(account.Letter),
+            info.Email ?? account.Label,
+            string.Join(" · ", new[] { info.DisplayName, ShellModel.PlanOf(info.OrganizationType) }.Where(s => !string.IsNullOrEmpty(s))),
+            usage.FiveHour ?? 0, ShellModel.Percent(usage.FiveHour), usage.Week ?? 0, ShellModel.Percent(usage.Week),
+            ShellModel.AsOf(usage.At, now), running == 0 ? "none running" : $"{running} running");
+    }
 }
 
 /// <summary>One row of the picker's recent-sessions list.</summary>

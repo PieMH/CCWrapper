@@ -119,6 +119,13 @@ public static class AccountReader
             model, Effort(s, model), s.Prop("permissions").Prop("defaultMode").Str());
     }
 
+    /// <summary>Claude Code's own <c>theme</c> from settings.json ("dark", "light", "light-daltonized", …); null when unset.</summary>
+    public static string? ClaudeTheme(Account account)
+    {
+        using var settings = JsonUtil.Load(account.Paths.Settings);
+        return (settings?.RootElement ?? default).Prop("theme").Str();
+    }
+
     /// <summary>The "projects" keys of .claude.json with their lastStartTime (when present).</summary>
     internal static List<(string Path, DateTimeOffset? LastStart)> Projects(Account account)
     {

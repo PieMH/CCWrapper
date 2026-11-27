@@ -94,6 +94,8 @@ public sealed class CompactTests : IDisposable
     {
         var sl = new StatusLineData { FiveHourUsedPercent = 58, FiveHourResetsAt = Now.AddMinutes(-5) };
         Assert.Contains("5h window reset was due", BarFormat.Usage(sl, null, Now).Tip);
+        Assert.Null(BarFormat.Usage(sl, null, Now).FiveHour); // the window started over: 58% is not its usage
+        Assert.Equal("5h — · wk —", BarFormat.Usage(sl, null, Now).Text);
         Assert.DoesNotContain("resets", BarFormat.Usage(null, null, Now).Tip);
     }
 }
