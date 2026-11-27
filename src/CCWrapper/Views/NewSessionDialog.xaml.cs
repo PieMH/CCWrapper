@@ -32,6 +32,8 @@ public partial class NewSessionDialog : Window
         Folder.ItemsSource = projects.Select(p => p.Path).ToList();
         if (Folder.Text.Length == 0 && projects.Count > 0) Folder.SelectedIndex = 0;
         Fill(Model, ["opus", "sonnet", "haiku"], info?.Model);
+        // Opus by default; an account already on an Opus keeps its own (--model opus would drop "opus[1m]"'s 1M context)
+        if (info?.Model?.StartsWith("opus", StringComparison.OrdinalIgnoreCase) != true) Model.SelectedItem = "opus";
         Fill(Effort, ["low", "medium", "high", "xhigh", "max"], info?.Effort);
         Fill(Mode, ["acceptEdits", "auto", "bypassPermissions", "manual", "dontAsk", "plan"], info?.DefaultMode);
     }

@@ -64,7 +64,7 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
   - **Plugin page:** click a card in Discover for what the marketplace's `marketplace.json` says about the plugin (version, author, license, keywords), its components from a hidden `claude plugin details`, **Install**, and **View source**, which opens the source in your browser (http and https only).
   - **MCP servers and connectors:** every server with its health (connected, needs sign-in, failed), your own and those of plugins; add or remove your own, and sign in to servers and claude.ai connectors. A switch on each one turns it off for one project folder only, as `/mcp disable` does.
   - Every change runs Claude Code's own `claude plugin` or `claude mcp` command in the background, shown in the window's status strip. New sessions get the change; **Reload idle sessions** sends `/reload-plugins` to the open ones that are idle.
-- **New session:** pick a folder, plus optionally a model, effort, permission mode and name. Unchanged fields keep the account's defaults.
+- **New session:** pick a folder, plus optionally a model, effort, permission mode and name. The model starts on Opus, unless the account's own default is already an Opus (such as `opus[1m]`), which it keeps; the other unchanged fields keep the account's defaults.
 
 **Tabs**
 - Every open session is a tab above the terminal, running in parallel: its status (● working, ◎ waiting for you, gently pulsing, ○ idle), its name and a × to close it (asks first if Claude is busy; it stays resumable).
