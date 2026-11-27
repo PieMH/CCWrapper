@@ -97,3 +97,8 @@ dotnet test
 - `main` is protected: work on a branch and open a pull request. Never push to `main` or force-push.
 - Commit messages: no `Co-Authored-By` or other AI attribution trailers.
 - Keep README's feature list and test badge in step with behavior changes, and the policy files in step with what the app sends.
+
+<!-- skillmanager:start -->
+## SkillManager
+This project's skills, plugins, MCP servers and agents are tiered in `SKILLMANAGER.md`: essential loads every session, useful is pulled in on demand, informative is installed but off here. Read it before saying a capability is missing, and change tiers with `/skillmanager-update` rather than by installing things again.
+<!-- skillmanager:end -->

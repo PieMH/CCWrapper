@@ -1,0 +1,241 @@
+# SkillManager
+
+Scope: CCWrapper, a native Windows GUI (C# / .NET 10, WPF + Fluent) around the real Claude Code TUI: sessions as tabs, one account per window; ConPTY (Porta.Pty) shown through WebView2 + xterm.js; read-only parsers over Claude Code's files; a Browser panel driven over in-process CDP; a native-AOT relay exe; xUnit tests; Velopack releases from GitHub Actions. Work is C#/XAML features and fixes, Windows process/console plumbing, WPF view polish (color themes next) and README/policy docs. No web framework, backend, database or media work.
+
+The Claude Code skills, plugins, MCP servers and agents for this project, in three tiers. The SkillManager plugin
+applies them at every session start. To re-tier something, move its line to another section or run `/skillmanager-update`.
+
+## Essential
+
+Loaded in every session of this project.
+
+- `plugin:ponytail@ponytail` — Lazy senior dev mode. · Source: https://github.com/DietrichGebert/ponytail · Use: always on: smallest complete change; `/ponytail-review` before a PR · Config: user scope, v5.3.3; level follows effort
+- `plugin:security-guidance@claude-plugins-official` — Security review for Claude-generated code. · Source: https://github.com/anthropics/claude-plugins-official/tree/main/plugins/security-guidance · Use: regex warnings on edits; matters here for the Browser tool, pipes and process launch code · Config: user scope, v2.0.21; Opus reviews off via ENABLE_CODE_SECURITY_REVIEW=0
+- `plugin:skillmanager@skillmanager` — Per-project tiers for skills, plugins, MCP servers and agents: essential loads every session, useful is pulled in on demand, informative stays off. · Source: C:/Users/piemo/Projects/SkillManager · Use: these tiers; `/skillmanager-update` to move things · Config: user scope, v0.5.3
+- `plugin:agents-team@agents-team` — Orchestrated multi-agent work: the Opus session plans, routes, reviews, does the pivotal tasks and the final QA; light tasks run on a local model when the mach… · Source: https://github.com/PieMH/agents-team · Use: `/agents-team <work>` for multi-part releases (v1.2.0 was built this way); explicit-only · Config: user scope, v0.5.0; workers in per-task worktrees, PRs to protected main
+- `hook:user/PreToolUse/Bash` — runs rtk on PreToolUse · Source: user settings · Use: rewrites Bash commands through rtk to cut output · Config: user settings; `rtk proxy <cmd>` for raw output
+- `hook:user/UserPromptSubmit/*` — runs node on UserPromptSubmit · Source: user settings · Use: ponytail-effort.mjs sets ponytail's level from the prompt's effort · Config: user settings
+
+## Useful
+
+Not loaded up front. Pulled in when a task calls for it.
+
+- `plugin:context7@claude-plugins-official` — Upstash Context7 MCP server for up-to-date documentation lookup. · Source: https://github.com/anthropics/claude-plugins-official · Use: docs lookup for WPF/.NET 10, WebView2, Velopack, xterm.js, Porta.Pty · Config: user scope; enable here when a task needs library docs
+- `plugin:claude-md-management@claude-plugins-official` — Tools to maintain and improve CLAUDE.md files - audit quality, capture session learnings, and keep project memory current. · Source: https://github.com/anthropics/claude-plugins-official · Use: keep CLAUDE.md (rules, layout table, release notes) in step with behavior changes · Config: user scope, v1.0.0
+- `skill:impeccable` — Use when the user wants to design, redesign, shape, critique, audit, polish, simplify, harden, animate, or otherwise improve a frontend interface: websites, la… · Source: https://github.com/pbakaus/impeccable · Use: WPF view polish: hierarchy, color, states; the 1.2.1 color themes · Config: user scope; web-oriented, apply its judgment to XAML and Theme.xaml keys
+- `skill:interface-design` — Craft-first interface design for dashboards, admin panels, SaaS apps, tools, settings pages, data interfaces, and interactive products. · Source: https://github.com/Dammyjay93/interface-design · Use: settings pages, panels and tool UI craft; palettes for Default/Dark/High contrast/Space/Sun · Config: user scope; colors only through Theme.xaml keys
+- `agent:Code Reviewer` — Expert code reviewer who provides constructive, actionable feedback focused on correctness, maintainability, security, and performance — not style preferences. · Source: local · Use: review a branch before its PR · Config: project scope (.claude/agents)
+- `agent:Minimal Change Engineer` — Engineering specialist focused on minimum-viable diffs — fixes only what was asked, refuses scope creep, prefers three similar lines over a premature abstracti… · Source: local · Use: bug fixes that must stay small (usage probe, console spam, key handling) · Config: project scope (.claude/agents)
+- `agent:Desktop App Engineer` — Expert desktop application engineer for Electron and Tauri — secure IPC and process isolation, code signing and notarization, auto-update pipelines, native OS… · Source: local · Use: Windows desktop concerns: process trees, ConPTY, auto-update, signing · Config: project scope; written for Electron/Tauri, the concerns carry over to WPF/Velopack
+- `agent:Software Architect` — Expert software architect specializing in system design, domain-driven design, architectural patterns, and technical decision-making for scalable, maintainable… · Source: local · Use: larger design calls, e.g. theme switching (StaticResource vs DynamicResource) · Config: project scope (.claude/agents)
+- `agent:Technical Writer` — Expert technical writer specializing in developer documentation, API references, README files, and tutorials. · Source: local · Use: README feature list, PRIVACY/TERMS/SECURITY kept in step with what the app does · Config: project scope (.claude/agents)
+- `agent:Accessibility Auditor` — Expert accessibility specialist who audits interfaces against WCAG standards, tests with assistive technologies, and ensures inclusive design. · Source: local · Use: contrast and keyboard checks, e.g. the High contrast and Sun themes · Config: project scope (.claude/agents)
+- `agent:UI Designer` — Expert UI designer specializing in visual design systems, component libraries, and pixel-perfect interface creation. · Source: local · Use: visual design of new WPF views and the theme palettes · Config: project scope (.claude/agents)
+
+- `builtin:code-review` — Review the current diff or a PR for correctness bugs. · Source: built-in · Use: `/code-review` before a PR to protected main · Config: built-in
+- `builtin:simplify` — Review changed code for reuse and simplification, then apply fixes. · Source: built-in · Use: `/simplify` on a finished change · Config: built-in
+- `builtin:security-review` — On-demand AI security review. · Source: built-in · Use: `/security-review` for changes to BrowserMcp, BrowserPipe, ClaudeLaunch or anything that sends to the TUI · Config: built-in
+
+## Informative
+
+Installed on this machine and profile, switched off for this project. This section is regenerated per machine.
+
+- `plugin:chrome-devtools-mcp@claude-plugins-official` — Reliable automation, in-depth debugging, and performance analysis in Chrome using Chrome DevTools a… · Source: https://github.com/anthropics/claude-plugins-official
+- `plugin:clangd-lsp@claude-plugins-official` — No description · Source: https://github.com/anthropics/claude-plugins-official
+- `plugin:claude-code-setup@claude-plugins-official` — Analyze codebases and recommend tailored Claude Code automations such as hooks, skills, MCP servers… · Source: https://github.com/anthropics/claude-plugins-official
+- `plugin:design@synced` — Accelerate design workflows — critique, design system management, UX writing, accessibility audits,… · Source: claude.ai account
+- `plugin:engineering@synced` — Streamline engineering workflows — standups, code review, architecture decisions, incident response… · Source: claude.ai account
+- `plugin:floorplan@floorplan` — See how your app actually fits together: an interactive map of your codebase where every part, file… · Source: https://github.com/haydenschmitty/floorplan
+- `plugin:frontend-design@claude-plugins-official` — Frontend design skill for UI/UX implementation · Source: https://github.com/anthropics/claude-plugins-official
+- `plugin:hyperframes@hyperframes` — HyperFrames by HeyGen. · Source: https://hyperframes.heygen.com
+- `plugin:n8n-knowledge@synced` — Auto-recalls n8n documentation and community knowledge when working on n8n projects. · Source: https://github.com/dbenn8/n8n-knowledge
+- `plugin:watch@synced` — Give an agent video evidence: timestamped frames and native captions, with optional local WhisperX… · Source: https://github.com/bradautomates/claude-video
+- `skill:agent-reach` — Read-only access to platform content: search, read posts, view comments, fetch subtitles, stock quo… · Source: local
+- `skill:animate` — Build an animation from scratch, making the decisions in the order that determines whether it feels… · Source: https://github.com/emilkowalski/skills
+- `skill:animation-performance` — Keep web animations inside the frame budget — animate composite-only properties, keep motion off th… · Source: https://github.com/emilkowalski/skills
+- `skill:animation-vocabulary` — Reverse-lookup glossary that turns a vague description of a web animation or motion effect into its… · Source: https://github.com/emilkowalski/skills
+- `skill:anthropic-skills:built-in-browser` — Read this skill before the first step that uses the built-in browser, the browser pane inside the C… · Source: claude.ai account
+- `skill:anthropic-skills:chrome-browser` — Read this skill before the first step that uses Claude in Chrome, the browser extension whose tools… · Source: claude.ai account
+- `skill:anthropic-skills:computer-use` — Read this skill before the first step of any request to do something in an app on the person's own… · Source: claude.ai account
+- `skill:anthropic-skills:deep-research` — Use this skill when the user's prompt requires (1) researching a topic across multiple sources, com… · Source: claude.ai account
+- `skill:anthropic-skills:doc-coauthoring` — Guide users through a structured workflow for co-authoring documentation. · Source: claude.ai account
+- `skill:anthropic-skills:docs` — docs (editable docs people share and comment on; the default for any document, named as a doc or no… · Source: claude.ai account
+- `skill:anthropic-skills:docx` — Use this skill whenever the user wants to create, read, edit, or manipulate Word documents (.docx)… · Source: claude.ai account
+- `skill:anthropic-skills:google-workspace` — Read this before the first Google Drive, Docs, Sheets or Slides connector call whenever the task cr… · Source: claude.ai account
+- `skill:anthropic-skills:import-memory` — Import a memory export from another AI assistant into Claude's memory — conversationally, additivel… · Source: claude.ai account
+- `skill:anthropic-skills:learn` — Use this skill when the user wants intellectual understanding — learning how or why something works… · Source: claude.ai account
+- `skill:anthropic-skills:morning` — Render the user's morning brief as a styled HTML artifact, or set it up as a recurring weekday task. · Source: claude.ai account
+- `skill:anthropic-skills:pdf` — Use this skill whenever the user wants to do anything with PDF files. · Source: claude.ai account
+- `skill:anthropic-skills:pptx` — Use this skill any time a .pptx or .potx file is involved in any way — as input, output, or both. · Source: claude.ai account
+- `skill:anthropic-skills:site-redesign-kit` — Mappa un sito pubblico, ne estrae i contenuti fedelmente, produce audit UX/manutenibilità e prototi… · Source: claude.ai account
+- `skill:anthropic-skills:skill-creator` — Create new skills, modify and improve existing skills, and measure skill performance. · Source: claude.ai account
+- `skill:anthropic-skills:theme-factory` — Toolkit for styling artifacts with a theme. · Source: claude.ai account
+- `skill:anthropic-skills:web-artifacts-builder` — Suite of tools for creating elaborate, multi-component claude.ai HTML artifacts using modern fronte… · Source: claude.ai account
+- `skill:anthropic-skills:xlsx` — Use this skill any time a spreadsheet file is the primary input or output. · Source: claude.ai account
+- `skill:apple-design` — Apple's approach to interface design and fluid, physical motion, translated for the web. · Source: https://github.com/emilkowalski/skills
+- `skill:brandkit` — Premium brand-kit image generation skill for creating high-end brand-guidelines boards, logo system… · Source: https://github.com/Leonxlnx/taste-skill
+- `skill:break-ui` — Try to break a piece of UI by feeding it worst-case data — long names, unbreakable emails, one-lett… · Source: https://github.com/emilkowalski/skills
+- `skill:choreograph` — Coordinate several elements that animate together — decide what moves, in what order, how much they… · Source: https://github.com/emilkowalski/skills
+- `skill:design-taste-frontend` — tasteskill 2.5.1, the anti-slop frontend skill. · Source: https://github.com/Leonxlnx/taste-skill
+- `skill:emil-design-eng` — Emil Kowalski's design-engineering philosophy for UI polish, component design, animation decisions,… · Source: https://github.com/emilkowalski/skills
+- `skill:find-animation-opportunities` — Search a codebase or UI for places that don't animate but should, and reject everything that should… · Source: https://github.com/emilkowalski/skills
+- `skill:google-maps-scraper` — Google Maps scraper for lead generation. · Source: https://github.com/Mahanaicoach/google-maps-scraper-kit
+- `skill:gsap-core` — Official GSAP skill for the core API — gsap.to(), from(), fromTo(), easing, duration, stagger, defa… · Source: https://github.com/greensock/gsap-skills
+- `skill:gsap-performance` — Official GSAP skill for performance — prefer transforms, avoid layout thrashing, will-change, batch… · Source: https://github.com/greensock/gsap-skills
+- `skill:gsap-plugins` — Official GSAP skill for GSAP plugins — registration, ScrollToPlugin, ScrollSmoother, Flip, Draggabl… · Source: https://github.com/greensock/gsap-skills
+- `skill:gsap-react` — Official GSAP skill for React — useGSAP hook, refs, gsap.context(), cleanup. · Source: https://github.com/greensock/gsap-skills
+- `skill:gsap-scrolltrigger` — Official GSAP skill for ScrollTrigger — scroll-linked animations, pinning, scrub, triggers. · Source: https://github.com/greensock/gsap-skills
+- `skill:gsap-timeline` — Official GSAP skill for timelines — gsap.timeline(), position parameter, nesting, playback. · Source: https://github.com/greensock/gsap-skills
+- `skill:hallmark` — Design skill for websites and new pages that look designed, not generated. · Source: https://github.com/nutlope/hallmark
+- `skill:humanizer` — Rewrite AI-sounding text so it reads like the writer without changing what it says. · Source: https://github.com/blader/humanizer
+- `skill:improve-animations` — Survey a codebase's animation and motion code as a senior motion advisor, then produce a prioritize… · Source: https://github.com/emilkowalski/skills
+- `skill:last30days` — Research what people actually say about any topic in the last 30 days. · Source: https://github.com/mvanhorn/last30days-skill
+- `skill:logo-design` — Professional logo and brand-mark design, from brief to production files. · Source: https://github.com/kaankiziltug/logo-design-skill
+- `skill:openfilm` — Make videos as web pages with OpenFilm. · Source: https://github.com/openfilm/openfilm
+- `skill:pick-ui-library` — Pick the library for a frontend task from a curated list — primitives, toasts, drawers, command men… · Source: https://github.com/emilkowalski/skills
+- `skill:prototype` — Build multiple genuinely different versions of a UI piece you describe, rendered behind a visual pi… · Source: https://github.com/emilkowalski/skills
+- `skill:redesign-existing-projects` — Upgrades existing websites and apps to premium quality. · Source: https://github.com/Leonxlnx/taste-skill
+- `skill:review-animations` — Reviews animation and motion code against a high craft bar derived from Emil Kowalski's design engi… · Source: https://github.com/emilkowalski/skills
+- `skill:teach` — Teach the user a new skill or concept, within this workspace. · Source: https://github.com/mattpocock/skills
+- `skill:transitions-dev` — Production-ready CSS transitions for web apps. · Source: https://github.com/Jakubantalik/transitions.dev
+- `skill:vercel-composition-patterns` — React composition patterns that scale. · Source: https://github.com/vercel-labs/agent-skills
+- `skill:vercel-react-best-practices` — React and Next.js performance optimization guidelines from Vercel Engineering. · Source: https://github.com/vercel-labs/agent-skills
+- `skill:video-use` — Edit any video by conversation. · Source: https://github.com/browser-use/video-use
+- `skill:web-design-guidelines` — Review UI code for Web Interface Guidelines compliance. · Source: https://github.com/vercel-labs/agent-skills
+- `mcp:anicraft` — stdio server (anicraft-cli) · Source: local
+- `mcp:deckcraft` — stdio server (deckcraft-cli) · Source: local
+- `mcp:designcraft` — stdio server (designcraft-cli) · Source: local
+- `mcp:effectcraft` — stdio server (effectcraft-cli) · Source: local
+- `mcp:figcraft` — stdio server (figcraft-cli) · Source: local
+- `mcp:filmcraft` — stdio server (filmcraft-cli) · Source: local
+- `mcp:gridcraft` — stdio server (gridcraft-cli) · Source: local
+- `mcp:pdfcraft` — stdio server (pdfcraft-cli) · Source: local
+- `mcp:photocraft` — stdio server (photocraft-cli) · Source: local
+- `mcp:soundcraft` — stdio server (soundcraft-cli) · Source: local
+- `mcp:vectorcraft` — stdio server (vectorcraft-cli) · Source: local
+- `mcp:wordcraft` — stdio server (wordcraft-cli) · Source: local
+- `agent:AI Data Remediation Engineer` — Specialist in self-healing data pipelines — uses air-gapped local SLMs and semantic clustering to a… · Source: local
+- `agent:AI Engineer` — Expert AI/ML engineer specializing in machine learning model development, deployment, and integrati… · Source: local
+- `agent:AI-Generated Code Security Auditor` — Security reviewer for AI-generated and vibe-coded apps — hunts the hardcoded secrets, broken row-le… · Source: local
+- `agent:API Platform Engineer` — Expert API platform engineer for public and partner APIs — contract-first design (OpenAPI/gRPC), ve… · Source: local
+- `agent:API Tester` — Expert API testing specialist focused on comprehensive API validation, performance testing, and qua… · Source: local
+- `agent:Application Security Engineer` — AppSec specialist who secures the software development lifecycle through threat modeling, secure co… · Source: local
+- `agent:ATS Validator Architect` — Architect and validator for Applicant Tracking Systems (ATS) and resume parsers. · Source: local
+- `agent:Autonomous Optimization Architect` — Intelligent system governor that continuously shadow-tests APIs for performance while enforcing str… · Source: local
+- `agent:Backend Architect` — Senior backend architect specializing in scalable system design, database architecture, API develop… · Source: local
+- `agent:Blockchain Security Auditor` — Expert smart contract security auditor specializing in vulnerability detection, formal verification… · Source: local
+- `agent:Brand Guardian` — Expert brand strategist and guardian specializing in brand identity development, consistency mainte… · Source: local
+- `agent:China Network Engineer` — Expert in mainland China's mainstream enterprise networking stacks — Huawei VRP, H3C Comware, Ruiji… · Source: local
+- `agent:Cloud Security Architect` — Cloud-native security specialist designing zero trust architectures, implementing defense-in-depth… · Source: local
+- `agent:CMS Developer` — Drupal and WordPress specialist for theme development, custom plugins/modules, content architecture… · Source: local
+- `agent:Codebase Archaeologist` — Multi-session, multi-tool drift detection specialist who audits codebases touched by several AI cod… · Source: local
+- `agent:Codebase Onboarding Engineer` — Expert developer onboarding specialist who helps new engineers understand unfamiliar codebases fast… · Source: local
+- `agent:Compliance Auditor` — Expert technical compliance auditor specializing in SOC 2, ISO 27001, HIPAA, and PCI-DSS audits — f… · Source: local
+- `agent:Data Engineer` — Expert data engineer specializing in building reliable data pipelines, lakehouse architectures, and… · Source: local
+- `agent:Data Privacy Officer` — Corporate data privacy specialist and DPO who builds GDPR, CCPA, and global privacy compliance prog… · Source: local
+- `agent:Data Visualization Engineer` — Expert data visualization engineer — chart-type selection by data and question, perceptually honest… · Source: local
+- `agent:Database Optimizer` — Expert database specialist focusing on schema design, query optimization, indexing strategies, and… · Source: local
+- `agent:Database Reliability Engineer` — Expert database reliability engineer (DBRE) — high availability and replication, automated failover… · Source: local
+- `agent:Developer Tooling Engineer` — Expert developer-tooling and CLI engineer — building command-line tools and internal developer plat… · Source: local
+- `agent:DevOps Automator` — Expert DevOps engineer specializing in infrastructure automation, CI/CD pipeline development, and c… · Source: local
+- `agent:Drupal Performance Engineer` — Expert Drupal 10/11 performance engineer specializing in Core Web Vitals, render and dynamic page c… · Source: local
+- `agent:Drupal Shopping Cart Engineer` — Expert Drupal e-commerce engineer specializing in Drupal Commerce for product catalog management, p… · Source: local
+- `agent:Email Intelligence Engineer` — Expert in extracting structured, reasoning-ready data from raw email threads for AI agents and auto… · Source: local
+- `agent:Embedded Firmware Engineer` — Specialist in bare-metal and RTOS firmware - ESP32/ESP-IDF, PlatformIO, Arduino, ARM Cortex-M, STM3… · Source: local
+- `agent:Evidence Collector` — Screenshot-obsessed, fantasy-allergic QA specialist - Reports reproducible issues with evidence and… · Source: local
+- `agent:Feishu Integration Developer` — Full-stack integration expert specializing in the Feishu (Lark) Open Platform — proficient in Feish… · Source: local
+- `agent:Filament Optimization Specialist` — Expert in restructuring and optimizing Filament PHP admin interfaces for maximum usability and effi… · Source: local
+- `agent:FinOps Engineer` — Expert cloud cost engineer for AWS/GCP/Azure — cost allocation and tagging, rightsizing, commitment… · Source: local
+- `agent:Frontend Developer` — Expert frontend developer specializing in modern web technologies, React/Vue/Angular frameworks, UI… · Source: local
+- `agent:GaussDB Expert Engineer` — Expert database specialist focusing on GaussDB OLTP — Huawei's self-developed enterprise-grade rela… · Source: local
+- `agent:Git Workflow Master` — Expert in Git workflows, branching strategies, and version control best practices including convent… · Source: local
+- `agent:Identity & Access Engineer` — Expert identity engineer for OAuth 2.0/OIDC flows, enterprise SSO (SAML/OIDC) and SCIM provisioning… · Source: local
+- `agent:Image Prompt Engineer` — Expert photography prompt engineer specializing in crafting detailed, evocative prompts for AI imag… · Source: local
+- `agent:Incident Responder` — Digital forensics and incident response specialist who leads breach investigations, contains active… · Source: local
+- `agent:Incident Response Commander` — Expert incident commander specializing in production incident management, structured response coord… · Source: local
+- `agent:Inclusive Visuals Specialist` — Representation expert who defeats systemic AI biases to generate culturally accurate, affirming, an… · Source: local
+- `agent:Internationalization Engineer` — Expert i18n engineer for ICU MessageFormat, CLDR plural rules, RTL and bidirectional layouts, local… · Source: local
+- `agent:IoT Fleet Engineer` — Expert IoT and edge fleet engineer — device provisioning and identity, MQTT/telemetry pipelines, st… · Source: local
+- `agent:IT Service Manager` — Expert IT service management specialist using ITIL 4 framework for service catalog design, incident… · Source: local
+- `agent:it-compliance-auditor` — Audits a built Italian SMB website against the agency's legal and launch doctrine — footer legal na… · Source: local
+- `agent:italian-copy-reviewer` — Reviews Italian website copy for native fluency before a client sees it — flags translationese, Eng… · Source: local
+- `agent:Knowledge Graph Engineer` — Structures information and capabilities into interconnected nodes (entities) and edges (relationshi… · Source: local
+- `agent:LLM Post-Training Engineer` — Evidence-driven owner for SFT, preference optimization, RLHF/RLVR, MoE post-training, and the relea… · Source: local
+- `agent:MCP Builder` — Expert Model Context Protocol developer who designs, builds, and tests MCP servers that extend AI a… · Source: local
+- `agent:Mobile App Builder` — Specialized mobile application developer with expertise in native iOS/Android development and cross… · Source: local
+- `agent:Mobile Release Engineer` — Expert mobile release and distribution engineer for iOS and Android — code signing, provisioning, f… · Source: local
+- `agent:Multi-Agent Systems Architect` — Systems architect specializing in the design, coordination, and governance of multi-agent AI pipeli… · Source: local
+- `agent:Network Engineer` — Expert network engineer for Cisco IOS/IOS-XE, Cisco ASA/FTD, Juniper Junos, and Palo Alto PAN-OS ro… · Source: local
+- `agent:OrgScript Engineer` — Expert in designing, parsing, and implementing OrgScript grammar, AST validation, and business logi… · Source: local
+- `agent:Payments & Billing Engineer` — Expert payments engineer for PSP integrations (Stripe, Adyen, Braintree, PayPal), idempotent paymen… · Source: local
+- `agent:PDF Engine Architect` — Architect and specialist in deterministic HTML-to-PDF document compilation, Playwright browser cont… · Source: local
+- `agent:Penetration Tester` — Offensive security specialist conducting authorized penetration tests, red team operations, and vul… · Source: local
+- `agent:Performance Benchmarker` — Expert performance testing and optimization specialist focused on measuring, analyzing, and improvi… · Source: local
+- `agent:Persona Walkthrough Specialist` — Simulate cognitive walkthroughs of web pages from a defined persona's psychological perspective — c… · Source: local
+- `agent:Platform Engineer` — Expert internal developer platform (IDP) engineer specializing in golden paths, paved roads, and se… · Source: local
+- `agent:Privacy Engineer` — Expert privacy engineer who implements privacy in code — PII discovery and classification, data min… · Source: local
+- `agent:Prompt Engineer` — Specialist in crafting, testing, and systematically optimizing prompts for LLMs — turning vague ins… · Source: local
+- `agent:RAG Pipeline Engineer` — Production RAG specialist focused on chunking strategy, retrieval quality, hybrid search, re-rankin… · Source: local
+- `agent:Rapid Prototyper` — Specialized in ultra-fast proof-of-concept development and MVP creation using efficient tools and f… · Source: local
+- `agent:Reality Checker` — Stops fantasy approvals, evidence-based certification - Default to "NEEDS WORK", requires overwhelm… · Source: local
+- `agent:Realtime Collaboration Engineer` — Expert realtime systems engineer for WebSocket/SSE infrastructure, presence, CRDT and OT-based coll… · Source: local
+- `agent:Research Synthesist` — Expert in literature review, source evaluation, and evidence synthesis — turns a scattered pile of… · Source: local
+- `agent:Rust Refactoring Specialist` — Expert Rust engineer for repository-scale refactoring, safe renames, module restructuring, duplicat… · Source: local
+- `agent:Search Relevance Engineer` — Expert search engineer for Elasticsearch and OpenSearch — index and analyzer design, BM25 query tun… · Source: local
+- `agent:Secrets & Credential Hygiene Engineer` — Owns the full lifecycle of secrets and credentials — detection, prevention, vaulting, rotation, and… · Source: local
+- `agent:Section 508 Accessibility Specialist` — Expert U.S. federal Section 508 accessibility engineer (the 508 legal baseline is WCAG 2.0 Level AA… · Source: local
+- `agent:Security Architect` — Expert security architect specializing in threat modeling, secure-by-design architecture, trust-bou… · Source: local
+- `agent:Senior Developer` — Premium implementation specialist - Masters Laravel/Livewire/FluxUI, advanced CSS, Three.js integra… · Source: local
+- `agent:Senior SecOps Engineer` — Defensive application security specialist who scans every code submission for secrets and sensitive… · Source: local
+- `agent:ServiceNow Developer & Mentor` — ServiceNow platform developer and step-by-step troubleshooter — Business Rules, Script Includes, Gl… · Source: local
+- `agent:Solidity Smart Contract Engineer` — Expert Solidity developer specializing in EVM smart contract architecture, gas optimization, upgrad… · Source: local
+- `agent:SRE (Site Reliability Engineer)` — Expert site reliability engineer specializing in SLOs, error budgets, observability, chaos engineer… · Source: local
+- `agent:Test Automation Engineer` — Expert end-to-end test automation engineer for Playwright and Cypress — resilient selectors, flake… · Source: local
+- `agent:Test Results Analyzer` — Expert test analysis specialist focused on comprehensive test result evaluation, quality metrics an… · Source: local
+- `agent:Threat Detection Engineer` — Expert detection engineer specializing in SIEM rule development, MITRE ATT&CK coverage mapping, thr… · Source: local
+- `agent:Threat Intelligence Analyst` — Cyber threat intelligence specialist who tracks adversary groups, maps attack campaigns to MITRE AT… · Source: local
+- `agent:Tool Evaluator` — Expert technology assessment specialist focused on evaluating, testing, and recommending tools, sof… · Source: local
+- `agent:UI Finish-Gate Reviewer` — Product-interface reviewer who catches generic, interchangeable UI before it ships by grounding cri… · Source: local
+- `agent:Universal Document Compiler` — Architect of schema-agnostic document ASTs, algorithmic data-shape layout inference, bidirectional… · Source: local
+- `agent:USWDS Developer` — Expert U.S. Web Design System frontend developer specializing in USWDS components and design tokens… · Source: local
+- `agent:UX Architect` — Technical architecture and UX specialist who provides developers with solid foundations, CSS system… · Source: local
+- `agent:UX Researcher` — Expert user experience researcher specializing in user behavior analysis, usability testing, and da… · Source: local
+- `agent:Video Streaming Engineer` — Expert video streaming engineer for adaptive bitrate delivery — HLS/DASH packaging, ffmpeg transcod… · Source: local
+- `agent:Visual Storyteller` — Expert visual communication specialist focused on creating compelling visual narratives, multimedia… · Source: local
+- `agent:Voice AI Integration Engineer` — Expert in building end-to-end speech transcription pipelines using Whisper-style models and cloud A… · Source: local
+- `agent:WebAssembly Engineer` — Expert WebAssembly engineer — compiling Rust/C++/Go to Wasm, JS interop and the boundary marshallin… · Source: local
+- `agent:WeChat Mini Program Developer` — Expert WeChat Mini Program developer specializing in 小程序 development with WXML/WXSS/WXS, WeChat API… · Source: local
+- `agent:Whimsy Injector` — Expert creative specialist focused on adding personality, delight, and playful elements to brand ex… · Source: local
+- `agent:WordPress Performance Engineer` — Expert WordPress performance engineer specializing in Core Web Vitals, object caching (Redis/Memcac… · Source: local
+- `agent:WordPress Shopping Cart Engineer` — Expert WordPress e-commerce engineer specializing in WooCommerce for product catalog management, pa… · Source: local
+- `agent:Workflow Architect` — Workflow design specialist who maps complete workflow trees for every system, user journey, and age… · Source: local
+- `agent:Workflow Optimizer` — Expert process improvement specialist focused on analyzing, optimizing, and automating workflows ac… · Source: local
+- `builtin:run` — Launch and drive the app to see a change. · Source: built-in · Off here: CLAUDE.md verifies with tests, `--smoke` and targeted live checks, never UI automation
+- `builtin:claude-api` — Claude API / Anthropic SDK reference. · Source: built-in · Off here: the app never calls Anthropic APIs, and it would trigger on every mention of Claude Code
+- `connector:Asana` — claude.ai connector. · Source: claude.ai account
+- `connector:Atlassian` — claude.ai connector. · Source: claude.ai account
+- `connector:BibleMCP` — claude.ai connector. · Source: claude.ai account
+- `connector:Box` — claude.ai connector. · Source: claude.ai account
+- `connector:Canva` — claude.ai connector. · Source: claude.ai account
+- `connector:Claude Data` — claude.ai connector. · Source: claude.ai account
+- `connector:Claude Docs` — claude.ai connector. · Source: claude.ai account
+- `connector:ElevenLabs` — claude.ai connector. · Source: claude.ai account
+- `connector:Figma` — claude.ai connector. · Source: claude.ai account
+- `connector:Full Elevenlabs connector` — claude.ai connector. · Source: claude.ai account
+- `connector:Gmail` — claude.ai connector. · Source: claude.ai account
+- `connector:Google Calendar` — claude.ai connector. · Source: claude.ai account
+- `connector:Google Docs` — claude.ai connector. · Source: claude.ai account
+- `connector:Google Drive` — claude.ai connector. · Source: claude.ai account
+- `connector:Google Sheets` — claude.ai connector. · Source: claude.ai account
+- `connector:Google Slides` — claude.ai connector. · Source: claude.ai account
+- `connector:HubSpot` — claude.ai connector. · Source: claude.ai account
+- `connector:Intercom` — claude.ai connector. · Source: claude.ai account
+- `connector:Linear` — claude.ai connector. · Source: claude.ai account
+- `connector:Meetings` — claude.ai connector. · Source: claude.ai account
+- `connector:Notion` — claude.ai connector. · Source: claude.ai account
+- `connector:Sentry` — claude.ai connector. · Source: claude.ai account
+- `connector:Slack` — claude.ai connector. · Source: claude.ai account
+- `connector:Supabase` — claude.ai connector. · Source: claude.ai account
+- `connector:Trello` — claude.ai connector. · Source: claude.ai account
+- `connector:monday.com` — claude.ai connector. · Source: claude.ai account
+- `connector:n8n` — claude.ai connector. · Source: claude.ai account
