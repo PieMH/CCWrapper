@@ -38,7 +38,7 @@ public partial class AccountPicker : Window
             var (cards, recent) = await Task.Run(() => // reads files: off the UI thread
             {
                 var accounts = AccountStore.Discover();
-                return (accounts.Select(a => AccountCard.From(a, AccountReader.Read(a), SessionCatalog.Running(a).Count, now)).ToList(),
+                return (accounts.Select(a => AccountCard.From(a, AccountReader.Read(a), SessionCatalog.Running(a).Count, now, StatusLineFeed.Newest(a))).ToList(),
                     SessionCatalog.Recent(accounts).Select(e => RecentRow.From(e, now)).ToList());
             });
             var shown = new ObservableCollection<AccountCard>(cards);
@@ -54,14 +54,18 @@ public partial class AccountPicker : Window
         Status.Visibility = Status.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    /// <summary>Runs /usage hidden for the card's account (see <see cref="UsageProbe"/>) and shows the fresh numbers.</summary>
+    /// <summary>Runs /usage hidden for the card's account (see <see cref="UsageProbe"/>) and shows the fresh numbers, or
+    /// says how to get them when the check saved nothing.</summary>
     static async Task CheckUsageAsync(ObservableCollection<AccountCard> cards, int i)
     {
         var card = cards[i];
         cards[i] = card with { AsOf = "checking usage…" };
         var fresh = await UsageProbe.RefreshAsync(card.Account);
-        var info = fresh ? await Task.Run(() => AccountReader.Read(card.Account)) : null;
-        cards[i] = info is null ? card : AccountCard.From(card.Account, info, 0, DateTimeOffset.Now) with { Running = card.Running };
+        var a = card.Account;
+        var info = fresh ? await Task.Run(() => AccountReader.Read(a)) : null;
+        cards[i] = info is not null ? AccountCard.From(a, info, 0, DateTimeOffset.Now, await Task.Run(() => StatusLineFeed.Newest(a))) with { Running = card.Running }
+            : UsageProbe.FailedRecently(a) ? card with { AsOf = "run /login to refresh", AsOfTip = $"{UsageProbe.FailedHint}\nThe numbers shown: {card.AsOf}." }
+            : card;
     }
 
     void OnCardClick(object sender, RoutedEventArgs e)

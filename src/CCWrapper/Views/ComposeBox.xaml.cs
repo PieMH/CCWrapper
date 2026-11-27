@@ -324,19 +324,32 @@ public partial class ComposeBox : UserControl
             try { if (Clipboard.GetDataObject() is { } data && PasteHandler.ForCompose(data) is { } text) Insert(text); }
             catch (ExternalException) { } // clipboard held by another app
         }
-        else if (e.Key == Key.Up && _session is not null
-            && Input.GetLineIndexFromCharacterIndex(Input.CaretIndex) == 0 && HistoryOf(_session).Previous(Input.Text) is { } prev)
+        else if (e.Key is Key.Up or Key.Down && OnEdgeLine(up: e.Key == Key.Up))
         {
-            e.Handled = true;
-            Recall(prev);
-        }
-        else if (e.Key == Key.Down && _session is not null
-            && Input.GetLineIndexFromCharacterIndex(Input.CaretIndex) == Input.LineCount - 1 && HistoryOf(_session).Next(Input.Text) is { } next)
-        {
-            e.Handled = true;
-            Recall(next);
+            var up = e.Key == Key.Up;
+            var history = _session is null ? null : HistoryOf(_session);
+            if (mods == ModifierKeys.None && ArrowJumps(up, Input.CaretIndex, Input.Text.Length, history?.Shows(Input.Text) == true))
+            {
+                e.Handled = true;
+                Input.CaretIndex = up ? 0 : Input.Text.Length;
+            }
+            else if (history is not null && (up ? history.Previous(Input.Text) : history.Next(Input.Text)) is { } text)
+            {
+                e.Handled = true;
+                Recall(text);
+            }
         }
     }
+
+    bool OnEdgeLine(bool up)
+    {
+        var line = Input.GetLineIndexFromCharacterIndex(Input.CaretIndex);
+        return up ? line == 0 : line == Input.LineCount - 1;
+    }
+
+    /// <summary>Up on the first line / Down on the last: true when the caret should jump to the start / end of the text.
+    /// From there, or while the box shows a recalled prompt, the key browses the prompt history instead.</summary>
+    internal static bool ArrowJumps(bool up, int caret, int length, bool recalled) => !recalled && (up ? caret > 0 : caret < length);
 
     /// <summary>Puts <paramref name="text"/> in an empty box and focuses it. A box with text keeps it: the text is never replaced
     /// or added to, only focused. Not sent.</summary>
@@ -670,6 +683,9 @@ public sealed class PromptHistory
         if (_items.Count == 0 || _items[^1] != text) _items.Add(text);
         _pos = _items.Count;
     }
+
+    /// <summary>True when <paramref name="box"/> shows the prompt Up/Down last recalled, unedited.</summary>
+    public bool Shows(string box) => box.Length > 0 && _pos < _items.Count && box == _items[_pos];
 
     /// <summary>The older prompt, or null when <paramref name="box"/> holds something typed or nothing is older.</summary>
     public string? Previous(string box)

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using CCWrapper.Core;
 using CCWrapper.Data;
 using CCWrapper.Terminal;
@@ -117,6 +118,42 @@ public sealed class ShellTests
 
         var unknown = AccountCard.From(A, new AccountInfo(null, null, null, null, null, null, null, null, null, null, null), 0, Now);
         Assert.Equal(("a@x.com", "", "—", "usage unknown", "none running"), (unknown.Title, unknown.Subtitle, unknown.FiveHourText, unknown.AsOf, unknown.Running));
+    }
+
+    [Fact]
+    public void Card_takes_the_newer_status_line_and_blanks_a_window_that_has_reset()
+    {
+        // Saved two weeks ago; its weekly window reset since: the old 36% is not this week's usage.
+        var info = new AccountInfo("me@x.com", null, null, null, null, Now.AddDays(-14), new(0, null), new(36, Now.AddDays(-11)), null, null, null);
+        var stale = AccountCard.From(C, info, 0, Now);
+        Assert.Equal(("0%", "—"), (stale.FiveHourText, stale.WeekText));
+
+        var live = new StatusLineData { FiveHourUsedPercent = 4, SevenDayUsedPercent = 75, SevenDayResetsAt = Now.AddDays(2), ReceivedAt = Now.AddMinutes(-5) };
+        var card = AccountCard.From(C, info, 0, Now, live);
+        Assert.Equal(("4%", "75%", "as of 11:55"), (card.FiveHourText, card.WeekText, card.AsOf));
+    }
+
+    [Fact]
+    public void Newest_status_line_is_the_accounts_own()
+    {
+        var dir = Directory.CreateTempSubdirectory("ccw-live-").FullName;
+        try
+        {
+            static string Line(string root, int week) => System.Text.Json.JsonSerializer.Serialize(new
+            {
+                transcript_path = root + @"\projects\C--p\s.jsonl",
+                rate_limits = new { seven_day = new { used_percentage = week } },
+            });
+            File.WriteAllText(Path.Combine(dir, "1.json"), Line(@"C:\h\.claude-c", 10));
+            File.WriteAllText(Path.Combine(dir, "2.json"), Line(@"C:\h\.claude-c", 20));
+            File.WriteAllText(Path.Combine(dir, "3.json"), Line(@"C:\h\.claude-cc", 99)); // another account whose folder shares the prefix
+            File.WriteAllText(Path.Combine(dir, "4.json"), "not json");
+            File.SetLastWriteTime(Path.Combine(dir, "1.json"), DateTime.Now.AddMinutes(-10));
+
+            Assert.Equal(20, StatusLineFeed.Newest(C, dir)?.SevenDayUsedPercent);
+            Assert.Null(StatusLineFeed.Newest(A, dir)); // ~\.claude: none of these
+        }
+        finally { Directory.Delete(dir, recursive: true); }
     }
 
     [Fact]

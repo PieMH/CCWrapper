@@ -427,7 +427,8 @@
                                        Text="The bottom bar offers a Compact button, left of the context meter, once the context passes the threshold. The button only fills the message box; you send it." />
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                                 <TextBlock Text="Threshold" VerticalAlignment="Center" Margin="0,0,10,0" />
-                                <TextBox x:Name="CompactThreshold" Style="{StaticResource Field}" Width="60" TextChanged="OnAppEdited" AutomationProperties.Name="Context threshold in percent" />
+                                <!-- 100 wide: two digits beside Fluent's clear button (60 hid the digits under it) -->
+                                <TextBox x:Name="CompactThreshold" Style="{StaticResource Field}" Width="100" TextChanged="OnAppEdited" AutomationProperties.Name="Context threshold in percent" />
                                 <TextBlock Text="% of the context window (1 to 99)" Style="{StaticResource Dim}" VerticalAlignment="Center" Margin="8,0,0,0" />
                             </StackPanel>
                             <TextBlock Text="Prompt after /compact" Margin="0,0,0,4" />
