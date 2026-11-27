@@ -30,7 +30,7 @@
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#20242A" />
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHover}" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource Raised}" />
@@ -45,7 +45,7 @@
 
         <!-- Status: ● working, ◎ waiting for input (pulses unless Windows animations are off), ○ idle, dim ○ ended -->
         <Style x:Key="StatusRing" TargetType="Ellipse">
-            <Setter Property="Stroke" Value="White" />
+            <Setter Property="Stroke" Value="{StaticResource Text}" />
             <Setter Property="StrokeThickness" Value="1.4" />
             <Setter Property="Width" Value="9" />
             <Setter Property="Height" Value="9" />
@@ -79,7 +79,7 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="StatusDot" TargetType="Ellipse">
-            <Setter Property="Fill" Value="White" />
+            <Setter Property="Fill" Value="{StaticResource Text}" />
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Status}" Value="Busy">

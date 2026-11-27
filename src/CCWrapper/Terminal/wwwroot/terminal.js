@@ -7,6 +7,8 @@ const $ = id => document.getElementById(id);
 const tabs = new Map(); // id -> { id, term, fit, search, el, overlay }
 let visible = null;
 let webgl = null;
+// Default theme until the host sends the chosen one ('theme', before any tab opens).
+let termTheme = { background: '#101215', foreground: '#d3d9e1', cursor: '#d3d9e1', selectionBackground: '#2b74c266' };
 
 const decorations = {
   matchBackground: '#5c4a1f',
@@ -27,7 +29,7 @@ function create(id) {
     scrollback: 10000,
     fontFamily: "'Cascadia Mono', Consolas, monospace",
     fontSize: 14,
-    theme: { background: '#101215', foreground: '#d3d9e1', cursor: '#d3d9e1', selectionBackground: '#2b74c266' }, // Theme.xaml
+    theme: termTheme,
     linkHandler: { activate: link }, // OSC 8 hyperlinks
   });
   const fit = new FitAddon.FitAddon();
@@ -172,10 +174,20 @@ $('find-full').onclick = () => visible && post({ t: 'transcript', id: visible.id
 document.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
 document.addEventListener('drop', e => e.preventDefault());
 
+// The app theme's colors; the terminal's own (bg, fg) follow Claude Code's theme (TerminalHost.ThemeMessage).
+function applyTheme(m) {
+  const vars = { scheme: m.light ? 'light' : 'dark', bg: m.bg, field: m.field, panel: m.panel, border: m.border, text: m.text,
+    muted: m.muted, accent: m.accent, 'accent-fill': m.accentFill, hover: m.hover, 'on-accent': m.onAccent };
+  for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty('--' + k, v);
+  termTheme = { background: m.bg, foreground: m.fg, cursor: m.fg, selectionBackground: m.accentFill + '66' };
+  for (const t of tabs.values()) t.term.options.theme = termTheme;
+}
+
 host.addEventListener('message', e => {
   const m = JSON.parse(e.data);
   const tab = tabs.get(m.id);
   switch (m.t) {
+    case 'theme': applyTheme(m); break;
     case 'open': { // new tab, or Resume of an exited one: clean screen, then report the size the PTY should start with
       const t = tab ?? create(m.id);
       t.term.reset();

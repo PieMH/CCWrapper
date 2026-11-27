@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Tests](https://img.shields.io/badge/tests-609%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-628%20passing-brightgreen)
 
 Claude Code in a bare PowerShell window works, but it's clumsy. There's no search, you can't paste screenshots or files with Ctrl+V, you can't see your other sessions, and context, usage, file changes and subagents are hard to keep an eye on. If you also juggle **several Claude Code accounts** (work and personal, for example), it gets worse.
 
@@ -56,7 +56,8 @@ It stays light: a native WPF app (no Electron), Windows' own icon font, a dark s
   - **Account:** the name, email, organization, plan and IDs from the account's `.claude.json` (never `.credentials.json`), the config folder, the Claude Code version, and the other preferences that no page edits, read-only, with anything that looks like a key or token left out. Buttons open the config folder, and the account, usage and billing pages in your browser.
   - **CLAUDE.md:** edit the user, project and local `CLAUDE.md` files. **JSON** shows a whole file for anything else.
   - Changes wait for **Save**, which writes only the files you changed and keeps every key the window doesn't show. Open sessions pick settings up as soon as they are saved.
-  - **CCWrapper:** the app's own settings, saved in `%LOCALAPPDATA%\CCWrapper\app.json` (not a Claude Code file): the compact hint on or off, its threshold and its prompt, and whether Claude may use the Browser panel.
+  - **CCWrapper:** the app's own settings, saved in `%LOCALAPPDATA%\CCWrapper\app.json` (not a Claude Code file): the color theme, the compact hint on or off, its threshold and its prompt, and whether Claude may use the Browser panel.
+  - **Appearance:** five color themes: Default, Dark (black), High contrast (strong colors on black, yellow accent), Space (dark blue and yellow) and Sun (light). A theme applies when CCWrapper restarts; Save offers to restart the window. The terminal stays light or dark as Claude Code's own `/theme` is, since Claude Code paints it in that theme's colors.
 - **Plugins & connectors:** a window of its own for everything `/plugin` and `/mcp` do, without touching your open sessions.
   - **Plugins:** turn installed plugins on and off; see each one's skills, MCP servers, context cost and notes; update, configure or uninstall it. Plugins synced from your claude.ai account are listed too. The list scrolls with the mouse wheel.
   - **Discover and Marketplaces:** search the marketplaces' catalogs (**Show 60 more** pages through them, from the local copies, with no network) and install to the user, project or local scope; add, update and remove marketplaces.
@@ -189,7 +190,7 @@ CCWrapper is a viewer and a launcher. It doesn't touch your logins.
 - **It deletes a session's files only when you pick Delete on its right-click menu and confirm:** the transcript `projects\<folder>\<id>.jsonl` and its `<id>\` folder, for good. A session that is open anywhere is refused, and nothing outside those two paths is touched.
 - **It edits `.claude.json` only when you flip a server's folder switch** in Plugins & connectors, the one change there that no `claude` command makes. Like Claude Code itself, it takes the file's lock, reads the file as it is at that moment, changes that folder's list of servers turned off and writes it back; the previous version goes to the same backups folder.
 - **Check health** in Plugins & connectors runs `claude mcp list`, which connects to every MCP server (and starts the local ones) to see if it answers, as `/mcp` does.
-- **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images (deleted after 7 days), the browser profiles (a Browser cache over 100 MB is cleared at start; cookies stay until you clear them), settings backups, `app.json` (CCWrapper's own settings: your update choice, the compact hint and the browser choice), and the live status data described next.
+- **Otherwise it writes only to** `%LOCALAPPDATA%\CCWrapper`: pasted images (deleted after 7 days), the browser profiles (a Browser cache over 100 MB is cleared at start; cookies stay until you clear them), settings backups, `app.json` (CCWrapper's own settings: your update choice, the color theme, the compact hint and the browser choice), and the live status data described next.
 - **The status line:** if an account has no `statusLine` of its own, each session gets a tiny silent relay (`CCWrapper.StatusRelay.exe`) through `--settings`, which feeds the bottom bar. If you have your own status line, it's left alone.
 - **The Browser tool:** each session also gets that relay as a local MCP server (`ccwrapper-browser`, through `--mcp-config`), and a line in its system prompt (`--append-system-prompt`) to prefer it. The server talks only to its own CCWrapper window, through a local pipe that only your Windows user can open. Pages Claude opens load in the Browser panel's profile for the account (all tabs share it), with your logins, and Claude Code asks permission per tool as it does for any MCP tool. Its scripts and DevTools act with those logins, but DevTools refuses cookie access, downloads, local files, all simulated input (keyboard, mouse, touch and drag), the page history and scripts that persist across pages. Claude opens only http, https, blob, about:blank and data addresses, not local files, and its tools refuse to work on a page that is not a web address. The same holds for every tab. Turn it off in Settings → CCWrapper.
 - **Links it opens in your browser, on your click only:** the account, usage and billing pages (Settings → Account), a plugin's source (View source) and GitHub's bug form (Report a bug), whose address carries the three versions. The app sends nothing itself.
@@ -228,7 +229,7 @@ Every step is in the history: `git log --first-parent` shows the merge of each t
 - [xterm.js](https://xtermjs.org/) 6 (the VS Code terminal) in WebView2;
 - [Porta.Pty](https://www.nuget.org/packages/Porta.Pty) for ConPTY;
 - [DiffPlex](https://github.com/mmanela/diffplex) for diffs;
-- xUnit, with 609 tests on synthetic fixtures.
+- xUnit, with 628 tests on synthetic fixtures.
 
 ## Development
 
@@ -245,7 +246,7 @@ src/CCWrapper/             WPF app (Theme.xaml: colors and styles, App.xaml: Flu
   Terminal/                ConPTY session, WebView2 + xterm.js host, paste, hidden /usage, process helpers
   Views/                   picker, main window, tab bar, sidebar, panels, bottom bar, compose box
 src/CCWrapper.StatusRelay/ silent relay: the statusLine → %LOCALAPPDATA%\CCWrapper\live, and the Browser tool's MCP server (--browser)
-tests/CCWrapper.Tests/     xUnit tests (one builds every view with the theme loaded)
+tests/CCWrapper.Tests/     xUnit tests (one builds every view with a swapped theme loaded)
 docs/                      the screenshot
 scripts/pack.ps1           builds the Velopack installer (CI: .github/workflows; the bug form: .github/ISSUE_TEMPLATE)
 ```

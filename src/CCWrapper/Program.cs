@@ -11,6 +11,7 @@ public static class Program
         Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
         var app = new App();
         app.InitializeComponent();
+        Views.Themes.Apply(app, Views.Themes.Find(Core.AppPrefs.ReadTheme())); // before the first window: views read colors once
         app.Run();
     }
 }

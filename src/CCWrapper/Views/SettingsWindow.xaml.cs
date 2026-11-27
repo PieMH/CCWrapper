@@ -50,6 +50,7 @@ public partial class SettingsWindow : Window
     string? _jsonError, _envError, _appError; // typed text that does not parse: Save waits until it does
     CompactPrefs _app = CompactPrefs.Load(), _appSaved = CompactPrefs.Load(); // the CCWrapper page: app.json, not a settings file
     bool _browser = AppPrefs.ReadBrowserTool(), _browserSaved = AppPrefs.ReadBrowserTool();
+    string _theme = Themes.Find(AppPrefs.ReadTheme()).Id, _themeSaved = Themes.Find(AppPrefs.ReadTheme()).Id;
 
     public SettingsWindow(Account account, string? cwd)
     {
@@ -59,6 +60,7 @@ public partial class SettingsWindow : Window
         Title = $"Settings · {ShellModel.LetterOf(account.Letter)}";
         UserSub.Text = $"Every folder · ~\\{Path.GetFileName(account.ConfigRoot)}\\settings.json";
         EnvList.ItemsSource = _env;
+        BuildThemeChoices();
         _ready = true; // the XAML's IsChecked="True" raises Checked before the fields above exist
         Loaded += async (_, _) => await LoadAsync();
     }
@@ -656,6 +658,7 @@ public partial class SettingsWindow : Window
     void ShowApp()
     {
         _quiet = true;
+        foreach (var choice in ThemeChoices.Children.OfType<RadioButton>()) choice.IsChecked = (string)choice.Tag == _theme;
         BrowserOn.IsChecked = _browser;
         (CompactOn.IsChecked, CompactThreshold.Text, CompactPrompt.Text) = (_app.Enabled, _app.Threshold.ToString(), _app.Prompt);
         _quiet = false;
@@ -668,6 +671,48 @@ public partial class SettingsWindow : Window
         _appError = !int.TryParse(CompactThreshold.Text, out var threshold) || !CompactPrefs.ValidThreshold(threshold) ? "The threshold must be a whole number from 1 to 99."
             : CompactPrompt.Text.Trim().Length == 0 ? "The prompt can't be empty." : null;
         if (_appError is null) _app = new(CompactOn.IsChecked == true, threshold, CompactPrompt.Text.Trim());
+        _saved = false;
+        UpdateSaveBar();
+    }
+
+    /// <summary>A radio button per theme: a swatch of its background, panel, text and accent, and its name.</summary>
+    void BuildThemeChoices()
+    {
+        foreach (var theme in Themes.All)
+        {
+            var c = Themes.ColorsOf(theme);
+            Brush Br(string key) => new SolidColorBrush(Themes.ColorOf(c[key]));
+            var swatch = new Border
+            {
+                Width = 64, Height = 30, CornerRadius = new(5), BorderThickness = new(1), BorderBrush = Br("ControlLine"), Background = Br("Bg"),
+                Margin = new(0, 0, 8, 0), ClipToBounds = true,
+                Child = new DockPanel
+                {
+                    Children =
+                    {
+                        new Border { Width = 18, Background = Br("Panel") },
+                        new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = Br("Accent"), Margin = new(0, 0, 8, 0) },
+                        new TextBlock { Text = "Aa", Foreground = Br("Text"), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 0, 0) },
+                    },
+                },
+            };
+            DockPanel.SetDock(((DockPanel)swatch.Child).Children[0], Dock.Left);
+            DockPanel.SetDock(((DockPanel)swatch.Child).Children[1], Dock.Right);
+            var choice = new RadioButton
+            {
+                GroupName = "Theme", Tag = theme.Id, Margin = new(0, 0, 20, 8), VerticalContentAlignment = VerticalAlignment.Center,
+                Content = new StackPanel { Orientation = Orientation.Horizontal, Children = { swatch, new TextBlock { Text = theme.Name, VerticalAlignment = VerticalAlignment.Center } } },
+            };
+            AutomationPropertiesName(choice, theme.Name + " theme");
+            choice.Checked += OnThemeChosen;
+            ThemeChoices.Children.Add(choice);
+        }
+    }
+
+    void OnThemeChosen(object sender, RoutedEventArgs e)
+    {
+        if (!_ready || _quiet || sender is not RadioButton { Tag: string id }) return;
+        _theme = id;
         _saved = false;
         UpdateSaveBar();
     }
@@ -706,7 +751,7 @@ public partial class SettingsWindow : Window
     List<string> DirtyNames() =>
         _files.Values.Where(f => f.Dirty).Select(f => $"{f.Scope} settings")
             .Concat(_memory.Where(m => m.Value.Dirty).Select(m => m.Key == SettingsScope.Local ? "CLAUDE.local.md" : $"{m.Key} CLAUDE.md"))
-            .Concat(_app != _appSaved || _browser != _browserSaved ? new[] { "CCWrapper settings" } : [])
+            .Concat(_app != _appSaved || _browser != _browserSaved || _theme != _themeSaved ? new[] { "CCWrapper settings" } : [])
             .ToList();
 
     void UpdateSaveBar()
@@ -721,7 +766,15 @@ public partial class SettingsWindow : Window
             : ("No unsaved changes", B("SwitchOff"));
     }
 
-    void OnSave(object sender, RoutedEventArgs e) => SaveAll();
+    void OnSave(object sender, RoutedEventArgs e)
+    {
+        var themeBefore = _themeSaved;
+        if (!SaveAll() || _themeSaved == themeBefore || _themeSaved == Themes.Active.Id) return;
+        if (Dialog.Show(this, $"The {Themes.Find(_themeSaved).Name} theme applies when CCWrapper restarts. Restart this window now?\n\n" +
+                "Its sessions end and stay resumable. Other account windows switch at their next start.",
+                "Settings", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            (Owner as MainWindow)?.Restart("Restarting");
+    }
 
     bool SaveAll()
     {
@@ -738,6 +791,12 @@ public partial class SettingsWindow : Window
 
     IEnumerable<(string Path, string? Error)> SaveApp()
     {
+        if (_theme != _themeSaved)
+        {
+            var themeError = AppPrefs.WriteTheme(_theme);
+            if (themeError is null) _themeSaved = _theme;
+            yield return (AppPrefs.DefaultPath, themeError);
+        }
         if (_browser != _browserSaved)
         {
             var browserError = AppPrefs.WriteBrowserTool(_browser);
@@ -752,7 +811,7 @@ public partial class SettingsWindow : Window
 
     void OnRevert(object sender, RoutedEventArgs e)
     {
-        (_app, _browser) = (_appSaved, _browserSaved);
+        (_app, _browser, _theme) = (_appSaved, _browserSaved, _themeSaved);
         foreach (var f in _files.Values) f.Revert();
         foreach (var m in _memory.Values) m.Revert();
         _saved = false;

@@ -87,7 +87,7 @@
                                            HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <TextBlock Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="2" Text="{Binding Project}" Foreground="#AEB7C2" TextTrimming="CharacterEllipsis" Margin="8,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{Binding Project}" Foreground="{StaticResource TextDim}" TextTrimming="CharacterEllipsis" Margin="8,0" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="3" Text="{Binding Age}" Foreground="{StaticResource Muted}" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
                     </DataTemplate>

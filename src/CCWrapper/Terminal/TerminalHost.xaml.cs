@@ -26,10 +26,11 @@ public partial class TerminalHost : UserControl
     /// <summary>The exit overlay's Close button was clicked; the handler removes the session and calls <see cref="Close"/>.</summary>
     public event EventHandler<LiveSession>? CloseRequested;
 
+    object? _theme; // the page's colors, sent each time it says it is ready
+
     public TerminalHost()
     {
         InitializeComponent();
-        Web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(0x1e, 0x1e, 0x1e);
         Loaded += (_, _) => _ = Ready;
         Dispatcher.ShutdownStarted += (_, _) =>
         {
@@ -198,6 +199,10 @@ public partial class TerminalHost : UserControl
     async Task InitAsync()
     {
         var letter = AppState.Current?.Account.Letter ?? "smoke";
+        var account = AppState.Current?.Account;
+        var claudeLight = account is not null
+            && (await Task.Run(() => AccountReader.ClaudeTheme(account)))?.StartsWith("light", StringComparison.OrdinalIgnoreCase) == true;
+        _theme = ThemeMessage(claudeLight);
         var env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(ClaudeLaunch.AppDataDir, "WebView2", letter));
         await Web.EnsureCoreWebView2Async(env);
         var core = Web.CoreWebView2;
@@ -259,6 +264,7 @@ public partial class TerminalHost : UserControl
         switch (S("t"))
         {
             case "ready":
+                if (_theme is not null) Post(_theme); // before any tab opens
                 if (!_pageReady.TrySetResult()) RestoreTerminals(); // the page reloaded after a renderer crash
                 return;
             case "copy": SetClipboard(S("d")); return;
@@ -319,6 +325,21 @@ public partial class TerminalHost : UserControl
     void Post(object message)
     {
         if (!_browserGone) Web.CoreWebView2?.PostWebMessageAsString(JsonSerializer.Serialize(message));
+    }
+
+    /// <summary>The theme's colors for terminal.js, with the terminal's own from <see cref="Views.Themes.TerminalColors"/>;
+    /// also the WebView2's background until the page paints.</summary>
+    object ThemeMessage(bool claudeLight)
+    {
+        string Hex(string key) => Views.Themes.Hex(((System.Windows.Media.SolidColorBrush)FindResource(key)).Color);
+        var (bg, fg) = Views.Themes.TerminalColors(Hex("TerminalBg"), Hex("TerminalText"), claudeLight);
+        var c = Views.Themes.ColorOf(bg);
+        Web.DefaultBackgroundColor = System.Drawing.Color.FromArgb(c.R, c.G, c.B);
+        return new
+        {
+            t = "theme", light = Views.Themes.Luminance(c) > 0.5, bg, fg, field = Hex("Bg"), panel = Hex("Panel"), border = Hex("Line"),
+            text = Hex("Text"), muted = Hex("Muted"), accent = Hex("Accent"), accentFill = Hex("AccentFill"), hover = Hex("Hover"), onAccent = Hex("OnAccent"),
+        };
     }
 
     sealed class Tab(TerminalHost host, LiveSession session) : IScreenChannel

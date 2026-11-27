@@ -44,7 +44,7 @@
                                 <Style TargetType="TextBlock">
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsFolder}" Value="True">
-                                            <Setter Property="Foreground" Value="#AEB7C2" />
+                                            <Setter Property="Foreground" Value="{StaticResource TextDim}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

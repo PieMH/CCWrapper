@@ -31,6 +31,11 @@ public partial class MainWindow : Window, IAppCommands
     {
         _state = AppState.Current = new AppState(account, this); // before InitializeComponent: child views read it
         InitializeComponent();
+        var accent = ((SolidColorBrush)FindResource("Accent")).Color;
+        ResumeSweepBar.Fill = new LinearGradientBrush(new GradientStopCollection
+        {
+            new(Color.FromArgb(0, accent.R, accent.G, accent.B), 0), new(accent, 0.5), new(Color.FromArgb(0, accent.R, accent.G, accent.B), 1),
+        }, new Point(0, 0), new Point(1, 0));
         try { _browserPipe = new BrowserPipe(BrowserPipe.NameFor(Environment.ProcessId), new BrowserMcp(Browser, () => AppPrefs.ReadBrowserTool())); }
         catch (Exception) { } // the Browser tool is optional: without its pipe the tabs show the server as failed, the app runs
         var letter = ShellModel.LetterOf(account.Letter);
@@ -261,6 +266,14 @@ public partial class MainWindow : Window, IAppCommands
         var n = sessions.Count(s => s.Status is SessionStatus.Busy or SessionStatus.Waiting);
         return n == 0 || Dialog.Show(this, $"{what} ends {n} busy or waiting session(s); they stay resumable.\n\nContinue?",
             "CCWrapper", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    }
+
+    /// <summary>Restarts this window's process as its account (a new theme loads at start), after the busy-session confirm.</summary>
+    internal void Restart(string what)
+    {
+        if (!ConfirmEnd(what, _state.OpenSessions)) return;
+        _confirmedEnd = true; // the restart closes this window: do not ask again
+        App.RestartAsAccount(_state.Account);
     }
 
     protected override void OnClosing(CancelEventArgs e)

@@ -29,7 +29,16 @@ public static class AppPrefs
 
     public static string? WriteBrowserTool(bool on, string? path = null) => Write("browserTool", on, path);
 
-    static string? Write(string key, bool on, string? path)
+    /// <summary>The <c>theme</c> id (see <c>Themes</c>); null when never chosen or unreadable, which means Default.</summary>
+    public static string? ReadTheme(string? path = null)
+    {
+        try { return Load(path ?? DefaultPath)?["theme"] is JsonValue v && v.TryGetValue(out string? s) ? s : null; }
+        catch (Exception) { return null; }
+    }
+
+    public static string? WriteTheme(string id, string? path = null) => Write("theme", id, path);
+
+    static string? Write(string key, JsonNode value, string? path)
     {
         path ??= DefaultPath;
         try
@@ -37,7 +46,7 @@ public static class AppPrefs
             JsonObject o;
             try { o = Load(path) ?? []; }
             catch (Exception) { o = []; } // a broken file is replaced
-            o[key] = on;
+            o[key] = value;
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, o.ToJsonString());
             return null;

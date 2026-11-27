@@ -420,7 +420,17 @@
 
                 <!-- ============ CCWrapper: app.json, not settings.json ============ -->
                 <ScrollViewer x:Name="AppPage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
-                    <Border Style="{StaticResource Tile}" Padding="16,14" VerticalAlignment="Top">
+                    <StackPanel VerticalAlignment="Top">
+                    <Border Style="{StaticResource Tile}" Padding="16,14" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="Appearance" Style="{StaticResource SmallLabel}" Margin="0,0,0,2" />
+                            <TextBlock Style="{StaticResource Dim}" TextWrapping="Wrap" TextTrimming="None" Margin="0,0,0,10"
+                                       Text="The app's colors. A new theme applies when CCWrapper restarts: Save offers to restart this window, other windows switch at their next start. The terminal stays light or dark as Claude Code's own /theme is." />
+                            <!-- One radio button per theme, with a swatch of its colors (BuildThemeChoices) -->
+                            <WrapPanel x:Name="ThemeChoices" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Tile}" Padding="16,14">
                         <StackPanel>
                             <CheckBox x:Name="CompactOn" Content="Show compact hint" Checked="OnAppEdited" Unchecked="OnAppEdited" />
                             <TextBlock Style="{StaticResource Dim}" TextWrapping="Wrap" TextTrimming="None" Margin="0,2,0,12"
@@ -440,6 +450,7 @@
                                        Text="New sessions get the tool and are told to prefer it. Off also refuses calls from sessions already open." />
                         </StackPanel>
                     </Border>
+                    </StackPanel>
                 </ScrollViewer>
 
                 <!-- ============ JSON ============ -->
